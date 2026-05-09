@@ -1,0 +1,36 @@
+{
+  "name": "leadgen-ai",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest",
+    "@hookform/resolvers": "latest",
+    "@supabase/supabase-js": "latest",
+    "@tanstack/react-query": "latest",
+    "autoprefixer": "^10.5.0",
+    "axios": "latest",
+    "date-fns": "latest",
+    "lucide-react": "latest",
+    "next": "14.x",
+    "papaparse": "latest",
+    "react": "18.x",
+    "react-dom": "18.x",
+    "react-hook-form": "latest",
+    "react-hot-toast": "latest",
+    "recharts": "latest",
+    "tailwindcss": "3.x",
+    "typescript": "5.x",
+    "xlsx": "^0.18.5",
+    "zod": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "25.6.2",
+    "@types/react": "19.2.14"
+  }
+}
