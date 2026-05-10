@@ -1,5 +1,5 @@
 import React from 'react'
-import CampaignEditPage from '../../../../../../components/campaigns/CampaignEditPage'
+import CampaignEditPage from '../../../../../components/campaigns/CampaignEditPage'
 
 export default function EditCampaignRoute({ params }: { params: { id: string } }) {
   return (
