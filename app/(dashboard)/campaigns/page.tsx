@@ -1,9 +1,10 @@
 "use client"
 
-import React, { useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
+import { ChevronDown, Copy, Pause, Play, MoreVertical } from 'lucide-react'
 
 function statusStyles(status: string) {
   switch (status) {
@@ -22,6 +23,57 @@ export default function CampaignsPage() {
   const { data, isLoading, error } = useCampaigns()
   const qc = useQueryClient()
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    function onClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuFor(null)
+      }
+    }
+
+    document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [])
+
+  const campaignCopyPayload = useMemo(() => (campaign: any) => ({
+    name: `${campaign.name} (Copy)`,
+    organization_id: campaign.organization_id || null,
+    daily_limit: campaign.daily_limit ?? 50,
+    email_gap: campaign.email_gap ?? 10,
+    stop_on_reply: campaign.stop_on_reply ?? true,
+    open_tracking: campaign.open_tracking ?? false,
+    link_tracking: campaign.link_tracking ?? true,
+    campaign_schedule: {
+      schedules: [
+        {
+          name: 'Default Schedule',
+          timezone: campaign.timezone || 'Etc/GMT+12',
+          timing: {
+            from: campaign.from_time || '09:00',
+            to: campaign.to_time || '17:00'
+          },
+          days: {
+            monday: true,
+            tuesday: true,
+            wednesday: true,
+            thursday: true,
+            friday: true,
+            saturday: false,
+            sunday: false
+          }
+        }
+      ]
+    },
+    sequences: Array.isArray(campaign.sequences) && campaign.sequences.length
+      ? campaign.sequences.map((sequence: any, index: number) => ({
+          step_number: index + 1,
+          delay_days: index === 0 ? 0 : Number(sequence.delay_days || index),
+          subject_variable: sequence.subject_variable || `{{custom_subject_${index + 1}}}`,
+          body_variable: sequence.body_variable || `{{personalization_${index + 1}}}`
+        }))
+      : [{ step_number: 1, delay_days: 0, subject_variable: '{{custom_subject_1}}', body_variable: '{{personalization_1}}' }]
+  }), [])
 
   return (
     <div className="space-y-4">
@@ -58,7 +110,12 @@ export default function CampaignsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {data.map((campaign: any) => (
+                {data.map((campaign: any) => {
+                  const currentStatus = String(campaign.status || 'draft')
+                  const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
+                  const canPause = currentStatus === 'active'
+
+                  return (
                   <tr key={campaign.id} className="hover:bg-slate-50">
                     <td className="px-6 py-4 text-sm font-medium text-slate-900">{campaign.name}</td>
                     <td className="px-6 py-4 text-sm">
@@ -71,79 +128,86 @@ export default function CampaignsPage() {
                       {campaign.created_at ? new Date(campaign.created_at).toLocaleString() : '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-right relative">
-                      <button
-                        onClick={() => setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)}
-                        className="rounded bg-slate-100 px-3 py-1 text-sm"
-                      >
-                        Actions
-                      </button>
-                      {openMenuFor === campaign.id ? (
-                        <div className="absolute right-3 top-10 z-10 w-40 rounded border bg-white shadow">
-                          <button
-                            className="w-full text-left px-3 py-2 hover:bg-slate-50"
-                            onClick={async () => {
-                              try {
-                                const resp = await fetch(`/api/campaigns/${campaign.id}/activate`, { method: 'POST' })
-                                const json = await resp.json()
-                                if (!resp.ok || json.error) throw new Error(json.error || 'Activate failed')
-                                qc.invalidateQueries({ queryKey: ['campaigns'] })
-                                setOpenMenuFor(null)
-                              } catch (e) {
-                                alert(String(e))
-                              }
-                            }}
-                          >
-                            Activate / Resume
-                          </button>
-                          <button
-                            className="w-full text-left px-3 py-2 hover:bg-slate-50"
-                            onClick={async () => {
-                              try {
-                                const resp = await fetch(`/api/campaigns/${campaign.id}/pause`, { method: 'POST' })
-                                const json = await resp.json()
-                                if (!resp.ok || json.error) throw new Error(json.error || 'Pause failed')
-                                qc.invalidateQueries({ queryKey: ['campaigns'] })
-                                setOpenMenuFor(null)
-                              } catch (e) {
-                                alert(String(e))
-                              }
-                            }}
-                          >
-                            Pause
-                          </button>
-                          <button
-                            className="w-full text-left px-3 py-2 hover:bg-slate-50"
-                            onClick={async () => {
-                              try {
-                                const body = {
-                                  name: `Copy of ${campaign.name}`,
-                                  organization_id: campaign.organization_id || null,
-                                  daily_limit: campaign.daily_limit,
-                                  email_gap: campaign.email_gap,
-                                  stop_on_reply: campaign.stop_on_reply,
-                                  open_tracking: campaign.open_tracking,
-                                  link_tracking: campaign.link_tracking,
-                                  timezone: campaign.timezone,
-                                  from_time: campaign.from_time,
-                                  to_time: campaign.to_time
+                      <div ref={menuRef} className="relative inline-block text-left">
+                        <button
+                          onClick={() => setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                          aria-label="Open campaign actions"
+                        >
+                          <MoreVertical className="h-4 w-4" aria-hidden="true" />
+                        </button>
+
+                        {openMenuFor === campaign.id ? (
+                          <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                            {canActivate ? (
+                              <button
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                                onClick={async () => {
+                                  try {
+                                    const resp = await fetch(`/api/campaigns/${campaign.id}/activate`, { method: 'POST' })
+                                    const json = await resp.json()
+                                    if (!resp.ok || json.error) throw new Error(json.error || 'Activate failed')
+                                    qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                    setOpenMenuFor(null)
+                                  } catch (e) {
+                                    alert(String(e))
+                                  }
+                                }}
+                              >
+                                <Play className="h-4 w-4" />
+                                Activate / Resume
+                              </button>
+                            ) : null}
+
+                            {canPause ? (
+                              <button
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                                onClick={async () => {
+                                  try {
+                                    const resp = await fetch(`/api/campaigns/${campaign.id}/pause`, { method: 'POST' })
+                                    const json = await resp.json()
+                                    if (!resp.ok || json.error) throw new Error(json.error || 'Pause failed')
+                                    qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                    setOpenMenuFor(null)
+                                  } catch (e) {
+                                    alert(String(e))
+                                  }
+                                }}
+                              >
+                                <Pause className="h-4 w-4" />
+                                Pause
+                              </button>
+                            ) : null}
+
+                            <button
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onClick={async () => {
+                                try {
+                                  const body = campaignCopyPayload(campaign)
+                                  const resp = await fetch('/api/campaigns', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify(body)
+                                  })
+                                  const json = await resp.json()
+                                  if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
+                                  qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                  setOpenMenuFor(null)
+                                } catch (e) {
+                                  alert(String(e))
                                 }
-                                const resp = await fetch('/api/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-                                const json = await resp.json()
-                                if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
-                                qc.invalidateQueries({ queryKey: ['campaigns'] })
-                                setOpenMenuFor(null)
-                              } catch (e) {
-                                alert(String(e))
-                              }
-                            }}
-                          >
-                            Copy
-                          </button>
-                        </div>
-                      ) : null}
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                              Copy
+                            </button>
+                          </div>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
