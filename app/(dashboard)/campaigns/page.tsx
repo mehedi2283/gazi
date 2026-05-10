@@ -1,8 +1,9 @@
 "use client"
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import useCampaigns from '../../../hooks/useCampaigns'
+import { useQueryClient } from '@tanstack/react-query'
 
 function statusStyles(status: string) {
   switch (status) {
@@ -19,6 +20,8 @@ function statusStyles(status: string) {
 
 export default function CampaignsPage() {
   const { data, isLoading, error } = useCampaigns()
+  const qc = useQueryClient()
+  const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
 
   return (
     <div className="space-y-4">
@@ -66,6 +69,78 @@ export default function CampaignsPage() {
                     <td className="px-6 py-4 text-sm text-slate-600">{campaign.instantly_campaign_id || '-'}</td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {campaign.created_at ? new Date(campaign.created_at).toLocaleString() : '-'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-right relative">
+                      <button
+                        onClick={() => setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)}
+                        className="rounded bg-slate-100 px-3 py-1 text-sm"
+                      >
+                        Actions
+                      </button>
+                      {openMenuFor === campaign.id ? (
+                        <div className="absolute right-3 top-10 z-10 w-40 rounded border bg-white shadow">
+                          <button
+                            className="w-full text-left px-3 py-2 hover:bg-slate-50"
+                            onClick={async () => {
+                              try {
+                                const resp = await fetch(`/api/campaigns/${campaign.id}/activate`, { method: 'POST' })
+                                const json = await resp.json()
+                                if (!resp.ok || json.error) throw new Error(json.error || 'Activate failed')
+                                qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                setOpenMenuFor(null)
+                              } catch (e) {
+                                alert(String(e))
+                              }
+                            }}
+                          >
+                            Activate / Resume
+                          </button>
+                          <button
+                            className="w-full text-left px-3 py-2 hover:bg-slate-50"
+                            onClick={async () => {
+                              try {
+                                const resp = await fetch(`/api/campaigns/${campaign.id}/pause`, { method: 'POST' })
+                                const json = await resp.json()
+                                if (!resp.ok || json.error) throw new Error(json.error || 'Pause failed')
+                                qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                setOpenMenuFor(null)
+                              } catch (e) {
+                                alert(String(e))
+                              }
+                            }}
+                          >
+                            Pause
+                          </button>
+                          <button
+                            className="w-full text-left px-3 py-2 hover:bg-slate-50"
+                            onClick={async () => {
+                              try {
+                                const body = {
+                                  name: `Copy of ${campaign.name}`,
+                                  organization_id: campaign.organization_id || null,
+                                  daily_limit: campaign.daily_limit,
+                                  email_gap: campaign.email_gap,
+                                  stop_on_reply: campaign.stop_on_reply,
+                                  open_tracking: campaign.open_tracking,
+                                  link_tracking: campaign.link_tracking,
+                                  timezone: campaign.timezone,
+                                  from_time: campaign.from_time,
+                                  to_time: campaign.to_time
+                                }
+                                const resp = await fetch('/api/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                                const json = await resp.json()
+                                if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
+                                qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                setOpenMenuFor(null)
+                              } catch (e) {
+                                alert(String(e))
+                              }
+                            }}
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      ) : null}
                     </td>
                   </tr>
                 ))}
