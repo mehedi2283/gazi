@@ -14,6 +14,7 @@ type LocalCampaign = {
   stop_on_reply: boolean | null
   open_tracking: boolean | null
   link_tracking: boolean | null
+  sending_days: Record<string, boolean> | null
   timezone: string | null
   from_time: string | null
   to_time: string | null
@@ -133,6 +134,7 @@ function normalizeInstantlyCampaign(campaign: any) {
     stop_on_reply: campaign?.stop_on_reply ?? true,
     open_tracking: campaign?.open_tracking ?? true,
     link_tracking: campaign?.link_tracking ?? true,
+    sending_days: schedule?.days || { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false },
     timezone: normalizeTimezone(schedule?.timezone),
     from_time: timing?.from || '09:00',
     to_time: timing?.to || '17:00',
@@ -154,6 +156,7 @@ function mergeInstantlyCampaign(local: LocalCampaign, instantlyCampaign: any): L
     stop_on_reply: normalized.stop_on_reply,
     open_tracking: normalized.open_tracking,
     link_tracking: normalized.link_tracking,
+    sending_days: normalized.sending_days,
     timezone: normalized.timezone,
     from_time: normalized.from_time,
     to_time: normalized.to_time,
@@ -299,6 +302,7 @@ export async function POST(req: Request) {
     const stopOnReply = body.stop_on_reply ?? true
     const openTracking = body.open_tracking ?? false
     const linkTracking = body.link_tracking ?? true
+    const sendingDays = schedule.days || { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false }
     const timezone = normalizeTimezone(schedule.timezone)
     const fromTime = schedule.timing?.from || '09:00'
     const toTime = schedule.timing?.to || '17:00'
@@ -315,6 +319,7 @@ export async function POST(req: Request) {
       stop_on_reply: stopOnReply,
       open_tracking: openTracking,
       link_tracking: linkTracking,
+      sending_days: sendingDays,
       timezone,
       from_time: fromTime,
       to_time: toTime,
@@ -401,6 +406,7 @@ export async function POST(req: Request) {
         .from('campaigns')
         .update({
           instantly_campaign_id: instantlyCampaignId,
+          sending_days: sendingDays,
           updated_at: new Date().toISOString()
         })
         .eq('id', campaign.id)
@@ -439,6 +445,7 @@ export async function POST(req: Request) {
         .from('campaigns')
         .update({
           instantly_campaign_id: instantlyCampaignId,
+          sending_days: sendingDays,
           status: instantlyStatus,
           updated_at: new Date().toISOString()
         })

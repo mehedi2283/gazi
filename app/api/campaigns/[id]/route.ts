@@ -103,7 +103,16 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
   try {
     const { data, error } = await supabase.from('campaigns').select('*').eq('id', params.id).single()
     if (error) return NextResponse.json({ data: null, error: error.message })
-    return NextResponse.json({ data: normalizeCampaignRow(data), error: null })
+
+    const { data: sequences, error: sequenceError } = await supabase
+      .from('sequences')
+      .select('*')
+      .eq('campaign_id', params.id)
+      .order('step_number', { ascending: true })
+
+    if (sequenceError) return NextResponse.json({ data: null, error: sequenceError.message })
+
+    return NextResponse.json({ data: { ...normalizeCampaignRow(data), sequences: sequences || [] }, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }
@@ -129,20 +138,68 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     if (sequenceError) return NextResponse.json({ data: null, error: sequenceError.message })
 
-    const updatedCampaign = {
-      ...existingCampaign,
-      ...body,
-      campaign_schedule: body.campaign_schedule || existingCampaign?.campaign_schedule
+    const schedule = body.campaign_schedule?.schedules?.[0] || {}
+    const timezone = normalizeTimezone(schedule.timezone || existingCampaign?.timezone)
+    const fromTime = schedule.timing?.from || existingCampaign?.from_time || '09:00'
+    const toTime = schedule.timing?.to || existingCampaign?.to_time || '17:00'
+    const sendingDays = schedule.days || existingCampaign?.sending_days || { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false }
+    const sequenceSteps = Array.isArray(body.sequences) && body.sequences.length > 0 ? body.sequences : sequenceRows || []
+
+    const normalizedSequences = sequenceSteps.map((sequence: any, index: number) => ({
+      step_number: index + 1,
+      delay_days: index === 0 ? 0 : Number(sequence.delay_days ?? index),
+      subject_variable: sequence.subject_variable || `{{custom_subject_${index + 1}}}`,
+      body_variable: sequence.body_variable || `{{personalization_${index + 1}}}`,
+      subject: sequence.subject_variable || `{{custom_subject_${index + 1}}}`,
+      body: sequence.body_variable || `{{personalization_${index + 1}}}`
+    }))
+
+    const campaignUpdate = {
+      organization_id: body.organization_id || body.organizationId || existingCampaign?.organization_id || null,
+      name: body.name || existingCampaign?.name,
+      daily_limit: Number(body.daily_limit ?? existingCampaign?.daily_limit ?? 50),
+      email_gap: Number(body.email_gap ?? existingCampaign?.email_gap ?? 10),
+      stop_on_reply: body.stop_on_reply ?? existingCampaign?.stop_on_reply ?? true,
+      open_tracking: body.open_tracking ?? existingCampaign?.open_tracking ?? false,
+      link_tracking: body.link_tracking ?? existingCampaign?.link_tracking ?? true,
+      sending_days: sendingDays,
+      timezone,
+      from_time: fromTime,
+      to_time: toTime,
+      updated_at: new Date().toISOString()
     }
 
     if (existingCampaign?.instantly_campaign_id) {
-      const instantlyPayload = buildInstantlyPayload(updatedCampaign, sequenceRows || [])
+      const instantlyPayload = buildInstantlyPayload({
+        ...existingCampaign,
+        ...campaignUpdate,
+        campaign_schedule: body.campaign_schedule || existingCampaign?.campaign_schedule
+      }, normalizedSequences)
       await updateCampaign(existingCampaign.instantly_campaign_id, instantlyPayload)
     }
 
-    const { data, error } = await supabase.from('campaigns').update(body).eq('id', params.id).select()
+    const { error: deleteError } = await supabase.from('sequences').delete().eq('campaign_id', params.id)
+    if (deleteError) return NextResponse.json({ data: null, error: deleteError.message })
+
+    if (normalizedSequences.length > 0) {
+      const { error: insertError } = await supabase.from('sequences').insert(
+        normalizedSequences.map((sequence) => ({
+          campaign_id: params.id,
+          step_number: sequence.step_number,
+          delay_days: sequence.delay_days,
+          subject_variable: sequence.subject_variable,
+          body_variable: sequence.body_variable,
+          subject: sequence.subject,
+          body: sequence.body
+        }))
+      )
+
+      if (insertError) return NextResponse.json({ data: null, error: insertError.message })
+    }
+
+    const { data, error } = await supabase.from('campaigns').update(campaignUpdate).eq('id', params.id).select()
     if (error) return NextResponse.json({ data: null, error: error.message })
-    return NextResponse.json({ data: normalizeCampaignRow(data?.[0]), error: null })
+    return NextResponse.json({ data: { ...normalizeCampaignRow(data?.[0]), sequences: normalizedSequences }, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }
