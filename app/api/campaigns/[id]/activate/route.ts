@@ -2,6 +2,21 @@ import { NextResponse } from 'next/server'
 import { activateCampaign } from '../../../../../lib/instantly/client'
 import supabase from '../../../../../lib/supabase/server'
 
+function mapInstantlyStatus(status: unknown) {
+  const statuses: Record<string, string> = {
+    '-99': 'account_suspended',
+    '-1': 'accounts_unhealthy',
+    '-2': 'bounce_protect',
+    '0': 'draft',
+    '1': 'active',
+    '2': 'paused',
+    '3': 'completed',
+    '4': 'running_subsequences'
+  }
+
+  return statuses[String(status)] || 'active'
+}
+
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {
     const { data: campaign, error: campaignError } = await supabase.from('campaigns').select('instantly_campaign_id').eq('id', params.id).single()
@@ -13,7 +28,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (campaign?.instantly_campaign_id) {
       try {
         instantlyResp = await activateCampaign(campaign.instantly_campaign_id)
-        newStatus = instantlyResp?.data?.status || 'active'
+        newStatus = mapInstantlyStatus(instantlyResp?.data?.status)
       } catch (e: any) {
         await supabase.from('campaigns').update({ status: 'error' }).eq('id', params.id)
         return NextResponse.json({ data: null, error: e?.message || String(e) })

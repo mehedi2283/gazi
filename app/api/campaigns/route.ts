@@ -110,6 +110,15 @@ function mapInstantlyStatus(status: unknown) {
   return statuses[String(status)] || 'draft'
 }
 
+function normalizeCampaignStatus(status: unknown) {
+  const value = String(status || 'draft')
+  if (['draft', 'active', 'paused', 'completed', 'error', 'account_suspended', 'accounts_unhealthy', 'bounce_protect', 'running_subsequences'].includes(value)) {
+    return value
+  }
+
+  return mapInstantlyStatus(status)
+}
+
 function normalizeInstantlyCampaign(campaign: any) {
   const schedule = campaign?.campaign_schedule?.schedules?.[0] || {}
   const timing = schedule?.timing || {}
@@ -138,7 +147,7 @@ function mergeInstantlyCampaign(local: LocalCampaign, instantlyCampaign: any): L
   return {
     ...local,
     name: normalized.name,
-    status: normalized.status,
+    status: normalizeCampaignStatus(normalized.status),
     instantly_campaign_id: normalized.instantly_campaign_id,
     daily_limit: normalized.daily_limit,
     email_gap: normalized.email_gap,
@@ -249,7 +258,13 @@ export async function GET() {
       return NextResponse.json({ data: [...mergedInstantlyCampaigns, ...localOnlyCampaigns], error: null })
     }
 
-    return NextResponse.json({ data: localCampaigns, error: null })
+    return NextResponse.json({
+      data: localCampaigns.map((campaign) => ({
+        ...campaign,
+        status: normalizeCampaignStatus(campaign.status)
+      })),
+      error: null
+    })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }

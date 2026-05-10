@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
@@ -23,11 +23,10 @@ export default function CampaignsPage() {
   const { data, isLoading, error } = useCampaigns()
   const qc = useQueryClient()
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement | null>(null)
-
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      const target = event.target as HTMLElement | null
+      if (target && !target.closest('[data-campaign-actions]')) {
         setOpenMenuFor(null)
       }
     }
@@ -128,9 +127,13 @@ export default function CampaignsPage() {
                       {campaign.created_at ? new Date(campaign.created_at).toLocaleString() : '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-right relative">
-                      <div ref={menuRef} className="relative inline-block text-left">
+                      <div className="relative inline-block text-left" data-campaign-actions>
                         <button
-                          onClick={() => setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)}
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)
+                          }}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           aria-label="Open campaign actions"
                         >
@@ -141,6 +144,7 @@ export default function CampaignsPage() {
                           <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
                             {canActivate ? (
                               <button
+                                type="button"
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
                                 onClick={async () => {
                                   try {
@@ -161,6 +165,7 @@ export default function CampaignsPage() {
 
                             {canPause ? (
                               <button
+                                type="button"
                                 className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
                                 onClick={async () => {
                                   try {
@@ -180,6 +185,7 @@ export default function CampaignsPage() {
                             ) : null}
 
                             <button
+                              type="button"
                               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
                               onClick={async () => {
                                 try {
