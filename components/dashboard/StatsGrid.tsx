@@ -5,6 +5,7 @@ import useStats from '../../hooks/useStats'
 type StatsGridProps = {
   initialData?: {
     totalLeads: number
+      activeLeads?: number
     activeCampaigns: number
     replyRate: string
     openRate: string
@@ -22,13 +23,13 @@ export default function StatsGrid({ initialData }: StatsGridProps) {
   ))}</div>
   if (error) return <div className="text-red-600">Error loading stats</div>
 
-  const stats = data || { totalLeads: 0, activeCampaigns: 0, replyRate: '0%', openRate: '0%' }
+  const stats = data || { totalLeads: 0, activeLeads: 0, activeCampaigns: 0, replyRate: '0%', openRate: '0%' }
 
   const cards = [
     { label: 'Total Leads', value: stats.totalLeads },
+    { label: 'Active Leads', value: stats.activeLeads },
     { label: 'Active Campaigns', value: stats.activeCampaigns },
-    { label: 'Reply Rate', value: stats.replyRate },
-    { label: 'Open Rate', value: stats.openRate }
+    { label: 'Reply Rate', value: stats.replyRate }
   ]
 
   return (

@@ -23,6 +23,7 @@ export async function GET() {
     const stats = statsRes.data || []
 
     const totalLeads = leads.length
+    const activeLeads = leads.filter((lead) => lead.status === 'active').length
     const activeCampaigns = campaigns.filter((campaign) => campaign.status === 'active').length
     const totalOpens = leads.reduce((sum, lead) => sum + (lead.email_open_count || 0), 0)
     const totalReplies = leads.reduce((sum, lead) => sum + (lead.email_reply_count || 0), 0)
@@ -60,6 +61,7 @@ export async function GET() {
     return NextResponse.json({
       data: {
         totalLeads,
+        activeLeads,
         activeCampaigns,
         replyRate,
         openRate,
