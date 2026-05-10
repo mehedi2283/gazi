@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, Copy, Pause, Play, MoreVertical } from 'lucide-react'
+import { Copy, Pause, Play, MoreVertical, RefreshCw } from 'lucide-react'
 
 function statusStyles(status: string) {
   switch (status) {
@@ -113,6 +113,7 @@ export default function CampaignsPage() {
                   const currentStatus = String(campaign.status || 'draft')
                   const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
                   const canPause = currentStatus === 'active'
+                  const canPatch = Boolean(campaign.instantly_campaign_id)
 
                   return (
                   <tr key={campaign.id} className="hover:bg-slate-50">
@@ -182,6 +183,31 @@ export default function CampaignsPage() {
                                 <Pause className="h-4 w-4" />
                                 Pause
                               </button>
+                            ) : null}
+
+                            {canPatch ? (
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onClick={async () => {
+                                try {
+                                  const resp = await fetch(`/api/campaigns/${campaign.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ updated_at: new Date().toISOString() })
+                                  })
+                                  const json = await resp.json()
+                                  if (!resp.ok || json.error) throw new Error(json.error || 'Patch failed')
+                                  qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                  setOpenMenuFor(null)
+                                } catch (e) {
+                                  alert(String(e))
+                                }
+                              }}
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                              Patch Campaign
+                            </button>
                             ) : null}
 
                             <button
