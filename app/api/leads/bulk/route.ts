@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
-import { addLeadsBulk } from '../../../../lib/instantly/client'
+import { mapLeadsForWebhook, sendLeadsToWebhook } from '../../../../lib/webhook/leads'
 
 export async function POST(req: Request) {
   try {
@@ -32,14 +32,52 @@ export async function POST(req: Request) {
     const { data, error } = await supabase.from('leads').insert(sanitized).select()
     if (error) return NextResponse.json({ data: null, error })
 
-    // push to Instantly in background
-    try {
-      await addLeadsBulk(sanitized)
-    } catch (e) {
-      // ignore here
+    const savedLeads = data || sanitized
+    const localCampaignIds = Array.from(new Set(
+      savedLeads
+        .map((lead: any) => (lead?.campaign_id ? String(lead.campaign_id) : null))
+        .filter(Boolean)
+    )) as string[]
+    const campaignMetaByLocalId = new Map<string, { instantly_campaign_id: string | null, sequence_count: number }>()
+
+    if (localCampaignIds.length > 0) {
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id, instantly_campaign_id')
+        .in('id', localCampaignIds)
+
+      const { data: sequences } = await supabase
+        .from('sequences')
+        .select('campaign_id')
+        .in('campaign_id', localCampaignIds)
+
+      const sequenceCountByCampaignId = new Map<string, number>()
+      for (const sequence of sequences || []) {
+        const campaignId = String(sequence.campaign_id)
+        sequenceCountByCampaignId.set(campaignId, (sequenceCountByCampaignId.get(campaignId) || 0) + 1)
+      }
+
+      for (const campaign of campaigns || []) {
+        if (campaign?.id) {
+          const campaignId = String(campaign.id)
+          campaignMetaByLocalId.set(campaignId, {
+            instantly_campaign_id: campaign?.instantly_campaign_id ? String(campaign.instantly_campaign_id) : null,
+            sequence_count: sequenceCountByCampaignId.get(campaignId) || 0
+          })
+        }
+      }
     }
 
-    return NextResponse.json({ data, error: null })
+    const webhookPayload = mapLeadsForWebhook(savedLeads, campaignMetaByLocalId)
+
+    let webhookError: string | null = null
+    try {
+      await sendLeadsToWebhook(webhookPayload)
+    } catch (e) {
+      webhookError = e instanceof Error ? e.message : String(e)
+    }
+
+    return NextResponse.json({ data: savedLeads, error: null, webhookError })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }

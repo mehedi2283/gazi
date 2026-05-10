@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import supabase from '../../../../../../lib/supabase/server'
+import supabase from '../../../../../lib/supabase/server'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
@@ -13,7 +13,10 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     if (leadsRes.error) return NextResponse.json({ data: null, error: leadsRes.error.message })
     if (statsRes.error) return NextResponse.json({ data: null, error: statsRes.error.message })
 
-    const leads = leadsRes.data || []
+    const leads = (leadsRes.data || []) as Array<{
+      email_open_count: number | null
+      email_reply_count: number | null
+    }>
     const stats = statsRes.data || []
 
     const totalLeads = leads.length

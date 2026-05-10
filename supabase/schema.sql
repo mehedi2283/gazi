@@ -21,15 +21,21 @@ create table if not exists profiles (
 create table if not exists campaigns (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid references organizations(id) on delete cascade,
+  created_by uuid references auth.users(id),
   name text not null,
   status text default 'draft',
   instantly_campaign_id text,
+  total_leads int default 0,
+  emails_sent int default 0,
+  open_count int default 0,
+  reply_count int default 0,
+  bounce_count int default 0,
   daily_limit int default 50,
   email_gap int default 10,
   stop_on_reply boolean default true,
-  open_tracking boolean default true,
+  open_tracking boolean default false,
   link_tracking boolean default true,
-  timezone text default 'Etc/GMT',
+  timezone text default 'Etc/GMT+12',
   from_time text default '09:00',
   to_time text default '17:00',
   created_at timestamptz default now(),
@@ -40,11 +46,18 @@ create table if not exists sequences (
   id uuid primary key default gen_random_uuid(),
   campaign_id uuid references campaigns(id) on delete cascade,
   step_number int not null,
+  subject_variable text,
+  body_variable text,
   subject text,
   body text,
   delay_days int default 0,
   created_at timestamptz default now()
 );
+
+alter table sequences add column if not exists subject_variable text;
+alter table sequences add column if not exists body_variable text;
+update sequences set subject_variable = subject where subject_variable is null and subject is not null;
+update sequences set body_variable = body where body_variable is null and body is not null;
 
 create table if not exists leads (
   id uuid primary key default gen_random_uuid(),

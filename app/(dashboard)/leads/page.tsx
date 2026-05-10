@@ -4,7 +4,9 @@ import React, { useMemo, useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
+import { Plus, Upload, UserPlus, X } from 'lucide-react'
 import useCampaigns from '../../../hooks/useCampaigns'
+import useLeads from '../../../hooks/useLeads'
 
 type LeadRow = {
   email?: string
@@ -24,39 +26,84 @@ type LeadRow = {
   title?: string
 }
 
+type AddMode = 'import' | 'manual'
+
 function normalizeRows(rows: any[]): LeadRow[] {
+  function normalizeKeys(obj: any) {
+    const out: Record<string, any> = {}
+    Object.keys(obj || {}).forEach((k) => {
+      const nk = String(k || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^\w_]/g, '')
+      out[nk] = obj[k]
+    })
+    return out
+  }
+
+  function findByKeys(obj: any, keys: string[], substrFallback?: string) {
+    for (const k of keys) {
+      if (obj[k] != null && obj[k] !== '') return obj[k]
+    }
+    if (substrFallback) {
+      const found = Object.keys(obj).find((kk) => kk.includes(substrFallback))
+      if (found) return obj[found]
+    }
+    return undefined
+  }
+
   return rows
-    .map((row) => ({
-      email: row.email || row.Email || row.E-mail,
-      first_name: row.first_name || row.firstName || row.first,
-      last_name: row.last_name || row.lastName || row.last,
-      company_name: row.company_name || row.company || row.Company,
-      company_domain: row.company_domain || row.domain,
-      website: row.website,
-      linkedin_url: row.linkedin_url || row.linkedin,
-      city: row.city,
-      state: row.state,
-      country: row.country,
-      industry: row.industry,
-      employees: row.employees || row.employee_count,
-      annual_revenue: row.annual_revenue || row.revenue,
-      phone: row.phone,
-      title: row.title
-    }))
+    .map((row) => {
+      const nr = normalizeKeys(row)
+      return {
+        email: findByKeys(nr, ['email', 'e_mail', 'e-mail'], 'email'),
+        first_name: findByKeys(nr, ['first_name', 'firstname', 'first'], 'first'),
+        last_name: findByKeys(nr, ['last_name', 'lastname', 'last'], 'last'),
+        company_name: findByKeys(nr, ['company_name', 'company', 'companyname'], 'company'),
+        company_domain: findByKeys(nr, ['company_domain', 'domain', 'companydomain'], 'domain'),
+        website: findByKeys(nr, ['website', 'url', 'site'], 'web'),
+        linkedin_url: findByKeys(nr, ['linkedin_url', 'linkedin', 'person_linkedin_url', 'company_linkedin_url'], 'linkedin'),
+        city: findByKeys(nr, ['city'], 'city'),
+        state: findByKeys(nr, ['state'], 'state'),
+        country: findByKeys(nr, ['country'], 'country'),
+        industry: findByKeys(nr, ['industry'], 'industry'),
+        employees: findByKeys(nr, ['employees', 'employee_count', 'number_of_employees'], 'employee'),
+        annual_revenue: findByKeys(nr, ['annual_revenue', 'revenue'], 'revenue'),
+        phone: findByKeys(nr, ['phone', 'phone_number', 'telephone'], 'phone'),
+        title: findByKeys(nr, ['title', 'role', 'position'], 'title')
+      }
+    })
     .filter((row) => Boolean(row.email))
+}
+
+function formatName(lead: any) {
+  return [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '-'
+}
+
+function formatDate(value?: string) {
+  return value ? new Date(value).toLocaleString() : '-'
 }
 
 export default function LeadsPage() {
   const { data: campaigns, isLoading: campaignsLoading } = useCampaigns()
+  const { data: leads, isLoading: leadsLoading, error: leadsError, refetch, add } = useLeads()
+  const [addOpen, setAddOpen] = useState(false)
+  const [addMode, setAddMode] = useState<AddMode>('import')
   const [selectedCampaignId, setSelectedCampaignId] = useState('')
   const [rows, setRows] = useState<LeadRow[]>([])
   const [fileName, setFileName] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [manualSubmitting, setManualSubmitting] = useState(false)
 
   const selectedCampaign = useMemo(
     () => campaigns?.find((campaign: any) => campaign.id === selectedCampaignId),
     [campaigns, selectedCampaignId]
   )
+
+  const campaignNameById = useMemo(() => {
+    return new Map<string, string>((campaigns || []).map((campaign: any) => [String(campaign.id), String(campaign.name)]))
+  }, [campaigns])
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -70,8 +117,9 @@ export default function LeadsPage() {
       if (extension === 'csv' || extension === 'txt') {
         const text = await file.text()
         const parsed = Papa.parse(text, { header: true, skipEmptyLines: true })
-        setRows(normalizeRows((parsed.data as any[]) || []))
-        toast.success(`Loaded ${((parsed.data as any[]) || []).length} rows from CSV`)
+        const normalized = normalizeRows((parsed.data as any[]) || [])
+        setRows(normalized)
+        toast.success(`Loaded ${normalized.length} leads from CSV`)
         return
       }
 
@@ -81,8 +129,9 @@ export default function LeadsPage() {
         const firstSheet = workbook.SheetNames[0]
         const sheet = workbook.Sheets[firstSheet]
         const json = XLSX.utils.sheet_to_json(sheet)
-        setRows(normalizeRows(json))
-        toast.success(`Loaded ${json.length} rows from spreadsheet`)
+        const normalized = normalizeRows(json)
+        setRows(normalized)
+        toast.success(`Loaded ${normalized.length} leads from spreadsheet`)
         return
       }
 
@@ -123,6 +172,7 @@ export default function LeadsPage() {
       toast.success(`Imported ${json.data?.length || rows.length} leads into campaign`)
       setRows([])
       setFileName('')
+      await refetch()
     } catch (error: any) {
       toast.error(error?.message || 'Unable to import leads')
     } finally {
@@ -130,107 +180,295 @@ export default function LeadsPage() {
     }
   }
 
+  async function handleManualSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+
+    if (!selectedCampaignId) {
+      toast.error('Select a campaign first')
+      return
+    }
+
+    const formData = new FormData(form)
+    const email = String(formData.get('email') || '').trim()
+
+    if (!email) {
+      toast.error('Email is required')
+      return
+    }
+
+    setManualSubmitting(true)
+    try {
+      const response = await add.mutateAsync({
+        organization_id: selectedCampaign?.organization_id || null,
+        campaign_id: selectedCampaignId,
+        email,
+        first_name: String(formData.get('first_name') || '').trim() || null,
+        last_name: String(formData.get('last_name') || '').trim() || null,
+        title: String(formData.get('title') || '').trim() || null,
+        company_name: String(formData.get('company_name') || '').trim() || null,
+        company_domain: String(formData.get('company_domain') || '').trim() || null,
+        phone: String(formData.get('phone') || '').trim() || null,
+        linkedin_url: String(formData.get('linkedin_url') || '').trim() || null,
+        source: 'manual'
+      })
+      toast.success('Lead added')
+      if (response?.data?.webhookError) {
+        toast.error(`Webhook failed: ${response.data.webhookError}`)
+      }
+      form.reset()
+      setAddOpen(false)
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error?.message || error?.response?.data?.error || error?.message || 'Unable to add lead')
+    } finally {
+      setManualSubmitting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Leads</h1>
-        <p className="text-slate-600">Upload CSV or spreadsheet leads, select a campaign, and import them into that campaign.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold">Leads</h1>
+          <p className="text-slate-600">View imported leads and add new leads manually or from a spreadsheet.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setAddOpen((open) => !open)}
+          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white"
+        >
+          {addOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Plus className="h-4 w-4" aria-hidden="true" />}
+          {addOpen ? 'Close' : 'Add Lead'}
+        </button>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="space-y-4 rounded-xl bg-white p-6 shadow">
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Select Campaign</span>
-              <select
-                value={selectedCampaignId}
-                onChange={(e) => setSelectedCampaignId(e.target.value)}
-                className="w-full rounded-lg border px-3 py-2"
-                disabled={campaignsLoading}
+      {addOpen ? (
+        <div className="space-y-5 rounded-lg bg-white p-6 shadow">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold">Add Lead</h2>
+            <div className="inline-flex rounded-lg border bg-slate-50 p-1">
+              <button
+                type="button"
+                onClick={() => setAddMode('import')}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${addMode === 'import' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'}`}
               >
-                <option value="">Choose a campaign</option>
-                {(campaigns || []).map((campaign: any) => (
-                  <option key={campaign.id} value={campaign.id}>
-                    {campaign.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Upload CSV or Spreadsheet</span>
-              <input
-                type="file"
-                accept=".csv,.txt,.xlsx,.xls"
-                onChange={handleFileChange}
-                className="w-full rounded-lg border px-3 py-2"
-              />
-            </label>
+                <Upload className="h-4 w-4" aria-hidden="true" />
+                Import
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode('manual')}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${addMode === 'manual' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'}`}
+              >
+                <UserPlus className="h-4 w-4" aria-hidden="true" />
+                Manual
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center justify-between rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            <span>{fileName ? `Loaded file: ${fileName}` : 'No file loaded yet'}</span>
-            <span>{rows.length} leads ready</span>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={handleImport}
-              disabled={uploading || !rows.length || !selectedCampaignId}
-              className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
+          <label className="space-y-2 block">
+            <span className="text-sm font-medium">Campaign</span>
+            <select
+              value={selectedCampaignId}
+              onChange={(e) => setSelectedCampaignId(e.target.value)}
+              className="w-full rounded-lg border px-3 py-2"
+              disabled={campaignsLoading}
             >
-              {uploading ? 'Importing...' : 'Import Leads to Campaign'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setRows([])
-                setFileName('')
-              }}
-              className="rounded-lg border px-4 py-2 font-medium text-slate-700"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
+              <option value="">Choose a campaign</option>
+              {(campaigns || []).map((campaign: any) => (
+                <option key={campaign.id} value={campaign.id}>
+                  {campaign.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-        <div className="rounded-xl bg-white p-6 shadow">
-          <h2 className="text-lg font-semibold">Import Preview</h2>
-          <p className="mb-4 text-sm text-slate-500">First few rows from your upload.</p>
+          {addMode === 'import' ? (
+            <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+              <div className="space-y-4">
+                <label className="space-y-2 block">
+                  <span className="text-sm font-medium">Upload CSV or Spreadsheet</span>
+                  <input
+                    type="file"
+                    accept=".csv,.txt,.xlsx,.xls"
+                    onChange={handleFileChange}
+                    className="w-full rounded-lg border px-3 py-2"
+                  />
+                </label>
 
-          {rows.length ? (
-            <div className="max-h-[420px] overflow-auto rounded-lg border">
-              <table className="min-w-full text-left text-sm">
-                <thead className="sticky top-0 bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-2">Email</th>
-                    <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">Company</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.slice(0, 8).map((row, index) => (
-                    <tr key={`${row.email}-${index}`} className="border-t">
-                      <td className="px-3 py-2">{row.email}</td>
-                      <td className="px-3 py-2">{[row.first_name, row.last_name].filter(Boolean).join(' ') || '-'}</td>
-                      <td className="px-3 py-2">{row.company_name || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                <div className="flex items-center justify-between rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                  <span>{fileName ? `Loaded file: ${fileName}` : 'No file loaded yet'}</span>
+                  <span>{rows.length} leads ready</span>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleImport}
+                    disabled={uploading || !rows.length || !selectedCampaignId}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
+                  >
+                    {uploading ? 'Importing...' : 'Import Leads'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRows([])
+                      setFileName('')
+                    }}
+                    className="rounded-lg border px-4 py-2 font-medium text-slate-700"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-base font-semibold">Import Preview</h3>
+                <p className="mb-3 text-sm text-slate-500">First few rows from your upload.</p>
+
+                {rows.length ? (
+                  <div className="max-h-[320px] overflow-auto rounded-lg border">
+                    <table className="min-w-full text-left text-sm">
+                      <thead className="sticky top-0 bg-slate-50">
+                        <tr>
+                          <th className="px-3 py-2">Email</th>
+                          <th className="px-3 py-2">Name</th>
+                          <th className="px-3 py-2">Company</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.slice(0, 8).map((row, index) => (
+                          <tr key={`${row.email}-${index}`} className="border-t">
+                            <td className="px-3 py-2">{row.email}</td>
+                            <td className="px-3 py-2">{[row.first_name, row.last_name].filter(Boolean).join(' ') || '-'}</td>
+                            <td className="px-3 py-2">{row.company_name || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">
+                    Upload a CSV or spreadsheet to preview leads before importing.
+                  </div>
+                )}
+              </div>
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">
-              Upload a CSV or spreadsheet to preview leads before importing.
-            </div>
+            <form onSubmit={handleManualSubmit} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Email</span>
+                  <input name="email" type="email" required className="w-full rounded-lg border px-3 py-2" placeholder="lead@example.com" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">First Name</span>
+                  <input name="first_name" className="w-full rounded-lg border px-3 py-2" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Last Name</span>
+                  <input name="last_name" className="w-full rounded-lg border px-3 py-2" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Title</span>
+                  <input name="title" className="w-full rounded-lg border px-3 py-2" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Company</span>
+                  <input name="company_name" className="w-full rounded-lg border px-3 py-2" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Company Domain</span>
+                  <input name="company_domain" className="w-full rounded-lg border px-3 py-2" placeholder="example.com" />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Phone</span>
+                  <input name="phone" className="w-full rounded-lg border px-3 py-2" />
+                </label>
+                <label className="space-y-2 md:col-span-2">
+                  <span className="text-sm font-medium">LinkedIn URL</span>
+                  <input name="linkedin_url" className="w-full rounded-lg border px-3 py-2" />
+                </label>
+              </div>
+
+              <button
+                type="submit"
+                disabled={manualSubmitting || !selectedCampaignId}
+                className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
+              >
+                {manualSubmitting ? 'Adding...' : 'Add Lead'}
+              </button>
+            </form>
           )}
         </div>
-      </div>
+      ) : null}
 
-      <div className="rounded-xl bg-white p-4 shadow">
-        <h2 className="text-lg font-semibold">Imported Leads</h2>
-        <p className="text-sm text-slate-500">This table will show leads after they are imported to Supabase.</p>
+      <div className="rounded-lg bg-white shadow">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4">
+          <div>
+            <h2 className="text-lg font-semibold">Leads</h2>
+            <p className="text-sm text-slate-500">{leads?.length || 0} leads in Supabase</p>
+          </div>
+        </div>
+
+        {leadsLoading ? (
+          <div className="space-y-3 p-4">
+            {Array.from({ length: 5 }).map((_, index) => (
+              <div key={index} className="h-12 animate-pulse rounded-lg bg-slate-100" />
+            ))}
+          </div>
+        ) : leadsError ? (
+          <div className="p-6 text-sm text-red-600">Failed to load leads.</div>
+        ) : leads?.length ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Email</th>
+                  <th className="px-4 py-3">Name</th>
+                  <th className="px-4 py-3">Company</th>
+                  <th className="px-4 py-3">Title</th>
+                  <th className="px-4 py-3">Campaign</th>
+                  <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Source</th>
+                  <th className="px-4 py-3">Created</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {leads.map((lead: any) => (
+                  <tr key={lead.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-900">{lead.email}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatName(lead)}</td>
+                    <td className="px-4 py-3 text-slate-700">{lead.company_name || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700">{lead.title || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700">{campaignNameById.get(lead.campaign_id) || '-'}</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                        {lead.status || 'new'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{lead.source || '-'}</td>
+                    <td className="px-4 py-3 text-slate-700">{formatDate(lead.created_at)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+            <div className="text-lg font-semibold text-slate-900">No leads yet</div>
+            <p className="max-w-md text-sm text-slate-500">Add leads manually or import a CSV/spreadsheet to populate this table.</p>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add Lead
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

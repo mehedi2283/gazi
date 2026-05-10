@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { pauseCampaign } from '../../../../../../lib/instantly/client'
-import supabase from '../../../../../../lib/supabase/server'
+import { pauseCampaign } from '../../../../../lib/instantly/client'
+import supabase from '../../../../../lib/supabase/server'
 
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   try {

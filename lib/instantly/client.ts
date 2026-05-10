@@ -2,6 +2,15 @@ import axios from 'axios'
 
 const BASE = 'https://api.instantly.ai/api/v2'
 
+type ListCampaignsParams = {
+  limit?: number
+  starting_after?: string
+  search?: string
+  tag_ids?: string
+  ai_sales_agent_id?: string
+  status?: number
+}
+
 function getAuthHeaders() {
   const key = process.env.INSTANTLY_API_KEY
   return { Authorization: `Bearer ${key}` }
@@ -40,6 +49,45 @@ export async function createCampaign(data: any) {
   }
 }
 
+export async function updateCampaign(id: string, data: any) {
+  try {
+    return await retryRequest(() => axios.patch(`${BASE}/campaigns/${id}`, data, { headers: getAuthHeaders() }))
+  } catch (err: any) {
+    throw getAxiosError(err)
+  }
+}
+
+export async function listCampaigns(params: ListCampaignsParams = {}) {
+  try {
+    return await retryRequest(() => axios.get(`${BASE}/campaigns`, {
+      headers: getAuthHeaders(),
+      params
+    }))
+  } catch (err: any) {
+    throw getAxiosError(err)
+  }
+}
+
+export async function listAllCampaigns(params: Omit<ListCampaignsParams, 'starting_after'> = {}) {
+  const campaigns: any[] = []
+  let startingAfter: string | undefined
+  let page = 0
+
+  do {
+    const response = await listCampaigns({
+      ...params,
+      limit: params.limit || 100,
+      starting_after: startingAfter
+    })
+    const items = Array.isArray(response.data?.items) ? response.data.items : []
+    campaigns.push(...items)
+    startingAfter = response.data?.next_starting_after || undefined
+    page += 1
+  } while (startingAfter && page < 20)
+
+  return campaigns
+}
+
 export async function activateCampaign(id: string) {
   try {
     return await retryRequest(() => axios.post(`${BASE}/campaigns/${id}/activate`, {}, { headers: getAuthHeaders() }))
@@ -60,15 +108,4 @@ export async function getCampaignAnalytics(id: string) {
   return axios.get(`${BASE}/campaigns/${id}/analytics/overview/summary`, { headers: getAuthHeaders() })
 }
 
-export async function addLead(data: any) {
-  return axios.post(`${BASE}/leads`, data, { headers: getAuthHeaders() })
-}
-
-export async function addLeadsBulk(leads: any[]) {
-  for (const lead of leads) {
-    await addLead(lead)
-    await new Promise((r) => setTimeout(r, 500))
-  }
-}
-
-export default { createCampaign, activateCampaign, pauseCampaign, getCampaignAnalytics, addLead, addLeadsBulk }
+export default { createCampaign, updateCampaign, listCampaigns, listAllCampaigns, activateCampaign, pauseCampaign, getCampaignAnalytics }
