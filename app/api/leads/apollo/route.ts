@@ -10,9 +10,6 @@ export async function POST(req: Request) {
       market_name: body.market_name || null,
       product_name: body.product_name || null,
       contacts_wanted: body.contacts_wanted ?? null,
-      contact_count: body.contacts_wanted ?? null,
-      contacts_count: body.contacts_wanted ?? null,
-      desired_contacts: body.contacts_wanted ?? null,
       campaign_id: body.campaign_id || null,
       campaign_name: body.campaign_name || null,
       organization_id: body.organization_id || null
