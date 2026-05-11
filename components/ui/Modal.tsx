@@ -17,7 +17,7 @@ export default function Modal({ open, title, children, onClose }: {
         onClick={onClose}
       />
 
-      <div className="relative z-10 w-full max-w-lg rounded-lg bg-white p-6 shadow-lg">
+      <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-auto rounded-lg bg-white p-6 shadow-lg">
         {title ? <h3 className="mb-4 text-lg font-semibold">{title}</h3> : null}
         <div>{children}</div>
       </div>

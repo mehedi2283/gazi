@@ -7,6 +7,7 @@ import toast from 'react-hot-toast'
 import { Plus, Upload, UserPlus, X } from 'lucide-react'
 import useCampaigns from '../../../hooks/useCampaigns'
 import useLeads from '../../../hooks/useLeads'
+import Modal from '../../../components/ui/Modal'
 
 type LeadRow = {
   email?: string
@@ -27,6 +28,24 @@ type LeadRow = {
 }
 
 type AddMode = 'import' | 'manual' | 'apollo'
+
+const REQUIRED_IMPORT_COLUMNS = [
+  { key: 'email', label: 'email', aliases: ['email', 'e_mail', 'e-mail'] },
+  { key: 'first_name', label: 'first_name', aliases: ['first_name', 'firstname', 'first'] },
+  { key: 'last_name', label: 'last_name', aliases: ['last_name', 'lastname', 'last'] },
+  { key: 'company_name', label: 'company_name', aliases: ['company_name', 'company', 'companyname'] },
+  { key: 'company_domain', label: 'company_domain', aliases: ['company_domain', 'domain', 'companydomain'] },
+  { key: 'website', label: 'website', aliases: ['website', 'url', 'site'] },
+  { key: 'linkedin_url', label: 'linkedin_url', aliases: ['linkedin_url', 'linkedin', 'person_linkedin_url', 'company_linkedin_url'] },
+  { key: 'city', label: 'city', aliases: ['city'] },
+  { key: 'state', label: 'state', aliases: ['state'] },
+  { key: 'country', label: 'country', aliases: ['country'] },
+  { key: 'industry', label: 'industry', aliases: ['industry'] },
+  { key: 'employees', label: 'employees', aliases: ['employees', 'employee_count', 'number_of_employees'] },
+  { key: 'annual_revenue', label: 'annual_revenue', aliases: ['annual_revenue', 'revenue'] },
+  { key: 'phone', label: 'phone', aliases: ['phone', 'phone_number', 'telephone'] },
+  { key: 'title', label: 'title', aliases: ['title', 'role', 'position'] }
+]
 
 function normalizeRows(rows: any[]): LeadRow[] {
   function normalizeKeys(obj: any) {
@@ -77,6 +96,34 @@ function normalizeRows(rows: any[]): LeadRow[] {
     .filter((row) => Boolean(row.email))
 }
 
+function normalizeHeaderName(value: string) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^\w_]/g, '')
+}
+
+async function copyToClipboard(value: string) {
+  if (navigator.clipboard?.writeText) {
+    return navigator.clipboard.writeText(value)
+  }
+
+  const temp = document.createElement('textarea')
+  temp.value = value
+  temp.style.position = 'fixed'
+  temp.style.opacity = '0'
+  document.body.appendChild(temp)
+  temp.select()
+  document.execCommand('copy')
+  document.body.removeChild(temp)
+}
+
+function isMatchingHeader(header: string) {
+  const normalized = normalizeHeaderName(header)
+  return REQUIRED_IMPORT_COLUMNS.some((column) => column.aliases.some((alias) => normalizeHeaderName(alias) === normalized))
+}
+
 function formatName(lead: any) {
   return [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '-'
 }
@@ -96,6 +143,8 @@ export default function LeadsPage() {
   const [apolloContactsWanted, setApolloContactsWanted] = useState('')
   const [rows, setRows] = useState<LeadRow[]>([])
   const [fileName, setFileName] = useState('')
+  const [fileHeaders, setFileHeaders] = useState<string[]>([])
+  const [importModalOpen, setImportModalOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [manualSubmitting, setManualSubmitting] = useState(false)
   const [apolloSubmitting, setApolloSubmitting] = useState(false)
@@ -108,6 +157,25 @@ export default function LeadsPage() {
   const campaignNameById = useMemo(() => {
     return new Map<string, string>((campaigns || []).map((campaign: any) => [String(campaign.id), String(campaign.name)]))
   }, [campaigns])
+
+  const headerStatuses = useMemo(() => {
+    return fileHeaders.map((header) => {
+      const normalized = normalizeHeaderName(header)
+      const matchedColumn = REQUIRED_IMPORT_COLUMNS.find((column) =>
+        column.aliases.some((alias) => normalizeHeaderName(alias) === normalized)
+      )
+
+      return {
+        header,
+        matched: Boolean(matchedColumn),
+        recommended: matchedColumn?.label || REQUIRED_IMPORT_COLUMNS.find((column) =>
+          column.key === 'email'
+        )?.label || 'email'
+      }
+    })
+  }, [fileHeaders])
+
+  const unmatchedHeaders = headerStatuses.filter((item) => !item.matched)
 
   async function handleFileChange(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
@@ -123,6 +191,8 @@ export default function LeadsPage() {
         const parsed = Papa.parse(text, { header: true, skipEmptyLines: true })
         const normalized = normalizeRows((parsed.data as any[]) || [])
         setRows(normalized)
+        setFileHeaders(((parsed.meta?.fields || []) as string[]).filter(Boolean))
+        setImportModalOpen(true)
         toast.success(`Loaded ${normalized.length} leads from CSV`)
         return
       }
@@ -135,6 +205,8 @@ export default function LeadsPage() {
         const json = XLSX.utils.sheet_to_json(sheet)
         const normalized = normalizeRows(json)
         setRows(normalized)
+        setFileHeaders(json.length ? Object.keys(json[0] || {}) : [])
+        setImportModalOpen(true)
         toast.success(`Loaded ${normalized.length} leads from spreadsheet`)
         return
       }
@@ -176,6 +248,8 @@ export default function LeadsPage() {
       toast.success(`Imported ${json.data?.length || rows.length} leads into campaign`)
       setRows([])
       setFileName('')
+      setFileHeaders([])
+      setImportModalOpen(false)
       await refetch()
     } catch (error: any) {
       toast.error(error?.message || 'Unable to import leads')
@@ -371,20 +445,44 @@ export default function LeadsPage() {
                   <span>{rows.length} leads ready</span>
                 </div>
 
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  <div className="font-semibold">Before uploading</div>
+                  <p className="mt-1">
+                    Match the sheet column names with the required names below. If a column name does not match, copy the correct name from here and paste it into your sheet before uploading.
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {REQUIRED_IMPORT_COLUMNS.map((column) => (
+                      <button
+                        key={column.key}
+                        type="button"
+                        onClick={async () => {
+                          await copyToClipboard(column.label)
+                          toast.success(`Copied ${column.label}`)
+                        }}
+                        className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
+                      >
+                        Copy {column.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 <div className="flex gap-3">
                   <button
                     type="button"
-                    onClick={handleImport}
+                    onClick={() => setImportModalOpen(true)}
                     disabled={uploading || !rows.length || !selectedCampaignId}
                     className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
                   >
-                    {uploading ? 'Importing...' : 'Import Leads'}
+                    Review & Import
                   </button>
                   <button
                     type="button"
                     onClick={() => {
                       setRows([])
                       setFileName('')
+                      setFileHeaders([])
+                      setImportModalOpen(false)
                     }}
                     className="rounded-lg border px-4 py-2 font-medium text-slate-700"
                   >
@@ -395,28 +493,47 @@ export default function LeadsPage() {
 
               <div>
                 <h3 className="text-base font-semibold">Import Preview</h3>
-                <p className="mb-3 text-sm text-slate-500">First few rows from your upload.</p>
+                <p className="mb-3 text-sm text-slate-500">Open the review modal to see all rows and confirm the import.</p>
 
-                {rows.length ? (
-                  <div className="max-h-[320px] overflow-auto rounded-lg border">
-                    <table className="min-w-full text-left text-sm">
-                      <thead className="sticky top-0 bg-slate-50">
-                        <tr>
-                          <th className="px-3 py-2">Email</th>
-                          <th className="px-3 py-2">Name</th>
-                          <th className="px-3 py-2">Company</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {rows.slice(0, 8).map((row, index) => (
-                          <tr key={`${row.email}-${index}`} className="border-t">
-                            <td className="px-3 py-2">{row.email}</td>
-                            <td className="px-3 py-2">{[row.first_name, row.last_name].filter(Boolean).join(' ') || '-'}</td>
-                            <td className="px-3 py-2">{row.company_name || '-'}</td>
-                          </tr>
+                {fileHeaders.length ? (
+                  <div className="space-y-3 rounded-lg border p-4 text-sm">
+                    <div>
+                      <div className="font-semibold text-slate-900">Detected columns</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {headerStatuses.map((item) => (
+                          <span
+                            key={item.header}
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${item.matched ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}
+                          >
+                            {item.header}
+                          </span>
                         ))}
-                      </tbody>
-                    </table>
+                      </div>
+                    </div>
+
+                    {unmatchedHeaders.length ? (
+                      <div className="rounded-md border border-red-200 bg-red-50 p-3 text-red-900">
+                        <div className="font-semibold">These columns are not matching</div>
+                        <p className="mt-1 text-sm">
+                          Copy the suggested column name and paste it into the sheet before uploading.
+                        </p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {unmatchedHeaders.map((item) => (
+                            <button
+                              key={item.header}
+                              type="button"
+                              onClick={async () => {
+                                await copyToClipboard(item.recommended)
+                                toast.success(`Copied ${item.recommended}`)
+                              }}
+                              className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-900"
+                            >
+                              {item.header} → copy {item.recommended}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
                 ) : (
                   <div className="rounded-lg border border-dashed p-6 text-sm text-slate-500">
@@ -522,6 +639,109 @@ export default function LeadsPage() {
           )}
         </div>
       ) : null}
+
+      <Modal
+        open={importModalOpen && rows.length > 0}
+        title="Review import"
+        onClose={() => setImportModalOpen(false)}
+      >
+        <div className="space-y-4">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div className="font-semibold">Before uploading</div>
+            <p className="mt-1">
+              Make sure your sheet columns match the names below. Use the copy buttons to copy the exact column names and paste them into your sheet.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {REQUIRED_IMPORT_COLUMNS.map((column) => (
+                <button
+                  key={column.key}
+                  type="button"
+                  onClick={async () => {
+                    await copyToClipboard(column.label)
+                    toast.success(`Copied ${column.label}`)
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
+                >
+                  Copy {column.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {unmatchedHeaders.length ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+              <div className="font-semibold">Column names not matching</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {unmatchedHeaders.map((item) => (
+                  <button
+                    key={item.header}
+                    type="button"
+                    onClick={async () => {
+                      await copyToClipboard(item.recommended)
+                      toast.success(`Copied ${item.recommended}`)
+                    }}
+                    className="inline-flex items-center gap-2 rounded-full border border-red-300 bg-white px-3 py-1 text-xs font-semibold text-red-900"
+                  >
+                    {item.header} → copy {item.recommended}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          <div className="overflow-hidden rounded-lg border">
+            <div className="border-b bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+              Full details
+            </div>
+            <div className="max-h-[45vh] overflow-auto">
+              <table className="min-w-full divide-y divide-slate-200 text-left text-sm">
+                <thead className="sticky top-0 bg-white text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-3 py-2">Email</th>
+                    <th className="px-3 py-2">Name</th>
+                    <th className="px-3 py-2">Company</th>
+                    <th className="px-3 py-2">Domain</th>
+                    <th className="px-3 py-2">Title</th>
+                    <th className="px-3 py-2">Phone</th>
+                    <th className="px-3 py-2">LinkedIn</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                  {rows.map((row, index) => (
+                    <tr key={`${row.email || 'row'}-${index}`} className="align-top">
+                      <td className="px-3 py-2">{row.email || '-'}</td>
+                      <td className="px-3 py-2">{[row.first_name, row.last_name].filter(Boolean).join(' ') || '-'}</td>
+                      <td className="px-3 py-2">{row.company_name || '-'}</td>
+                      <td className="px-3 py-2">{row.company_domain || '-'}</td>
+                      <td className="px-3 py-2">{row.title || '-'}</td>
+                      <td className="px-3 py-2">{row.phone || '-'}</td>
+                      <td className="px-3 py-2 break-all">{row.linkedin_url || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setImportModalOpen(false)}
+              className="rounded-lg border px-4 py-2 font-medium text-slate-700"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleImport}
+              disabled={uploading || !rows.length || !selectedCampaignId}
+              className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
+            >
+              {uploading ? 'Importing...' : 'Confirm Import'}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="rounded-lg bg-white shadow">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-4">
