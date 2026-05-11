@@ -27,6 +27,7 @@ export default function CampaignsPage() {
   const [copyFor, setCopyFor] = useState<string | null>(null)
   const [copyName, setCopyName] = useState<string>('')
   const [copyLoading, setCopyLoading] = useState(false)
+  const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
   const [copyModalFor, setCopyModalFor] = useState<any | null>(null)
   const [deleteModalFor, setDeleteModalFor] = useState<any | null>(null)
   useEffect(() => {
@@ -165,7 +166,7 @@ export default function CampaignsPage() {
             Failed to load campaigns.
           </div>
         ) : data?.length ? (
-          <div className="overflow-hidden rounded-xl">
+          <div className="relative rounded-xl overflow-visible">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
@@ -200,7 +201,11 @@ export default function CampaignsPage() {
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation()
+                            const btn = event.currentTarget as HTMLElement
+                            const rect = btn.getBoundingClientRect()
+                            const needAbove = (window.innerHeight - rect.bottom) < 220
                             setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)
+                            setMenuAboveFor(needAbove ? campaign.id : null)
                           }}
                           className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                           aria-label="Open campaign actions"
@@ -209,7 +214,7 @@ export default function CampaignsPage() {
                         </button>
 
                         {openMenuFor === campaign.id ? (
-                          <div className="absolute right-0 top-11 z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                          <div className={`absolute right-0 ${menuAboveFor === campaign.id ? 'bottom-11' : 'top-11'} z-20 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg`}>
                             {canActivate ? (
                               <button
                                 type="button"
