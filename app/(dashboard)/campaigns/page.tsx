@@ -23,6 +23,9 @@ export default function CampaignsPage() {
   const { data, isLoading, error } = useCampaigns()
   const qc = useQueryClient()
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  const [copyFor, setCopyFor] = useState<string | null>(null)
+  const [copyName, setCopyName] = useState<string>('')
+  const [copyLoading, setCopyLoading] = useState(false)
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement | null
@@ -196,29 +199,68 @@ export default function CampaignsPage() {
                               </Link>
                             ) : null}
 
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
-                              onClick={async () => {
-                                try {
-                                  const body = campaignCopyPayload(campaign)
-                                  const resp = await fetch('/api/campaigns', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(body)
-                                  })
-                                  const json = await resp.json()
-                                  if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
-                                  qc.invalidateQueries({ queryKey: ['campaigns'] })
-                                  setOpenMenuFor(null)
-                                } catch (e) {
-                                  alert(String(e))
-                                }
-                              }}
-                            >
-                              <Copy className="h-4 w-4" />
-                              Copy
-                            </button>
+                            {copyFor === campaign.id ? (
+                              <div className="px-3 py-2">
+                                <label className="mb-1 block text-xs text-slate-500">New campaign name</label>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    autoFocus
+                                    value={copyName}
+                                    onChange={(e) => setCopyName(e.target.value)}
+                                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm"
+                                  />
+                                  <button
+                                    type="button"
+                                    disabled={copyLoading || !copyName.trim()}
+                                    onClick={async (e) => {
+                                      e.stopPropagation()
+                                      try {
+                                        setCopyLoading(true)
+                                        const body = { ...campaignCopyPayload(campaign), name: copyName }
+                                        const resp = await fetch('/api/campaigns', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify(body)
+                                        })
+                                        const json = await resp.json()
+                                        if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
+                                        qc.invalidateQueries({ queryKey: ['campaigns'] })
+                                        setOpenMenuFor(null)
+                                        setCopyFor(null)
+                                        setCopyName('')
+                                      } catch (err) {
+                                        alert(String(err))
+                                      } finally {
+                                        setCopyLoading(false)
+                                      }
+                                    }}
+                                    className="rounded bg-indigo-600 px-3 py-1 text-sm text-white disabled:opacity-50"
+                                  >
+                                    Save
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => { e.stopPropagation(); setCopyFor(null); setCopyName('') }}
+                                    className="rounded border px-3 py-1 text-sm"
+                                  >
+                                    Cancel
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setCopyFor(campaign.id)
+                                  setCopyName(`${campaign.name} (Copy)`)
+                                }}
+                              >
+                                <Copy className="h-4 w-4" />
+                                Copy
+                              </button>
+                            )}
                           </div>
                         ) : null}
                       </div>
