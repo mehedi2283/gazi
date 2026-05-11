@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../lib/supabase/server'
-import { mapLeadsForWebhook, sendManualLeadsToWebhook } from '../../../lib/webhook/leads'
+import { mapLeadsForWebhook, sendLeadsToWebhook } from '../../../lib/webhook/leads'
 
 export async function GET() {
   try {
@@ -46,7 +46,7 @@ export async function POST(req: Request) {
 
     let webhookError: string | null = null
     try {
-      await sendManualLeadsToWebhook(webhookPayload)
+      await sendLeadsToWebhook(webhookPayload)
     } catch (e) {
       webhookError = e instanceof Error ? e.message : String(e)
     }
