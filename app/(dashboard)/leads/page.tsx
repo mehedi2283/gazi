@@ -124,6 +124,14 @@ function isMatchingHeader(header: string) {
   return REQUIRED_IMPORT_COLUMNS.some((column) => column.aliases.some((alias) => normalizeHeaderName(alias) === normalized))
 }
 
+function getCopyAllHeadersValue() {
+  return REQUIRED_IMPORT_COLUMNS.map((column) => column.label).join('\t')
+}
+
+function getCopyAllHeadersValue() {
+  return REQUIRED_IMPORT_COLUMNS.map((column) => column.label).join('\t')
+}
+
 function formatName(lead: any) {
   return [lead.first_name, lead.last_name].filter(Boolean).join(' ') || '-'
 }
@@ -448,22 +456,19 @@ export default function LeadsPage() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   <div className="font-semibold">Before uploading</div>
                   <p className="mt-1">
-                    Match the sheet column names with the required names below. If a column name does not match, copy the correct name from here and paste it into your sheet before uploading.
+                    Copy all column names, click the first cell in your sheet, and paste once to populate the header row.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {REQUIRED_IMPORT_COLUMNS.map((column) => (
-                      <button
-                        key={column.key}
-                        type="button"
-                        onClick={async () => {
-                          await copyToClipboard(column.label)
-                          toast.success(`Copied ${column.label}`)
-                        }}
-                        className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
-                      >
-                        Copy {column.label}
-                      </button>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        await copyToClipboard(getCopyAllHeadersValue())
+                        toast.success('Copied all column names')
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
+                    >
+                      Copy all column names
+                    </button>
                   </div>
                 </div>
 
@@ -649,22 +654,19 @@ export default function LeadsPage() {
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <div className="font-semibold">Before uploading</div>
             <p className="mt-1">
-              Make sure your sheet columns match the names below. Use the copy buttons to copy the exact column names and paste them into your sheet.
+              Copy all column names, click the first cell in your sheet, and paste once so the header row is filled automatically.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {REQUIRED_IMPORT_COLUMNS.map((column) => (
-                <button
-                  key={column.key}
-                  type="button"
-                  onClick={async () => {
-                    await copyToClipboard(column.label)
-                    toast.success(`Copied ${column.label}`)
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
-                >
-                  Copy {column.label}
-                </button>
-              ))}
+              <button
+                type="button"
+                onClick={async () => {
+                  await copyToClipboard(getCopyAllHeadersValue())
+                  toast.success('Copied all column names')
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
+              >
+                Copy all column names
+              </button>
             </div>
           </div>
 
