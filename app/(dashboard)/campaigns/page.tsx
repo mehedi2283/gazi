@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
-import { Copy, Pause, Play, MoreVertical, Pencil } from 'lucide-react'
+import { Copy, Pause, Play, MoreVertical, Pencil, Trash } from 'lucide-react'
+import Modal from '../../../components/ui/Modal'
 
 function statusStyles(status: string) {
   switch (status) {
@@ -26,6 +27,8 @@ export default function CampaignsPage() {
   const [copyFor, setCopyFor] = useState<string | null>(null)
   const [copyName, setCopyName] = useState<string>('')
   const [copyLoading, setCopyLoading] = useState(false)
+  const [copyModalFor, setCopyModalFor] = useState<any | null>(null)
+  const [deleteModalFor, setDeleteModalFor] = useState<any | null>(null)
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement | null
@@ -88,6 +91,67 @@ export default function CampaignsPage() {
           New Campaign
         </Link>
       </div>
+      
+      <Modal open={Boolean(copyModalFor)} title="Duplicate campaign" onClose={() => setCopyModalFor(null)}>
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">New campaign name</label>
+            <input
+              value={copyName}
+              onChange={(e) => setCopyName(e.target.value)}
+              className="w-full rounded-md border border-slate-200 px-3 py-2"
+            />
+          </div>
+          <div className="flex items-center justify-end gap-2">
+            <button className="rounded border px-3 py-1" onClick={() => setCopyModalFor(null)}>Cancel</button>
+            <button
+              className="rounded bg-indigo-600 px-3 py-1 text-white"
+              disabled={!copyName.trim()}
+              onClick={async () => {
+                try {
+                  setCopyLoading(true)
+                  const body = { ...campaignCopyPayload(copyModalFor), name: copyName }
+                  const resp = await fetch('/api/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                  const json = await resp.json()
+                  if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
+                  qc.invalidateQueries({ queryKey: ['campaigns'] })
+                  setCopyModalFor(null)
+                  setCopyName('')
+                } catch (err) {
+                  alert(String(err))
+                } finally { setCopyLoading(false) }
+              }}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={Boolean(deleteModalFor)} title="Delete campaign" onClose={() => setDeleteModalFor(null)}>
+        <div className="space-y-4">
+          <p>Are you sure you want to delete the campaign <strong>{deleteModalFor?.name}</strong>? This action cannot be undone.</p>
+          <div className="flex items-center justify-end gap-2">
+            <button className="rounded border px-3 py-1" onClick={() => setDeleteModalFor(null)}>Cancel</button>
+            <button
+              className="rounded bg-red-600 px-3 py-1 text-white"
+              onClick={async () => {
+                try {
+                  const resp = await fetch(`/api/campaigns/${deleteModalFor.id}`, { method: 'DELETE' })
+                  const json = await resp.json()
+                  if (!resp.ok || json.error) throw new Error(json.error || 'Delete failed')
+                  qc.invalidateQueries({ queryKey: ['campaigns'] })
+                  setDeleteModalFor(null)
+                } catch (err) {
+                  alert(String(err))
+                }
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="rounded-xl bg-white shadow">
         {isLoading ? (
@@ -199,68 +263,28 @@ export default function CampaignsPage() {
                               </Link>
                             ) : null}
 
-                            {copyFor === campaign.id ? (
-                              <div className="px-3 py-2">
-                                <label className="mb-1 block text-xs text-slate-500">New campaign name</label>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    autoFocus
-                                    value={copyName}
-                                    onChange={(e) => setCopyName(e.target.value)}
-                                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-sm"
-                                  />
-                                  <button
-                                    type="button"
-                                    disabled={copyLoading || !copyName.trim()}
-                                    onClick={async (e) => {
-                                      e.stopPropagation()
-                                      try {
-                                        setCopyLoading(true)
-                                        const body = { ...campaignCopyPayload(campaign), name: copyName }
-                                        const resp = await fetch('/api/campaigns', {
-                                          method: 'POST',
-                                          headers: { 'Content-Type': 'application/json' },
-                                          body: JSON.stringify(body)
-                                        })
-                                        const json = await resp.json()
-                                        if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
-                                        qc.invalidateQueries({ queryKey: ['campaigns'] })
-                                        setOpenMenuFor(null)
-                                        setCopyFor(null)
-                                        setCopyName('')
-                                      } catch (err) {
-                                        alert(String(err))
-                                      } finally {
-                                        setCopyLoading(false)
-                                      }
-                                    }}
-                                    className="rounded bg-indigo-600 px-3 py-1 text-sm text-white disabled:opacity-50"
-                                  >
-                                    Save
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); setCopyFor(null); setCopyName('') }}
-                                    className="rounded border px-3 py-1 text-sm"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setCopyFor(campaign.id)
-                                  setCopyName(`${campaign.name} (Copy)`)
-                                }}
-                              >
-                                <Copy className="h-4 w-4" />
-                                Copy
-                              </button>
-                            )}
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setOpenMenuFor(null)
+                                setCopyModalFor(campaign)
+                                setCopyName(`${campaign.name} (Copy)`)
+                              }}
+                            >
+                              <Copy className="h-4 w-4" />
+                              Copy
+                            </button>
+
+                            <button
+                              type="button"
+                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                              onClick={(e) => { e.stopPropagation(); setOpenMenuFor(null); setDeleteModalFor(campaign) }}
+                            >
+                              <Trash className="h-4 w-4" />
+                              Delete
+                            </button>
                           </div>
                         ) : null}
                       </div>
