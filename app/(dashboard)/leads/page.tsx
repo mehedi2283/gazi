@@ -26,7 +26,7 @@ type LeadRow = {
   title?: string
 }
 
-type AddMode = 'import' | 'manual'
+type AddMode = 'import' | 'manual' | 'apollo'
 
 function normalizeRows(rows: any[]): LeadRow[] {
   function normalizeKeys(obj: any) {
@@ -91,10 +91,14 @@ export default function LeadsPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [addMode, setAddMode] = useState<AddMode>('import')
   const [selectedCampaignId, setSelectedCampaignId] = useState('')
+  const [apolloMarketName, setApolloMarketName] = useState('')
+  const [apolloProductName, setApolloProductName] = useState('')
+  const [apolloContactsWanted, setApolloContactsWanted] = useState('')
   const [rows, setRows] = useState<LeadRow[]>([])
   const [fileName, setFileName] = useState('')
   const [uploading, setUploading] = useState(false)
   const [manualSubmitting, setManualSubmitting] = useState(false)
+  const [apolloSubmitting, setApolloSubmitting] = useState(false)
 
   const selectedCampaign = useMemo(
     () => campaigns?.find((campaign: any) => campaign.id === selectedCampaignId),
@@ -225,6 +229,64 @@ export default function LeadsPage() {
     }
   }
 
+  async function handleApolloSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const form = event.currentTarget
+
+    if (!selectedCampaignId) {
+      toast.error('Select a campaign first')
+      return
+    }
+
+    if (!apolloMarketName.trim()) {
+      toast.error('Market name is required')
+      return
+    }
+
+    if (!apolloProductName.trim()) {
+      toast.error('Product name is required')
+      return
+    }
+
+    if (!apolloContactsWanted.trim()) {
+      toast.error('How many contacts they want is required')
+      return
+    }
+
+    setApolloSubmitting(true)
+    try {
+      const response = await fetch('/api/leads/apollo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          market_name: apolloMarketName.trim(),
+          product_name: apolloProductName.trim(),
+          contacts_wanted: Number(apolloContactsWanted),
+          campaign_id: selectedCampaignId,
+          campaign_name: selectedCampaign?.name || null,
+          organization_id: selectedCampaign?.organization_id || null,
+          source: 'apollo'
+        })
+      })
+
+      const json = await response.json()
+      if (!response.ok || json.error) {
+        throw new Error(json.error?.message || json.error || 'Apollo webhook failed')
+      }
+
+      toast.success('Apollo request sent to webhook')
+      setApolloMarketName('')
+      setApolloProductName('')
+      setApolloContactsWanted('')
+      form.reset()
+      setAddOpen(false)
+    } catch (error: any) {
+      toast.error(error?.message || 'Unable to send Apollo request')
+    } finally {
+      setApolloSubmitting(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -262,6 +324,14 @@ export default function LeadsPage() {
               >
                 <UserPlus className="h-4 w-4" aria-hidden="true" />
                 Manual
+              </button>
+              <button
+                type="button"
+                onClick={() => setAddMode('apollo')}
+                className={`inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium ${addMode === 'apollo' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600'}`}
+              >
+                <Upload className="h-4 w-4" aria-hidden="true" />
+                Apollo
               </button>
             </div>
           </div>
@@ -355,7 +425,7 @@ export default function LeadsPage() {
                 )}
               </div>
             </div>
-          ) : (
+          ) : addMode === 'manual' ? (
             <form onSubmit={handleManualSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 <label className="space-y-2">
@@ -398,6 +468,55 @@ export default function LeadsPage() {
                 className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
               >
                 {manualSubmitting ? 'Adding...' : 'Add Lead'}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleApolloSubmit} className="space-y-4">
+              <div className="grid gap-4 md:grid-cols-3">
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Market name</span>
+                  <input
+                    name="market_name"
+                    value={apolloMarketName}
+                    onChange={(e) => setApolloMarketName(e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2"
+                    placeholder="e.g. SaaS founders"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">Product name</span>
+                  <input
+                    name="product_name"
+                    value={apolloProductName}
+                    onChange={(e) => setApolloProductName(e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2"
+                    placeholder="e.g. CRM automation"
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-medium">How many contacts they want</span>
+                  <input
+                    name="contacts_wanted"
+                    type="number"
+                    min="1"
+                    value={apolloContactsWanted}
+                    onChange={(e) => setApolloContactsWanted(e.target.value)}
+                    className="w-full rounded-lg border px-3 py-2"
+                    placeholder="100"
+                  />
+                </label>
+              </div>
+
+              <div className="rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                This will send a webhook with the market name, product name, desired contact count, and selected campaign ID.
+              </div>
+
+              <button
+                type="submit"
+                disabled={apolloSubmitting || !selectedCampaignId}
+                className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
+              >
+                {apolloSubmitting ? 'Sending...' : 'Send to Webhook'}
               </button>
             </form>
           )}
