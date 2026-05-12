@@ -25,4 +25,30 @@ export type Lead = {
   email: string
   first_name?: string
   last_name?: string
+  title?: string
+  company_name?: string
+  company_linkedin_url?: string | null
+  company_domain?: string | null
+  website?: string | null
+  linkedin_url?: string | null
+  facebook_url?: string | null
+  twitter_url?: string | null
+  city?: string | null
+  state?: string | null
+  country?: string | null
+  company_address?: string | null
+  company_city?: string | null
+  company_state?: string | null
+  company_country?: string | null
+  company_phone?: string | null
+  technologies?: string | null
+  industry?: string | null
+  employees?: string | number | null
+  annual_revenue?: string | null
+  total_funding?: string | null
+  latest_funding?: string | null
+  latest_funding_amount?: string | null
+  last_raised_at?: string | null
+  phone?: string | null
+  status?: string | null
 }

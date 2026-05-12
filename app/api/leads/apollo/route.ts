@@ -8,6 +8,7 @@ export async function POST(req: Request) {
     const payload = {
       source: 'apollo',
       market_name: body.market_name || null,
+      market_segments: Array.isArray(body.market_segments) && body.market_segments.length ? body.market_segments : null,
       product_name: body.product_name || null,
       contacts_wanted: body.contacts_wanted ?? null,
       campaign_id: body.campaign_id || null,

@@ -13,60 +13,95 @@ type LeadRow = {
   email?: string
   first_name?: string
   last_name?: string
+  title?: string
   company_name?: string
+  company_linkedin_url?: string
   company_domain?: string
   website?: string
   linkedin_url?: string
+  facebook_url?: string
+  twitter_url?: string
   city?: string
   state?: string
   country?: string
+  company_address?: string
+  company_city?: string
+  company_state?: string
+  company_country?: string
+  company_phone?: string
+  technologies?: string
   industry?: string
   employees?: string | number
   annual_revenue?: string
-  phone?: string
-  title?: string
+  total_funding?: string
+  latest_funding?: string
+  latest_funding_amount?: string
+  last_raised_at?: string
+  sent_at?: string
+  status?: string
 }
 
 type AddMode = 'import' | 'manual' | 'apollo'
 
 const REQUIRED_IMPORT_COLUMNS = [
-  { key: 'email', label: 'email', aliases: ['email', 'e_mail', 'e-mail'] },
-  { key: 'first_name', label: 'first_name', aliases: ['first_name', 'firstname', 'first'] },
-  { key: 'last_name', label: 'last_name', aliases: ['last_name', 'lastname', 'last'] },
-  { key: 'company_name', label: 'company_name', aliases: ['company_name', 'company', 'companyname'] },
-  { key: 'company_domain', label: 'company_domain', aliases: ['company_domain', 'domain', 'companydomain'] },
-  { key: 'website', label: 'website', aliases: ['website', 'url', 'site'] },
-  { key: 'linkedin_url', label: 'linkedin_url', aliases: ['linkedin_url', 'linkedin', 'person_linkedin_url', 'company_linkedin_url'] },
-  { key: 'city', label: 'city', aliases: ['city'] },
-  { key: 'state', label: 'state', aliases: ['state'] },
-  { key: 'country', label: 'country', aliases: ['country'] },
-  { key: 'industry', label: 'industry', aliases: ['industry'] },
-  { key: 'employees', label: 'employees', aliases: ['employees', 'employee_count', 'number_of_employees'] },
-  { key: 'annual_revenue', label: 'annual_revenue', aliases: ['annual_revenue', 'revenue'] },
-  { key: 'phone', label: 'phone', aliases: ['phone', 'phone_number', 'telephone'] },
-  { key: 'title', label: 'title', aliases: ['title', 'role', 'position'] }
+  { key: 'email', label: 'Email', aliases: ['Email'] },
+  { key: 'first_name', label: 'First Name', aliases: ['First Name'] },
+  { key: 'last_name', label: 'Last Name', aliases: ['Last Name'] },
+  { key: 'title', label: 'Title', aliases: ['Title'] },
+  { key: 'company_name', label: 'Company Name', aliases: ['Company Name'] },
+  { key: 'employees', label: '# Employees', aliases: ['# Employees'] },
+  { key: 'industry', label: 'Industry', aliases: ['Industry'] },
+  { key: 'linkedin_url', label: 'Person Linkedin Url', aliases: ['Person Linkedin Url'] },
+  { key: 'website', label: 'Website', aliases: ['Website'] },
+  { key: 'company_linkedin_url', label: 'Company Linkedin Url', aliases: ['Company Linkedin Url'] },
+  { key: 'facebook_url', label: 'Facebook Url', aliases: ['Facebook Url'] },
+  { key: 'twitter_url', label: 'Twitter Url', aliases: ['Twitter Url'] },
+  { key: 'city', label: 'City', aliases: ['City'] },
+  { key: 'state', label: 'State', aliases: ['State'] },
+  { key: 'country', label: 'Country', aliases: ['Country'] },
+  { key: 'company_address', label: 'Company Address', aliases: ['Company Address'] },
+  { key: 'company_city', label: 'Company City', aliases: ['Company City'] },
+  { key: 'company_state', label: 'Company State', aliases: ['Company State'] },
+  { key: 'company_country', label: 'Company Country', aliases: ['Company Country'] },
+  { key: 'company_phone', label: 'Company Phone', aliases: ['Company Phone'] },
+  { key: 'technologies', label: 'Technologies', aliases: ['Technologies'] },
+  { key: 'annual_revenue', label: 'Annual Revenue', aliases: ['Annual Revenue'] },
+  { key: 'total_funding', label: 'Total Funding', aliases: ['Total Funding'] },
+  { key: 'latest_funding', label: 'Latest Funding', aliases: ['Latest Funding'] },
+  { key: 'latest_funding_amount', label: 'Latest Funding Amount', aliases: ['Latest Funding Amount'] },
+  { key: 'last_raised_at', label: 'Last Raised At', aliases: ['Last Raised At'] },
+  { key: 'sent_at', label: 'sent_at', aliases: ['sent_at'] },
+  { key: 'status', label: 'status', aliases: ['status'] }
 ]
+
+const REQUIRED_IMPORT_COLUMN_NAMES = REQUIRED_IMPORT_COLUMNS.map((column) => column.label)
+
+// Apollo form used to collect country and product name
+
+function normalizeFieldName(value: string) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^\w_]/g, '')
+}
 
 function normalizeRows(rows: any[]): LeadRow[] {
   function normalizeKeys(obj: any) {
     const out: Record<string, any> = {}
     Object.keys(obj || {}).forEach((k) => {
-      const nk = String(k || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\s+/g, '_')
-        .replace(/[^\w_]/g, '')
+      const nk = normalizeFieldName(k)
       out[nk] = obj[k]
     })
     return out
   }
 
   function findByKeys(obj: any, keys: string[], substrFallback?: string) {
-    for (const k of keys) {
-      if (obj[k] != null && obj[k] !== '') return obj[k]
+    for (const key of keys.map((item) => normalizeFieldName(item))) {
+      if (obj[key] != null && obj[key] !== '') return obj[key]
     }
     if (substrFallback) {
-      const found = Object.keys(obj).find((kk) => kk.includes(substrFallback))
+      const fallback = normalizeFieldName(substrFallback)
+      const found = Object.keys(obj).find((kk) => normalizeFieldName(kk).includes(fallback))
       if (found) return obj[found]
     }
     return undefined
@@ -76,33 +111,55 @@ function normalizeRows(rows: any[]): LeadRow[] {
     .map((row) => {
       const nr = normalizeKeys(row)
       return {
-        email: findByKeys(nr, ['email', 'e_mail', 'e-mail'], 'email'),
-        first_name: findByKeys(nr, ['first_name', 'firstname', 'first'], 'first'),
-        last_name: findByKeys(nr, ['last_name', 'lastname', 'last'], 'last'),
-        company_name: findByKeys(nr, ['company_name', 'company', 'companyname'], 'company'),
-        company_domain: findByKeys(nr, ['company_domain', 'domain', 'companydomain'], 'domain'),
-        website: findByKeys(nr, ['website', 'url', 'site'], 'web'),
-        linkedin_url: findByKeys(nr, ['linkedin_url', 'linkedin', 'person_linkedin_url', 'company_linkedin_url'], 'linkedin'),
-        city: findByKeys(nr, ['city'], 'city'),
-        state: findByKeys(nr, ['state'], 'state'),
-        country: findByKeys(nr, ['country'], 'country'),
-        industry: findByKeys(nr, ['industry'], 'industry'),
-        employees: findByKeys(nr, ['employees', 'employee_count', 'number_of_employees'], 'employee'),
-        annual_revenue: findByKeys(nr, ['annual_revenue', 'revenue'], 'revenue'),
-        phone: findByKeys(nr, ['phone', 'phone_number', 'telephone'], 'phone'),
-        title: findByKeys(nr, ['title', 'role', 'position'], 'title')
+        email: findByKeys(nr, ['Email'], 'Email'),
+        first_name: findByKeys(nr, ['First Name'], 'First Name'),
+        last_name: findByKeys(nr, ['Last Name'], 'Last Name'),
+        title: findByKeys(nr, ['Title'], 'Title'),
+        company_name: findByKeys(nr, ['Company Name'], 'Company Name'),
+        company_linkedin_url: findByKeys(nr, ['Company Linkedin Url'], 'Company Linkedin Url'),
+        company_domain: findByKeys(nr, ['Company Domain'], 'Company Domain'),
+        website: findByKeys(nr, ['Website'], 'Website'),
+        linkedin_url: findByKeys(nr, ['Person Linkedin Url'], 'Person Linkedin Url'),
+        facebook_url: findByKeys(nr, ['Facebook Url'], 'Facebook Url'),
+        twitter_url: findByKeys(nr, ['Twitter Url'], 'Twitter Url'),
+        city: findByKeys(nr, ['City'], 'City'),
+        state: findByKeys(nr, ['State'], 'State'),
+        country: findByKeys(nr, ['Country'], 'Country'),
+        company_address: findByKeys(nr, ['Company Address'], 'Company Address'),
+        company_city: findByKeys(nr, ['Company City'], 'Company City'),
+        company_state: findByKeys(nr, ['Company State'], 'Company State'),
+        company_country: findByKeys(nr, ['Company Country'], 'Company Country'),
+        company_phone: findByKeys(nr, ['Company Phone'], 'Company Phone'),
+        technologies: findByKeys(nr, ['Technologies'], 'Technologies'),
+        industry: findByKeys(nr, ['Industry'], 'Industry'),
+        employees: findByKeys(nr, ['# Employees'], '# Employees'),
+        annual_revenue: findByKeys(nr, ['Annual Revenue'], 'Annual Revenue'),
+        total_funding: findByKeys(nr, ['Total Funding'], 'Total Funding'),
+        latest_funding: findByKeys(nr, ['Latest Funding'], 'Latest Funding'),
+        latest_funding_amount: findByKeys(nr, ['Latest Funding Amount'], 'Latest Funding Amount'),
+        last_raised_at: findByKeys(nr, ['Last Raised At'], 'Last Raised At'),
+        sent_at: findByKeys(nr, ['sent_at'], 'sent_at'),
+        status: findByKeys(nr, ['status'], 'status')
       }
     })
     .filter((row) => Boolean(row.email))
 }
 
 function normalizeHeaderName(value: string) {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '_')
-    .replace(/[^\w_]/g, '')
+  return normalizeFieldName(value)
 }
+
+const LOCAL_COUNTRIES = [
+  'Afghanistan','Albania','Algeria','Andorra','Angola','Antigua and Barbuda','Argentina','Armenia','Australia','Austria',
+  'Azerbaijan','Bahamas','Bahrain','Bangladesh','Barbados','Belarus','Belgium','Belize','Benin','Bhutan','Bolivia','Bosnia and Herzegovina','Botswana','Brazil','Brunei','Bulgaria','Burkina Faso','Burundi',
+  'Côte d\'Ivoire','Cabo Verde','Cambodia','Cameroon','Canada','Central African Republic','Chad','Chile','China','Colombia','Comoros','Costa Rica','Croatia','Cuba','Cyprus','Czech Republic',
+  'Democratic Republic of the Congo','Denmark','Djibouti','Dominica','Dominican Republic','Ecuador','Egypt','El Salvador','Equatorial Guinea','Eritrea','Estonia','Eswatini','Ethiopia','Fiji','Finland','France',
+  'Gabon','Gambia','Georgia','Germany','Ghana','Greece','Grenada','Guatemala','Guinea','Guinea-Bissau','Guyana','Haiti','Honduras','Hungary','Iceland','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy',
+  'Jamaica','Japan','Jordan','Kazakhstan','Kenya','Kiribati','Kuwait','Kyrgyzstan','Laos','Latvia','Lebanon','Lesotho','Liberia','Libya','Liechtenstein','Lithuania','Luxembourg','Madagascar','Malawi','Malaysia','Maldives','Mali','Malta','Marshall Islands','Mauritania','Mauritius','Mexico','Micronesia','Moldova','Monaco','Mongolia','Montenegro','Morocco','Mozambique','Myanmar',
+  'Namibia','Nauru','Nepal','Netherlands','New Zealand','Nicaragua','Niger','Nigeria','North Korea','North Macedonia','Norway','Oman','Pakistan','Palau','Panama','Papua New Guinea','Paraguay','Peru','Philippines','Poland','Portugal','Qatar',
+  'Republic of the Congo','Romania','Russia','Rwanda','Saint Kitts and Nevis','Saint Lucia','Saint Vincent and the Grenadines','Samoa','San Marino','Sao Tome and Principe','Saudi Arabia','Senegal','Serbia','Seychelles','Sierra Leone','Singapore','Slovakia','Slovenia','Solomon Islands','Somalia','South Africa','South Korea','South Sudan','Spain','Sri Lanka','Sudan','Suriname','Sweden','Switzerland','Syria',
+  'Taiwan','Tajikistan','Tanzania','Thailand','Timor-Leste','Togo','Tonga','Trinidad and Tobago','Tunisia','Turkey','Turkmenistan','Tuvalu','Uganda','Ukraine','United Arab Emirates','United Kingdom','United States','Uruguay','Uzbekistan','Vanuatu','Vatican City','Venezuela','Vietnam','Yemen','Zambia','Zimbabwe'
+]
 
 async function copyToClipboard(value: string) {
   if (navigator.clipboard?.writeText) {
@@ -140,7 +197,10 @@ export default function LeadsPage() {
   const [selectedCampaignId, setSelectedCampaignId] = useState('')
   const [apolloMarketName, setApolloMarketName] = useState('')
   const [apolloProductName, setApolloProductName] = useState('')
-  const [apolloContactsWanted, setApolloContactsWanted] = useState('')
+  const [countryOptions, setCountryOptions] = useState<string[]>([])
+  const [isCountryOpen, setIsCountryOpen] = useState(false)
+  const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
+  const comboboxRef = React.useRef<HTMLDivElement | null>(null)
   const [rows, setRows] = useState<LeadRow[]>([])
   const [fileName, setFileName] = useState('')
   const [fileHeaders, setFileHeaders] = useState<string[]>([])
@@ -153,6 +213,51 @@ export default function LeadsPage() {
     () => campaigns?.find((campaign: any) => campaign.id === selectedCampaignId),
     [campaigns, selectedCampaignId]
   )
+
+  React.useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const res = await fetch('https://restcountries.com/v3.1/all')
+        const data = await res.json()
+        if (!mounted) return
+        const names = (data || [])
+          .map((d: any) => d?.name?.common)
+          .filter(Boolean)
+          .sort((a: string, b: string) => a.localeCompare(b))
+        if (names && names.length) {
+          setCountryOptions(names)
+          return
+        }
+        // fallback to embedded list if remote fetch returned nothing
+        setCountryOptions(LOCAL_COUNTRIES)
+      } catch (e) {
+        // fetch failed — fallback to embedded list
+        setCountryOptions(LOCAL_COUNTRIES)
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const filteredCountries = React.useMemo(() => {
+    const q = apolloMarketName.trim().toLowerCase()
+    if (!q) return countryOptions
+    return countryOptions.filter((c) => c.toLowerCase().includes(q)).slice(0, 200)
+  }, [countryOptions, apolloMarketName])
+
+  React.useEffect(() => {
+    function onClick(e: MouseEvent) {
+      if (!comboboxRef.current) return
+      if (!comboboxRef.current.contains(e.target as Node)) {
+        setIsCountryOpen(false)
+        setHighlightedIndex(-1)
+      }
+    }
+    window.addEventListener('click', onClick)
+    return () => window.removeEventListener('click', onClick)
+  }, [])
 
   const campaignNameById = useMemo(() => {
     return new Map<string, string>((campaigns || []).map((campaign: any) => [String(campaign.id), String(campaign.name)]))
@@ -173,6 +278,14 @@ export default function LeadsPage() {
         )?.label || 'email'
       }
     })
+  }, [fileHeaders])
+
+  const missingRequiredHeaders = useMemo(() => {
+    return REQUIRED_IMPORT_COLUMNS.filter((column) => {
+      return !fileHeaders.some((header) =>
+        column.aliases.some((alias) => normalizeHeaderName(alias) === normalizeHeaderName(header))
+      )
+    }).map((column) => column.label)
   }, [fileHeaders])
 
   const unmatchedHeaders = headerStatuses.filter((item) => !item.matched)
@@ -225,6 +338,11 @@ export default function LeadsPage() {
 
     if (!rows.length) {
       toast.error('Upload a CSV or spreadsheet with leads first')
+      return
+    }
+
+    if (missingRequiredHeaders.length) {
+      toast.error(`Missing required columns: ${missingRequiredHeaders.join(', ')}`)
       return
     }
 
@@ -313,17 +431,12 @@ export default function LeadsPage() {
     }
 
     if (!apolloMarketName.trim()) {
-      toast.error('Market name is required')
+      toast.error('Country is required')
       return
     }
 
     if (!apolloProductName.trim()) {
       toast.error('Product name is required')
-      return
-    }
-
-    if (!apolloContactsWanted.trim()) {
-      toast.error('How many contacts they want is required')
       return
     }
 
@@ -333,9 +446,8 @@ export default function LeadsPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          market_name: apolloMarketName.trim(),
+          market_name: apolloMarketName.trim().toLowerCase(),
           product_name: apolloProductName.trim(),
-          contacts_wanted: Number(apolloContactsWanted),
           campaign_id: selectedCampaignId,
           campaign_name: selectedCampaign?.name || null,
           organization_id: selectedCampaign?.organization_id || null,
@@ -351,7 +463,6 @@ export default function LeadsPage() {
       toast.success('Apollo request sent to webhook')
       setApolloMarketName('')
       setApolloProductName('')
-      setApolloContactsWanted('')
       form.reset()
       setAddOpen(false)
     } catch (error: any) {
@@ -439,6 +550,7 @@ export default function LeadsPage() {
                     className="w-full rounded-lg border px-3 py-2"
                   />
                 </label>
+                
 
                 <div className="flex items-center justify-between rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-600">
                   <span>{fileName ? `Loaded file: ${fileName}` : 'No file loaded yet'}</span>
@@ -448,7 +560,7 @@ export default function LeadsPage() {
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   <div className="font-semibold">Before uploading</div>
                   <p className="mt-1">
-                    Match the sheet column names with the required names below. If a column name does not match, copy the correct name from here and paste it into your sheet before uploading.
+                    Match the sheet column names with the required names below. Every column in the list is mandatory for import.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {REQUIRED_IMPORT_COLUMNS.map((column) => (
@@ -465,6 +577,11 @@ export default function LeadsPage() {
                       </button>
                     ))}
                   </div>
+                  {missingRequiredHeaders.length ? (
+                    <div className="mt-3 rounded-md border border-red-200 bg-white px-3 py-2 text-red-900">
+                      Missing required columns: {missingRequiredHeaders.join(', ')}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex gap-3">
@@ -589,16 +706,84 @@ export default function LeadsPage() {
             </form>
           ) : (
             <form onSubmit={handleApolloSubmit} className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2">
-                  <span className="text-sm font-medium">Market name</span>
-                  <input
-                    name="market_name"
-                    value={apolloMarketName}
-                    onChange={(e) => setApolloMarketName(e.target.value)}
-                    className="w-full rounded-lg border px-3 py-2"
-                    placeholder="e.g. SaaS founders"
-                  />
+                  <span className="text-sm font-medium">Country</span>
+                  <div ref={comboboxRef} className="relative">
+                    <input
+                      name="market_name"
+                      aria-autocomplete="list"
+                      aria-expanded={isCountryOpen}
+                      aria-controls="countries-listbox"
+                      role="combobox"
+                      value={apolloMarketName}
+                      onChange={(e) => {
+                        setApolloMarketName(e.target.value)
+                        setIsCountryOpen(true)
+                        setHighlightedIndex(0)
+                      }}
+                      onFocus={() => {
+                        setIsCountryOpen(true)
+                        setHighlightedIndex(0)
+                      }}
+                      onKeyDown={(e) => {
+                        if (!isCountryOpen && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                          setIsCountryOpen(true)
+                          setHighlightedIndex(0)
+                          e.preventDefault()
+                          return
+                        }
+                        if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setHighlightedIndex((hi) => Math.min(hi + 1, filteredCountries.length - 1))
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setHighlightedIndex((hi) => Math.max(hi - 1, 0))
+                        } else if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const sel = filteredCountries[highlightedIndex] || filteredCountries[0]
+                          if (sel) {
+                            setApolloMarketName(sel)
+                            setIsCountryOpen(false)
+                            setHighlightedIndex(-1)
+                          }
+                        } else if (e.key === 'Escape') {
+                          setIsCountryOpen(false)
+                          setHighlightedIndex(-1)
+                        }
+                      }}
+                      className="w-full rounded-lg border px-3 py-2"
+                      placeholder="Type to search countries"
+                    />
+                    {isCountryOpen && filteredCountries.length > 0 && (
+                      <ul
+                        id="countries-listbox"
+                        role="listbox"
+                        className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-white shadow-lg"
+                      >
+                        {filteredCountries.map((c, idx) => (
+                          <li
+                            key={c}
+                            role="option"
+                            aria-selected={highlightedIndex === idx}
+                            onMouseEnter={() => setHighlightedIndex(idx)}
+                            onMouseDown={(ev) => ev.preventDefault()}
+                            onClick={() => {
+                              setApolloMarketName(c)
+                              setIsCountryOpen(false)
+                              setHighlightedIndex(-1)
+                            }}
+                            className={
+                              'cursor-pointer px-3 py-2 ' +
+                              (highlightedIndex === idx ? 'bg-sky-100' : '')
+                            }
+                          >
+                            {c}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </label>
                 <label className="space-y-2">
                   <span className="text-sm font-medium">Product name</span>
@@ -610,22 +795,12 @@ export default function LeadsPage() {
                     placeholder="e.g. CRM automation"
                   />
                 </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium">How many contacts they want</span>
-                  <input
-                    name="contacts_wanted"
-                    type="number"
-                    min="1"
-                    value={apolloContactsWanted}
-                    onChange={(e) => setApolloContactsWanted(e.target.value)}
-                    className="w-full rounded-lg border px-3 py-2"
-                    placeholder="100"
-                  />
-                </label>
               </div>
 
+              
+
               <div className="rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                This will send a webhook with the market name, product name, desired contact count, and selected campaign ID.
+                This will send a webhook with the selected country, product name, and selected campaign ID.
               </div>
 
               <button
@@ -649,21 +824,28 @@ export default function LeadsPage() {
           <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             <div className="font-semibold">Before uploading</div>
             <p className="mt-1">
-              Make sure your sheet columns match the names below. Use the copy buttons to copy the exact column names and paste them into your sheet.
+              Make sure your sheet columns match the lowercase names below. Use the copy button to copy all column names at once and paste them into your sheet.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              {REQUIRED_IMPORT_COLUMNS.map((column) => (
-                <button
-                  key={column.key}
-                  type="button"
-                  onClick={async () => {
-                    await copyToClipboard(column.label)
-                    toast.success(`Copied ${column.label}`)
-                  }}
-                  className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
+              <button
+                type="button"
+                onClick={async () => {
+                  await copyToClipboard(REQUIRED_IMPORT_COLUMN_NAMES.join('\t'))
+                  toast.success('Copied all column names')
+                }}
+                className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
+              >
+                Copy all column names
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {REQUIRED_IMPORT_COLUMN_NAMES.map((columnName) => (
+                <span
+                  key={columnName}
+                  className="inline-flex items-center rounded-full border border-amber-200 bg-white px-3 py-1 text-xs font-semibold text-amber-900"
                 >
-                  Copy {column.label}
-                </button>
+                  {columnName}
+                </span>
               ))}
             </div>
           </div>
@@ -734,7 +916,7 @@ export default function LeadsPage() {
             <button
               type="button"
               onClick={handleImport}
-              disabled={uploading || !rows.length || !selectedCampaignId}
+              disabled={uploading || !rows.length || !selectedCampaignId || missingRequiredHeaders.length > 0}
               className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
             >
               {uploading ? 'Importing...' : 'Confirm Import'}

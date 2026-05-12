@@ -1,0 +1,14 @@
+alter table leads add column if not exists company_linkedin_url text;
+alter table leads add column if not exists facebook_url text;
+alter table leads add column if not exists twitter_url text;
+alter table leads add column if not exists company_address text;
+alter table leads add column if not exists company_city text;
+alter table leads add column if not exists company_state text;
+alter table leads add column if not exists company_country text;
+alter table leads add column if not exists company_phone text;
+alter table leads add column if not exists technologies text;
+alter table leads add column if not exists total_funding text;
+alter table leads add column if not exists latest_funding text;
+alter table leads add column if not exists latest_funding_amount text;
+alter table leads add column if not exists last_raised_at timestamptz;
+alter table leads add column if not exists sent_at timestamptz;

@@ -17,7 +17,6 @@ export async function POST(req: Request) {
       Object.keys(obj || {}).forEach((k) => {
         const nk = String(k || '')
           .trim()
-          .toLowerCase()
           .replace(/\s+/g, '_')
           .replace(/[^\w_]/g, '')
         out[nk] = obj[k]
@@ -26,11 +25,12 @@ export async function POST(req: Request) {
     }
 
     function findByKeys(obj: any, keys: string[], substrFallback?: string) {
-      for (const k of keys) {
+      for (const k of keys.map((key) => String(key || '').trim().replace(/\s+/g, '_').replace(/[^\w_]/g, ''))) {
         if (obj[k] != null && obj[k] !== '') return obj[k]
       }
       if (substrFallback) {
-        const found = Object.keys(obj).find((kk) => kk.includes(substrFallback))
+        const fallback = String(substrFallback || '').trim().replace(/\s+/g, '_').replace(/[^\w_]/g, '')
+        const found = Object.keys(obj).find((kk) => kk.includes(fallback))
         if (found) return obj[found]
       }
       return undefined
@@ -41,21 +41,35 @@ export async function POST(req: Request) {
       return {
         organization_id: organization_id || null,
         campaign_id: campaign_id || null,
-        email: findByKeys(nr, ['email', 'e_mail', 'e-mail'], 'email'),
-        first_name: findByKeys(nr, ['first_name', 'firstname', 'first'], 'first'),
-        last_name: findByKeys(nr, ['last_name', 'lastname', 'last'], 'last'),
-        company_name: findByKeys(nr, ['company_name', 'company', 'companyname'], 'company'),
-        company_domain: findByKeys(nr, ['company_domain', 'domain', 'companydomain'], 'domain'),
-        website: findByKeys(nr, ['website', 'url', 'site'], 'web'),
-        linkedin_url: findByKeys(nr, ['linkedin_url', 'linkedin', 'person_linkedin_url', 'company_linkedin_url'], 'linkedin'),
-        city: findByKeys(nr, ['city'], 'city'),
-        state: findByKeys(nr, ['state'], 'state'),
-        country: findByKeys(nr, ['country'], 'country'),
-        industry: findByKeys(nr, ['industry'], 'industry'),
-        employees: (findByKeys(nr, ['employees', 'employee_count', 'number_of_employees'], 'employee') || null),
-        annual_revenue: findByKeys(nr, ['annual_revenue', 'revenue'], 'revenue'),
-        phone: findByKeys(nr, ['phone', 'phone_number', 'telephone'], 'phone'),
-        title: findByKeys(nr, ['title', 'role', 'position'], 'title'),
+        email: findByKeys(nr, ['Email'], 'Email'),
+        first_name: findByKeys(nr, ['First Name'], 'First Name'),
+        last_name: findByKeys(nr, ['Last Name'], 'Last Name'),
+        title: findByKeys(nr, ['Title'], 'Title'),
+        company_name: findByKeys(nr, ['Company Name'], 'Company Name'),
+        company_linkedin_url: findByKeys(nr, ['Company Linkedin Url'], 'Company Linkedin Url'),
+        company_domain: findByKeys(nr, ['Company Domain'], 'Company Domain'),
+        website: findByKeys(nr, ['Website'], 'Website'),
+        linkedin_url: findByKeys(nr, ['Person Linkedin Url'], 'Person Linkedin Url'),
+        facebook_url: findByKeys(nr, ['Facebook Url'], 'Facebook Url'),
+        twitter_url: findByKeys(nr, ['Twitter Url'], 'Twitter Url'),
+        city: findByKeys(nr, ['City'], 'City'),
+        state: findByKeys(nr, ['State'], 'State'),
+        country: findByKeys(nr, ['Country'], 'Country'),
+        company_address: findByKeys(nr, ['Company Address'], 'Company Address'),
+        company_city: findByKeys(nr, ['Company City'], 'Company City'),
+        company_state: findByKeys(nr, ['Company State'], 'Company State'),
+        company_country: findByKeys(nr, ['Company Country'], 'Company Country'),
+        company_phone: findByKeys(nr, ['Company Phone'], 'Company Phone'),
+        technologies: findByKeys(nr, ['Technologies'], 'Technologies'),
+        industry: findByKeys(nr, ['Industry'], 'Industry'),
+        employees: findByKeys(nr, ['# Employees'], '# Employees'),
+        annual_revenue: findByKeys(nr, ['Annual Revenue'], 'Annual Revenue'),
+        total_funding: findByKeys(nr, ['Total Funding'], 'Total Funding'),
+        latest_funding: findByKeys(nr, ['Latest Funding'], 'Latest Funding'),
+        latest_funding_amount: findByKeys(nr, ['Latest Funding Amount'], 'Latest Funding Amount'),
+        last_raised_at: findByKeys(nr, ['Last Raised At'], 'Last Raised At'),
+        sent_at: findByKeys(nr, ['sent_at'], 'sent_at'),
+        status: findByKeys(nr, ['status'], 'status'),
         source: 'csv'
       }
     })
