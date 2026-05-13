@@ -160,6 +160,9 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [leadFileName, setLeadFileName] = useState('')
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([])
   const [selectedEmail, setSelectedEmail] = useState('')
+  const [newEmailAddress, setNewEmailAddress] = useState('')
+  const [newEmailName, setNewEmailName] = useState('')
+  const [addingEmail, setAddingEmail] = useState(false)
   const [apolloLead, setApolloLead] = useState({
     market_name: '',
     product_name: ''
@@ -227,6 +230,66 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     fetchEmailAccounts()
   }, [])
+
+  async function handleAddEmailAccount() {
+    if (!newEmailAddress.trim() || !newEmailName.trim()) {
+      toast.error('Please provide both email address and account name')
+      return
+    }
+
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(newEmailAddress.trim())) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
+    setAddingEmail(true)
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      )
+
+      const { data, error: insertError } = await supabase
+        .from('email_accounts')
+        .insert({
+          email_address: newEmailAddress.trim(),
+          account_name: newEmailName.trim(),
+          provider: 'instantly'
+        })
+        .select()
+        .single()
+
+      if (insertError) {
+        if (insertError.message.includes('duplicate')) {
+          toast.error('This email address already exists')
+        } else {
+          toast.error(insertError.message || 'Failed to add email account')
+        }
+        return
+      }
+
+      if (data) {
+        const newAccount: EmailAccount = {
+          id: data.id,
+          email_address: data.email_address,
+          account_name: data.account_name,
+          provider: data.provider
+        }
+        setEmailAccounts((prev) => [...prev, newAccount])
+        setSelectedEmail(newEmailAddress.trim())
+        setNewEmailAddress('')
+        setNewEmailName('')
+        toast.success('Email account added successfully')
+      }
+    } catch (err: any) {
+      console.error('Failed to add email account:', err)
+      toast.error(err?.message || 'Failed to add email account')
+    } finally {
+      setAddingEmail(false)
+    }
+  })
 
   useEffect(() => {
     setName(initialData?.name || '')
@@ -694,8 +757,32 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                 ))}
               </select>
             ) : (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                No email accounts available. Please sync your Instantly account first.
+              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+                <p className="text-sm text-amber-700">No email accounts available. Add one below or sync your Instantly account.</p>
+                <div className="space-y-2">
+                  <input
+                    type="email"
+                    value={newEmailAddress}
+                    onChange={(event) => setNewEmailAddress(event.target.value)}
+                    placeholder="your-email@example.com"
+                    className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                  />
+                  <input
+                    type="text"
+                    value={newEmailName}
+                    onChange={(event) => setNewEmailName(event.target.value)}
+                    placeholder="Account name (e.g., Main Account)"
+                    className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddEmailAccount}
+                    disabled={addingEmail || !newEmailAddress.trim() || !newEmailName.trim()}
+                    className="w-full rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white disabled:bg-amber-400"
+                  >
+                    {addingEmail ? 'Adding...' : 'Add Email Account'}
+                  </button>
+                </div>
               </div>
             )}
           </label>
