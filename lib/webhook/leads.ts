@@ -1,4 +1,4 @@
-const DEFAULT_LEAD_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/88e7c5d9-6015-4ade-86af-03fc2b7b1c90'
+const DEFAULT_LEAD_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook-test/88e7c5d9-6015-4ade-86af-03fc2b7b1c90'
 const LEAD_WEBHOOK_URL = process.env.LEADS_WEBHOOK_URL || DEFAULT_LEAD_WEBHOOK_URL
 const IMPORT_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/22d3c430-9fa6-4c17-893b-a2e2a6d4e090'
 
@@ -38,6 +38,7 @@ export async function sendImportedLeadsToWebhook(
   campaignId: string,
   options: {
     sender_info?: Record<string, any> | null
+    sending_email?: string | null
     instantly_campaign_id?: string | null
     sequence_count?: number
   } = {}
@@ -47,6 +48,8 @@ export async function sendImportedLeadsToWebhook(
     campaign_id: campaignId,
     campaign_name: campaignName,
     sender_info: options.sender_info || null,
+    sending_email: options.sending_email || null,
+    email_list: options.sending_email ? [options.sending_email] : [],
     instantly_campaign_id: options.instantly_campaign_id || null,
     sequence_count: options.sequence_count ?? 0,
     total_leads: leads.length,

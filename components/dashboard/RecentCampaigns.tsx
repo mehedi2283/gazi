@@ -18,6 +18,19 @@ function statusStyles(status: string) {
   }
 }
 
+function formatCampaignDate(value?: string) {
+  if (!value) return 'Recently created'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'Recently created'
+
+  const month = date.getUTCMonth() + 1
+  const day = date.getUTCDate()
+  const year = date.getUTCFullYear()
+
+  return `${month}/${day}/${year}`
+}
+
 export default function RecentCampaigns({ data }: { data: Campaign[] }) {
   return (
     <div className="bg-white p-4 rounded-xl shadow min-h-[320px]">
@@ -34,7 +47,7 @@ export default function RecentCampaigns({ data }: { data: Campaign[] }) {
             <div key={campaign.id} className="flex items-center justify-between rounded-lg border px-3 py-3 hover:bg-slate-50">
               <div>
                 <div className="font-medium text-slate-900">{campaign.name}</div>
-                <div className="text-xs text-slate-500">{campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : 'Recently created'}</div>
+                <div className="text-xs text-slate-500">{formatCampaignDate(campaign.created_at)}</div>
               </div>
               <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusStyles(campaign.status)}`}>
                 {campaign.status}

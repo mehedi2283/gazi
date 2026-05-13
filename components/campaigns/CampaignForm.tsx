@@ -4,8 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
-import { Lock, Plus, Trash2 } from 'lucide-react'
-import { createClient } from '@supabase/supabase-js'
+import { ChevronDown, Lock, Plus, Trash2 } from 'lucide-react'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../lib/timezones'
 
 type LeadCreationMode = 'apollo' | 'import'
@@ -96,6 +95,7 @@ const COUNTRY_OPTIONS = [
 ]
 
 const CONTENT_LOCK_TOOLTIP = 'Email content is AI-personalized per lead and cannot be edited manually'
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function getSubjectVariable(stepNumber: number) {
   return `{{custom_subject_${stepNumber}}}`
@@ -163,6 +163,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [newEmailAddress, setNewEmailAddress] = useState('')
   const [newEmailName, setNewEmailName] = useState('')
   const [addingEmail, setAddingEmail] = useState(false)
+  const [emailMenuOpen, setEmailMenuOpen] = useState(false)
+  const [deletingEmailId, setDeletingEmailId] = useState('')
   const [apolloLead, setApolloLead] = useState({
     market_name: '',
     product_name: ''
@@ -179,6 +181,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [countryOpen, setCountryOpen] = useState(false)
   const [countryHighlight, setCountryHighlight] = useState(0)
   const countryRef = React.useRef<HTMLDivElement | null>(null)
+  const emailPickerRef = React.useRef<HTMLDivElement | null>(null)
   const [days, setDays] = useState({
     monday: initialData?.sending_days?.monday ?? initialData?.days?.monday ?? true,
     tuesday: initialData?.sending_days?.tuesday ?? initialData?.days?.tuesday ?? true,
@@ -202,26 +205,16 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   useEffect(() => {
     async function fetchEmailAccounts() {
       try {
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-        )
-        
-        const { data, error: fetchError } = await supabase
-          .from('email_accounts')
-          .select('id, email_address, account_name, provider')
-          .order('email_address', { ascending: true })
-        
-        if (fetchError) {
-          console.error('Error fetching email accounts:', fetchError)
+        const response = await fetch('/api/email-accounts')
+        const json = await response.json()
+
+        if (!response.ok || json.error) {
+          console.error('Error fetching email accounts:', json.error)
           return
         }
         
-        if (data) {
-          setEmailAccounts(data as EmailAccount[])
-          if (data.length > 0 && !selectedEmail) {
-            setSelectedEmail(data[0].email_address)
-          }
+        if (Array.isArray(json.data)) {
+          setEmailAccounts(json.data as EmailAccount[])
         }
       } catch (err) {
         console.error('Failed to fetch email accounts:', err)
@@ -231,63 +224,61 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     fetchEmailAccounts()
   }, [])
 
-  async function handleAddEmailAccount() {
-    if (!newEmailAddress.trim() || !newEmailName.trim()) {
-      toast.error('Please provide both email address and account name')
+  function selectTypedEmail() {
+    const normalizedEmail = newEmailAddress.trim().toLowerCase()
+
+    if (!EMAIL_REGEX.test(normalizedEmail)) {
+      toast.error('Please enter a valid email address')
       return
     }
 
-    // Simple email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-    if (!emailRegex.test(newEmailAddress.trim())) {
+    setSelectedEmail(normalizedEmail)
+    setEmailMenuOpen(false)
+  }
+
+  async function handleAddEmailAccount() {
+    if (!newEmailAddress.trim()) {
+      toast.error('Please provide an email address')
+      return
+    }
+
+    if (!EMAIL_REGEX.test(newEmailAddress.trim().toLowerCase())) {
       toast.error('Please enter a valid email address')
       return
     }
 
     setAddingEmail(true)
     try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      )
-
-      const { data, error: insertError } = await supabase
-        .from('email_accounts')
-        .insert({
-          email_address: newEmailAddress.trim(),
-          account_name: newEmailName.trim(),
-          provider: 'instantly'
-        })
-        .select()
-        .single()
-
-      if (insertError) {
-        if (insertError.message.includes('duplicate')) {
-          toast.error('This email address already exists')
-        } else {
-          toast.error(insertError.message || 'Failed to add email account')
-        }
-        return
-      }
-
-      if (data) {
-        const newAccount: EmailAccount = {
-          id: data.id,
-          email_address: data.email_address,
-          account_name: data.account_name,
-          provider: data.provider
-        }
-        setEmailAccounts((prev) => [...prev, newAccount])
-        setSelectedEmail(newEmailAddress.trim())
-        setNewEmailAddress('')
-        setNewEmailName('')
-        toast.success('Email account added successfully')
-      }
+      selectTypedEmail()
     } catch (err: any) {
-      console.error('Failed to add email account:', err)
-      toast.error(err?.message || 'Failed to add email account')
+      console.error('Failed to use email account:', err)
+      toast.error(err?.message || 'Failed to use email account')
     } finally {
       setAddingEmail(false)
+    }
+  }
+
+  async function handleDeleteEmailAccount(account: EmailAccount) {
+    setDeletingEmailId(account.id)
+    try {
+      const response = await fetch(`/api/email-accounts?id=${encodeURIComponent(account.id)}`, {
+        method: 'DELETE'
+      })
+      const json = await response.json()
+
+      if (!response.ok || json.error) {
+        throw new Error(json.error?.message || json.error || 'Failed to delete email account')
+      }
+
+      setEmailAccounts((prev) => prev.filter((item) => item.id !== account.id))
+      if (selectedEmail.toLowerCase() === account.email_address.toLowerCase()) {
+        setSelectedEmail('')
+      }
+      toast.success('Email account deleted')
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete email account')
+    } finally {
+      setDeletingEmailId('')
     }
   }
 
@@ -321,6 +312,9 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   }, [initialData])
 
   const sequenceError = useMemo(() => getSequenceError(steps), [steps])
+  const selectedEmailAccount = useMemo(() => {
+    return emailAccounts.find((account) => account.email_address.toLowerCase() === selectedEmail.toLowerCase()) || null
+  }, [emailAccounts, selectedEmail])
   const filteredCountries = useMemo(() => {
     const query = apolloLead.market_name.trim().toLowerCase()
     if (!query) return COUNTRY_OPTIONS
@@ -332,6 +326,18 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       if (!countryRef.current) return
       if (!countryRef.current.contains(event.target as Node)) {
         setCountryOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', handleOutsideClick)
+    return () => window.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!emailPickerRef.current) return
+      if (!emailPickerRef.current.contains(event.target as Node)) {
+        setEmailMenuOpen(false)
       }
     }
 
@@ -449,10 +455,19 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       return
     }
 
-    if (!selectedEmail) {
-      setError('Please select a sending email account')
-      setSubmitting(false)
-      return
+    const typedEmail = newEmailAddress.trim().toLowerCase()
+    let sendingEmail = selectedEmail.trim().toLowerCase()
+    let sendingEmailAccountName = selectedEmailAccount?.account_name || sendingEmail
+
+    if (typedEmail) {
+      if (!EMAIL_REGEX.test(typedEmail)) {
+        setError('Please enter a valid sending email address')
+        setSubmitting(false)
+        return
+      }
+
+      sendingEmail = typedEmail
+      sendingEmailAccountName = newEmailName.trim() || typedEmail
     }
 
     if (leadMode === 'apollo' && (!apolloLead.market_name.trim() || !apolloLead.product_name.trim())) {
@@ -501,7 +516,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         },
         lead_creation: leadCreation,
         lead_creation_mode: leadMode,
-        sending_email: selectedEmail
+        ...(sendingEmail ? {
+          sending_email: sendingEmail,
+          sending_email_account_name: sendingEmailAccountName
+        } : {})
       })
     } catch (err: any) {
       setError(err?.message || 'Unable to save campaign')
@@ -742,50 +760,103 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
             <p className="text-sm text-slate-600">Choose whether this campaign should create leads immediately after the campaign is created.</p>
           </div>
 
-          <label className="space-y-2">
+          <div className="space-y-2">
             <span className="text-sm font-medium">Sending Email Account</span>
-            {emailAccounts.length > 0 ? (
-              <select
-                value={selectedEmail}
-                onChange={(event) => setSelectedEmail(event.target.value)}
-                className="w-full rounded-lg border px-3 py-2"
-              >
-                {emailAccounts.map((account) => (
-                  <option key={account.id} value={account.email_address}>
-                    {account.account_name} ({account.email_address})
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <p className="text-sm text-amber-700">No email accounts available. Add one below or sync your Instantly account.</p>
-                <div className="space-y-2">
-                  <input
-                    type="email"
-                    value={newEmailAddress}
-                    onChange={(event) => setNewEmailAddress(event.target.value)}
-                    placeholder="your-email@example.com"
-                    className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="text"
-                    value={newEmailName}
-                    onChange={(event) => setNewEmailName(event.target.value)}
-                    placeholder="Account name (e.g., Main Account)"
-                    className="w-full rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddEmailAccount}
-                    disabled={addingEmail || !newEmailAddress.trim() || !newEmailName.trim()}
-                    className="w-full rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white disabled:bg-amber-400"
-                  >
-                    {addingEmail ? 'Adding...' : 'Add Email Account'}
-                  </button>
-                </div>
+            <div className="grid max-w-5xl gap-3 xl:grid-cols-[minmax(280px,360px)_minmax(520px,1fr)]">
+              <div ref={emailPickerRef} className="relative w-full">
+                <button
+                  type="button"
+                  onClick={() => setEmailMenuOpen((current) => !current)}
+                  className="flex h-10 w-full items-center justify-between rounded-lg border bg-white px-3 text-left text-sm text-slate-800 shadow-sm"
+                >
+                  <span className="truncate">
+                    {selectedEmail
+                      ? selectedEmailAccount
+                        ? `${selectedEmailAccount.account_name || selectedEmailAccount.email_address} (${selectedEmailAccount.email_address})`
+                        : selectedEmail
+                      : 'No sender selected'}
+                  </span>
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                </button>
+
+                {emailMenuOpen ? (
+                  <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border bg-white py-1 shadow-lg">
+                    <button
+                      type="button"
+                      className={`flex w-full items-center px-3 py-2 text-left text-sm hover:bg-slate-50 ${!selectedEmail ? 'font-semibold text-indigo-700' : 'text-slate-700'}`}
+                      onClick={() => {
+                        setSelectedEmail('')
+                        setNewEmailAddress('')
+                        setNewEmailName('')
+                        setEmailMenuOpen(false)
+                      }}
+                    >
+                      No sender selected
+                    </button>
+
+                    {emailAccounts.length ? (
+                      emailAccounts.map((account) => (
+                        <div key={account.id} className="flex items-center gap-1 px-1">
+                          <button
+                            type="button"
+                            className={`min-w-0 flex-1 rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-indigo-700' : 'text-slate-700'}`}
+                            onClick={() => {
+                              setSelectedEmail(account.email_address)
+                              setNewEmailAddress('')
+                              setNewEmailName('')
+                              setEmailMenuOpen(false)
+                            }}
+                          >
+                            <span className="block truncate">{account.account_name || account.email_address}</span>
+                            <span className="block truncate text-xs font-normal text-slate-500">{account.email_address}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              handleDeleteEmailAccount(account)
+                            }}
+                            disabled={deletingEmailId === account.id}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            aria-label={`Delete ${account.email_address}`}
+                          >
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-sm text-slate-500">No saved email accounts</div>
+                    )}
+                  </div>
+                ) : null}
               </div>
-            )}
-          </label>
+
+              <div className="grid w-full gap-2 sm:grid-cols-[minmax(260px,1fr)_minmax(180px,240px)_56px]">
+                <input
+                  type="email"
+                  value={newEmailAddress}
+                  onChange={(event) => setNewEmailAddress(event.target.value)}
+                  placeholder="new@email.com"
+                  className="h-10 min-w-0 rounded-lg border bg-white px-3 text-sm"
+                />
+                <input
+                  type="text"
+                  value={newEmailName}
+                  onChange={(event) => setNewEmailName(event.target.value)}
+                  placeholder="Name"
+                  className="h-10 min-w-0 rounded-lg border bg-white px-3 text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddEmailAccount}
+                  disabled={addingEmail || !newEmailAddress.trim()}
+                  className="h-10 rounded-lg bg-slate-900 px-3 text-sm font-medium text-white disabled:opacity-50"
+                >
+                  Use
+                </button>
+              </div>
+            </div>
+          </div>
 
           <div className="grid gap-3 md:grid-cols-2">
             {LEAD_MODE_OPTIONS.map((option) => (

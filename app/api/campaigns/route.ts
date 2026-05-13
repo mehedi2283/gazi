@@ -41,8 +41,51 @@ type LeadCreationPayload =
   | { mode: 'apollo'; lead?: Record<string, any> }
   | { mode: 'import'; leads?: Record<string, any>[] }
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function normalizeEmail(value: unknown) {
+  return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+async function saveEmailAccount(emailAddress: string, accountName?: string | null) {
+  if (!emailAddress) return null
+
+  const { error } = await supabase
+    .from('email_accounts')
+    .upsert(
+      {
+        email_address: emailAddress,
+        account_name: accountName?.trim() || emailAddress,
+        provider: 'instantly',
+        synced_at: new Date().toISOString()
+      },
+      { onConflict: 'email_address' }
+    )
+
+  return error ? formatSchemaError(error) : null
+}
+
+function formatInstantlyError(error: any) {
+  const message = typeof error?.message === 'string'
+    ? error.message
+    : typeof error?.data?.message === 'string'
+      ? error.data.message
+      : typeof error?.data?.error === 'string'
+        ? error.data.error
+        : typeof error === 'string'
+          ? error
+          : 'Instantly API failed while creating campaign/sequences.'
+
+  if (message.toLowerCase().includes('some emails are not found')) {
+    return 'The selected sending email does not exist in your Instantly account.'
+  }
+
+  return message
+}
+
 function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: string | null) {
   const senderInfo = body?.sender_info || null
+  const sendingEmail = normalizeEmail(body?.sending_email)
   const leadCreation: LeadCreationPayload = body?.lead_creation || { mode: 'none' }
   const sequenceCount = normalizeSequenceSteps(body?.sequences).length
 
@@ -54,6 +97,8 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
     instantly_campaign_id: instantlyCampaignId,
     sequence_count: sequenceCount,
     sender_info: senderInfo,
+    sending_email: sendingEmail || null,
+    email_list: sendingEmail ? [sendingEmail] : [],
     lead_creation_mode: leadCreation.mode,
     lead_creation: leadCreation,
     campaign: {
@@ -67,7 +112,8 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
       link_tracking: campaign?.link_tracking ?? null,
       timezone: campaign?.timezone || null,
       from_time: campaign?.from_time || null,
-      to_time: campaign?.to_time || null
+      to_time: campaign?.to_time || null,
+      sending_email: sendingEmail || null
     }
   }
 }
@@ -334,9 +380,14 @@ export async function POST(req: Request) {
 
     const organizationId = body.organization_id || body.organizationId || null
     const createdBy = body.created_by || body.createdBy || req.headers.get('x-user-id') || null
+    const sendingEmail = normalizeEmail(body.sending_email)
     const schedule = body.campaign_schedule?.schedules?.[0] || {}
     const sequenceSteps = normalizeSequenceSteps(body.sequences)
     const sequenceError = validateSequenceSteps(sequenceSteps)
+
+    if (body.sending_email && !EMAIL_REGEX.test(sendingEmail)) {
+      return NextResponse.json({ data: null, error: 'Please enter a valid sending email address' }, { status: 400 })
+    }
 
     if (sequenceError) {
       return NextResponse.json({ data: null, error: sequenceError }, { status: 400 })
@@ -435,7 +486,8 @@ export async function POST(req: Request) {
       daily_limit: Number.isFinite(dailyLimit) ? dailyLimit : 50,
       stop_on_reply: stopOnReply,
       open_tracking: openTracking,
-      link_tracking: linkTracking
+      link_tracking: linkTracking,
+      ...(sendingEmail ? { email_list: [sendingEmail] } : {})
     }
 
     let instantlyCampaignId: string | null = null
@@ -509,6 +561,14 @@ export async function POST(req: Request) {
 
       const updatedCampaign = updatedRows?.[0] || { ...campaign, instantly_campaign_id: instantlyCampaignId, status: instantlyStatus }
 
+      if (sendingEmail) {
+        const emailAccountError = await saveEmailAccount(sendingEmail, body?.sending_email_account_name || null)
+
+        if (emailAccountError) {
+          return NextResponse.json({ data: updatedCampaign, error: emailAccountError }, { status: 500 })
+        }
+      }
+
       const webhookErrors: string[] = []
 
       try {
@@ -527,6 +587,7 @@ export async function POST(req: Request) {
             updatedCampaign?.id || campaign.id,
             {
               sender_info: body?.sender_info || null,
+              sending_email: sendingEmail || null,
               instantly_campaign_id: instantlyCampaignId,
               sequence_count: sequenceCount
             }
@@ -551,7 +612,7 @@ export async function POST(req: Request) {
 
       return NextResponse.json({
         data: campaign,
-        error: instantlyError?.message || 'Instantly API failed while creating campaign/sequences.'
+        error: formatInstantlyError(instantlyError)
       }, { status: 502 })
     }
   } catch (err: any) {
