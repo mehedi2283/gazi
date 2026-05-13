@@ -1,0 +1,276 @@
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.dash{padding:1.25rem 0}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:10px}
+.topbar h1{font-size:18px;font-weight:500;color:var(--color-text-primary)}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-group{display:flex;gap:4px}
+.filter-btn{font-size:12px;padding:5px 11px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);cursor:pointer}
+.filter-btn.active{background:var(--color-background-secondary);color:var(--color-text-primary);border-color:var(--color-border-primary)}
+.camp-select{font-size:13px;padding:5px 10px;border-radius:var(--border-radius-md);border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);color:var(--color-text-primary);min-width:200px;max-width:260px}
+.api-row{display:flex;gap:8px;margin-bottom:1rem;flex-wrap:wrap}
+.api-row input{flex:1;min-width:200px;font-size:13px}
+.err{font-size:12px;color:var(--color-text-danger);margin-bottom:8px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:1.25rem}
+.kpi-card{background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:14px 16px;position:relative;overflow:hidden}
+.kpi-label{font-size:11px;color:var(--color-text-secondary);margin-bottom:5px;display:flex;align-items:center;gap:4px}
+.kpi-value{font-size:22px;font-weight:500;color:var(--color-text-primary)}
+.kpi-sub{font-size:10px;color:var(--color-text-tertiary);margin-top:2px}
+.kpi-icon{position:absolute;right:10px;top:10px;font-size:17px;opacity:0.2}
+.charts-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:1.25rem}
+.card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem}
+.card-title{font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:12px;display:flex;align-items:center;gap:5px}
+.legend{display:flex;gap:12px;font-size:11px;color:var(--color-text-secondary);margin-bottom:8px;flex-wrap:wrap}
+.legend span{display:flex;align-items:center;gap:4px}
+.ldot{width:8px;height:8px;border-radius:2px;display:inline-block}
+.table-wrap{overflow-x:auto}
+table{width:100%;font-size:12px;border-collapse:collapse;table-layout:fixed}
+thead th{font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-align:left;padding:6px 8px;border-bottom:0.5px solid var(--color-border-tertiary)}
+tbody td{padding:7px 8px;color:var(--color-text-primary);border-bottom:0.5px solid var(--color-border-tertiary)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:var(--color-background-secondary)}
+.badge{display:inline-block;font-size:10px;padding:2px 7px;border-radius:var(--border-radius-md)}
+.bg{background:#EAF3DE;color:#3B6D11}
+.ba{background:#FAEEDA;color:#854F0B}
+.bgr{background:#F1EFE8;color:#5F5E5A}
+.spinner{text-align:center;padding:1.5rem;color:var(--color-text-tertiary);font-size:13px}
+.camp-tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;padding:4px 10px;background:var(--color-background-info);color:var(--color-text-info);border-radius:var(--border-radius-md);margin-bottom:12px}
+</style>
+
+<div class="dash">
+  <h2 class="sr-only">Instantly.ai analytics dashboard with campaign filter dropdown</h2>
+
+  <div class="topbar">
+    <h1>Instantly analytics</h1>
+    <div class="controls">
+      <div class="filter-group" id="rangeFilter">
+        <button class="filter-btn" data-days="7">7d</button>
+        <button class="filter-btn active" data-days="30">30d</button>
+        <button class="filter-btn" data-days="90">90d</button>
+      </div>
+      <select class="camp-select" id="campSelect" onchange="onCampChange()" disabled>
+        <option value="all">All campaigns</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="api-row">
+    <input id="apiKey" type="password" placeholder="Paste Instantly API key..." />
+    <button onclick="loadData()">Load</button>
+  </div>
+  <div class="err" id="errMsg"></div>
+
+  <div id="campTag" style="display:none" class="camp-tag">
+    <i class="ti ti-filter" aria-hidden="true" style="font-size:13px"></i>
+    <span id="campTagName"></span>
+    <span style="cursor:pointer;opacity:0.6" onclick="resetCamp()"><i class="ti ti-x" aria-hidden="true" style="font-size:12px"></i></span>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="kpi-label">Emails sent</div><div class="kpi-value" id="kSent">—</div><div class="kpi-sub">total sent</div></div>
+    <div class="kpi-card"><div class="kpi-label">Open rate</div><div class="kpi-value" id="kOpen">—</div><div class="kpi-sub">unique opens</div></div>
+    <div class="kpi-card"><div class="kpi-label">Reply rate</div><div class="kpi-value" id="kReply">—</div><div class="kpi-sub">unique replies</div></div>
+    <div class="kpi-card"><div class="kpi-label">Bounce rate</div><div class="kpi-value" id="kBounce">—</div><div class="kpi-sub">of sent</div></div>
+  </div>
+
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">Daily trend</div>
+      <div class="legend">
+        <span><span class="ldot" style="background:#378ADD"></span>Sent</span>
+        <span><span class="ldot" style="background:#1D9E75"></span>Replies</span>
+        <span><span class="ldot" style="background:#D85A30"></span>Opens</span>
+      </div>
+      <div style="position:relative;height:190px"><canvas id="trendChart">Load data to see trend.</canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Engagement breakdown</div>
+      <div style="position:relative;height:190px;display:flex;align-items:center;justify-content:center">
+        <canvas id="donutChart">Load data.</canvas>
+        <div style="position:absolute;text-align:center;pointer-events:none">
+          <div style="font-size:10px;color:var(--color-text-tertiary)">sent</div>
+          <div style="font-size:18px;font-weight:500;color:var(--color-text-primary)" id="donutTotal">—</div>
+        </div>
+      </div>
+      <div class="legend" id="donutLegend" style="justify-content:center;margin-top:6px"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Campaign performance</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th style="width:26%">Campaign</th>
+          <th style="width:10%">Status</th>
+          <th style="width:10%">Leads</th>
+          <th style="width:10%">Sent</th>
+          <th style="width:10%">Opens</th>
+          <th style="width:10%">Replies</th>
+          <th style="width:9%">Clicks</th>
+          <th style="width:8%">Bounce</th>
+          <th style="width:7%">Open%</th>
+        </tr></thead>
+        <tbody id="campTable"><tr><td colspan="9" class="spinner">Enter API key and click Load</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let trendInst=null, donutInst=null;
+let activeDays=30, allCampaigns=[], allDaily=[], apiKey='';
+
+document.querySelectorAll('.filter-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    activeDays=parseInt(btn.dataset.days);
+    if(apiKey) loadData();
+  });
+});
+
+function getDateRange(days){
+  const end=new Date(), start=new Date();
+  start.setDate(start.getDate()-days);
+  return {start:start.toISOString().split('T')[0], end:end.toISOString().split('T')[0]};
+}
+
+async function loadData(){
+  apiKey=document.getElementById('apiKey').value.trim();
+  const err=document.getElementById('errMsg');
+  err.textContent='';
+  if(!apiKey){err.textContent='Please enter an API key.';return;}
+  const btn=event.currentTarget||document.querySelector('[onclick="loadData()"]');
+  btn.textContent='Loading...'; btn.disabled=true;
+  const {start,end}=getDateRange(activeDays);
+  const h={'Authorization':'Bearer '+apiKey};
+  try{
+    const [dRes,cRes]=await Promise.all([
+      fetch(`https://api.instantly.ai/api/v2/accounts/analytics/daily?start_date=${start}&end_date=${end}`,{headers:h}),
+      fetch(`https://api.instantly.ai/api/v2/campaigns/analytics`,{headers:h})
+    ]);
+    if(!dRes.ok) throw new Error('Auth failed — check your API key');
+    allDaily=await dRes.json();
+    allCampaigns=await cRes.json();
+    populateDropdown(allCampaigns);
+    renderAll('all');
+  }catch(e){err.textContent=e.message||'Failed to load.';}
+  btn.textContent='Load'; btn.disabled=false;
+}
+
+function populateDropdown(campaigns){
+  const sel=document.getElementById('campSelect');
+  sel.innerHTML='<option value="all">All campaigns</option>';
+  (campaigns||[]).forEach(c=>{
+    const o=document.createElement('option');
+    o.value=c.campaign_id||'';
+    o.textContent=c.campaign_name||c.campaign_id||'Unknown';
+    sel.appendChild(o);
+  });
+  sel.disabled=false;
+}
+
+function onCampChange(){
+  const val=document.getElementById('campSelect').value;
+  renderAll(val);
+  const tag=document.getElementById('campTag');
+  const tagName=document.getElementById('campTagName');
+  if(val==='all'){tag.style.display='none';}
+  else{
+    const c=allCampaigns.find(x=>x.campaign_id===val);
+    tagName.textContent=c?c.campaign_name:'Selected campaign';
+    tag.style.display='inline-flex';
+  }
+}
+
+function resetCamp(){
+  document.getElementById('campSelect').value='all';
+  document.getElementById('campTag').style.display='none';
+  renderAll('all');
+}
+
+async function renderAll(campId){
+  if(campId==='all'){
+    renderKPIsFromDaily(allDaily);
+    renderTrend(allDaily);
+    renderDonutFromCampaigns(allCampaigns);
+    renderTable(allCampaigns, null);
+  } else {
+    const apiKey2=document.getElementById('apiKey').value.trim();
+    const {start,end}=getDateRange(activeDays);
+    const h={'Authorization':'Bearer '+apiKey2};
+    try{
+      const dRes=await fetch(`https://api.instantly.ai/api/v2/campaigns/analytics/daily?campaign_id=${campId}&start_date=${start}&end_date=${end}`,{headers:h});
+      const dailyCamp=await dRes.json();
+      renderKPIsFromDaily(dailyCamp);
+      renderTrend(dailyCamp);
+    }catch(e){}
+    const c=allCampaigns.find(x=>x.campaign_id===campId);
+    if(c) renderDonutFromCampaigns([c]);
+    renderTable(allCampaigns, campId);
+  }
+}
+
+function renderKPIsFromDaily(daily){
+  const arr=Array.isArray(daily)?daily:[];
+  const sent=arr.reduce((s,d)=>s+(d.sent||0),0);
+  const open=arr.reduce((s,d)=>s+(d.unique_opened||0),0);
+  const reply=arr.reduce((s,d)=>s+(d.unique_replies||0),0);
+  const bounce=arr.reduce((s,d)=>s+(d.bounced||0),0);
+  document.getElementById('kSent').textContent=sent.toLocaleString();
+  document.getElementById('kOpen').textContent=sent>0?(open/sent*100).toFixed(1)+'%':'0%';
+  document.getElementById('kReply').textContent=sent>0?(reply/sent*100).toFixed(1)+'%':'0%';
+  document.getElementById('kBounce').textContent=sent>0?(bounce/sent*100).toFixed(1)+'%':'0%';
+}
+
+function renderTrend(daily){
+  const sorted=[...daily].sort((a,b)=>a.date>b.date?1:-1);
+  const labels=sorted.map(d=>d.date.slice(5));
+  const sent=sorted.map(d=>d.sent||0);
+  const replies=sorted.map(d=>d.unique_replies||0);
+  const opens=sorted.map(d=>d.unique_opened||0);
+  if(trendInst) trendInst.destroy();
+  trendInst=new Chart(document.getElementById('trendChart'),{
+    type:'line',data:{labels,datasets:[{label:'Sent',data:sent,borderColor:'#378ADD',backgroundColor:'rgba(55,138,221,0.07)',tension:0.3,fill:true,pointRadius:2,borderWidth:2},{label:'Replies',data:replies,borderColor:'#1D9E75',backgroundColor:'rgba(29,158,117,0.07)',tension:0.3,fill:true,pointRadius:2,borderWidth:2},{label:'Opens',data:opens,borderColor:'#D85A30',borderDash:[4,3],backgroundColor:'transparent',tension:0.3,fill:false,pointRadius:2,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{font:{size:10},maxRotation:45,autoSkip:true,maxTicksLimit:10},grid:{display:false}},y:{ticks:{font:{size:10}},grid:{color:'rgba(128,128,128,0.1)'}}}}
+  });
+}
+
+function renderDonutFromCampaigns(camps){
+  const opens=camps.reduce((s,c)=>s+(c.open_count_unique||0),0);
+  const replies=camps.reduce((s,c)=>s+(c.reply_count_unique||0),0);
+  const clicks=camps.reduce((s,c)=>s+(c.link_click_count_unique||0),0);
+  const bounced=camps.reduce((s,c)=>s+(c.bounced_count||0),0);
+  const sent=camps.reduce((s,c)=>s+(c.emails_sent_count||0),0);
+  document.getElementById('donutTotal').textContent=sent.toLocaleString();
+  const data=[opens,replies,clicks,bounced];
+  const labels=['Opens','Replies','Clicks','Bounced'];
+  const colors=['#378ADD','#1D9E75','#BA7517','#E24B4A'];
+  if(donutInst) donutInst.destroy();
+  donutInst=new Chart(document.getElementById('donutChart'),{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'transparent'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false},tooltip:{callbacks:{label:(c)=>` ${c.label}: ${c.raw.toLocaleString()}`}}}}});
+  document.getElementById('donutLegend').innerHTML=labels.map((l,i)=>`<span><span class="ldot" style="background:${colors[i]}"></span>${l} ${data[i].toLocaleString()}</span>`).join('');
+}
+
+function renderTable(campaigns, filterCampId){
+  const tbody=document.getElementById('campTable');
+  const list=filterCampId?campaigns.filter(c=>c.campaign_id===filterCampId):campaigns;
+  if(!list||!list.length){tbody.innerHTML='<tr><td colspan="9" class="spinner">No campaigns found</td></tr>';return;}
+  tbody.innerHTML=list.map(c=>{
+    const sent=c.emails_sent_count||0;
+    const openPct=sent>0?((c.open_count_unique||0)/sent*100).toFixed(1)+'%':'—';
+    const s=c.campaign_status===1?'<span class="badge bg">active</span>':c.campaign_status===2?'<span class="badge ba">paused</span>':'<span class="badge bgr">draft</span>';
+    return `<tr>
+      <td style="font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${c.campaign_name||''}">${c.campaign_name||'—'}</td>
+      <td>${s}</td>
+      <td>${(c.leads_count||0).toLocaleString()}</td>
+      <td>${sent.toLocaleString()}</td>
+      <td>${(c.open_count_unique||0).toLocaleString()}</td>
+      <td>${(c.reply_count_unique||0).toLocaleString()}</td>
+      <td>${(c.link_click_count_unique||0).toLocaleString()}</td>
+      <td>${(c.bounced_count||0).toLocaleString()}</td>
+      <td>${openPct}</td>
+    </tr>`;
+  }).join('');
+}
+</script>

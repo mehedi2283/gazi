@@ -35,12 +35,20 @@ export async function sendLeadsToWebhook(payload: unknown) {
 export async function sendImportedLeadsToWebhook(
   leads: LeadPayload[],
   campaignName: string,
-  campaignId: string
+  campaignId: string,
+  options: {
+    sender_info?: Record<string, any> | null
+    instantly_campaign_id?: string | null
+    sequence_count?: number
+  } = {}
 ) {
   const payload = {
     source: 'lead_import',
     campaign_id: campaignId,
     campaign_name: campaignName,
+    sender_info: options.sender_info || null,
+    instantly_campaign_id: options.instantly_campaign_id || null,
+    sequence_count: options.sequence_count ?? 0,
     total_leads: leads.length,
     leads: leads
   }

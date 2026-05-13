@@ -520,10 +520,16 @@ export async function POST(req: Request) {
 
       if (body?.lead_creation?.mode === 'import' && Array.isArray(body?.lead_creation?.leads)) {
         try {
+          const sequenceCount = Array.isArray(body?.sequences) ? body.sequences.length : 0
           await sendImportedLeadsToWebhook(
             body.lead_creation.leads,
             updatedCampaign?.name || body?.name || '',
-            updatedCampaign?.id || campaign.id
+            updatedCampaign?.id || campaign.id,
+            {
+              sender_info: body?.sender_info || null,
+              instantly_campaign_id: instantlyCampaignId,
+              sequence_count: sequenceCount
+            }
           )
         } catch (error: any) {
           webhookErrors.push(error?.message || String(error))
