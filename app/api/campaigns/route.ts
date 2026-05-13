@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createCampaign, listAllCampaigns, updateCampaign } from '../../../lib/instantly/client'
 import supabase from '../../../lib/supabase/server'
-import { sendLeadsToWebhook } from '../../../lib/webhook/leads'
+import { sendImportedLeadsToWebhook, sendLeadsToWebhook } from '../../../lib/webhook/leads'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../../lib/timezones'
 
 type LocalCampaign = {
@@ -509,13 +509,28 @@ export async function POST(req: Request) {
 
       const updatedCampaign = updatedRows?.[0] || { ...campaign, instantly_campaign_id: instantlyCampaignId, status: instantlyStatus }
 
-      let webhookError: string | null = null
+      const webhookErrors: string[] = []
+
       try {
         const webhookPayload = buildWebhookPayload(updatedCampaign, body, instantlyCampaignId)
         await sendLeadsToWebhook(webhookPayload)
       } catch (error: any) {
-        webhookError = error?.message || String(error)
+        webhookErrors.push(error?.message || String(error))
       }
+
+      if (body?.lead_creation?.mode === 'import' && Array.isArray(body?.lead_creation?.leads)) {
+        try {
+          await sendImportedLeadsToWebhook(
+            body.lead_creation.leads,
+            updatedCampaign?.name || body?.name || '',
+            updatedCampaign?.id || campaign.id
+          )
+        } catch (error: any) {
+          webhookErrors.push(error?.message || String(error))
+        }
+      }
+
+      const webhookError = webhookErrors.length > 0 ? webhookErrors.join(' | ') : null
 
       return NextResponse.json({ data: updatedCampaign, error: null, webhookError })
     } catch (instantlyError: any) {

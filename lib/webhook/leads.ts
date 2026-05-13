@@ -1,5 +1,6 @@
 const DEFAULT_LEAD_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/88e7c5d9-6015-4ade-86af-03fc2b7b1c90'
 const LEAD_WEBHOOK_URL = process.env.LEADS_WEBHOOK_URL || DEFAULT_LEAD_WEBHOOK_URL
+const IMPORT_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook-test/22d3c430-9fa6-4c17-893b-a2e2a6d4e090'
 
 type LeadPayload = {
   campaign_id?: string | null
@@ -26,6 +27,36 @@ export async function sendLeadsToWebhook(payload: unknown) {
     throw new Error(
       `Webhook request failed with status ${response.status}${responseText ? `: ${responseText}` : ''}`
     )
+  }
+
+  return response
+}
+
+export async function sendImportedLeadsToWebhook(
+  leads: LeadPayload[],
+  campaignName: string,
+  campaignId: string
+) {
+  const payload = {
+    source: 'lead_import',
+    campaign_id: campaignId,
+    campaign_name: campaignName,
+    total_leads: leads.length,
+    leads: leads
+  }
+
+  const response = await fetch(IMPORT_WEBHOOK_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => '')
+    console.error(`Import webhook request failed: ${response.status}${responseText ? `: ${responseText}` : ''}`)
   }
 
   return response
