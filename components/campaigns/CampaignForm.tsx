@@ -5,16 +5,12 @@ import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
 import { Lock, Plus, Trash2 } from 'lucide-react'
+import { createClient } from '@supabase/supabase-js'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../lib/timezones'
 
-type LeadCreationMode = 'none' | 'manual' | 'apollo' | 'import'
+type LeadCreationMode = 'apollo' | 'import'
 
 type LeadCreationConfig =
-  | { mode: 'none' }
-  | {
-      mode: 'manual'
-      lead: Record<string, any>
-    }
   | {
       mode: 'apollo'
       lead: {
@@ -26,6 +22,13 @@ type LeadCreationConfig =
       mode: 'import'
       leads: Record<string, any>[]
     }
+
+type EmailAccount = {
+  id: string
+  email_address: string
+  account_name: string
+  provider: string
+}
 
 type SequenceStep = {
   delay_days: number
@@ -74,8 +77,6 @@ type CampaignFormProps = {
 }
 
 const LEAD_MODE_OPTIONS: Array<{ value: LeadCreationMode; label: string; description: string }> = [
-  { value: 'none', label: 'No leads', description: 'Create the campaign only' },
-  { value: 'manual', label: 'Manual', description: 'Add one lead after launch' },
   { value: 'apollo', label: 'Apollo', description: 'Send country and product data to the webhook' },
   { value: 'import', label: 'Import', description: 'Upload a CSV or spreadsheet of leads' }
 ]
@@ -154,19 +155,11 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [stopOnReply, setStopOnReply] = useState(initialData?.stop_on_reply ?? true)
   const [openTracking, setOpenTracking] = useState(initialData?.open_tracking ?? false)
   const [linkTracking, setLinkTracking] = useState(initialData?.link_tracking ?? true)
-  const [leadMode, setLeadMode] = useState<LeadCreationMode>('none')
+  const [leadMode, setLeadMode] = useState<LeadCreationMode>('apollo')
   const [leadRows, setLeadRows] = useState<Record<string, any>[]>([])
   const [leadFileName, setLeadFileName] = useState('')
-  const [manualLead, setManualLead] = useState({
-    email: '',
-    first_name: '',
-    last_name: '',
-    title: '',
-    company_name: '',
-    company_domain: '',
-    phone: '',
-    linkedin_url: ''
-  })
+  const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([])
+  const [selectedEmail, setSelectedEmail] = useState('')
   const [apolloLead, setApolloLead] = useState({
     market_name: '',
     product_name: ''
@@ -201,6 +194,39 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     return initialSteps
   })
+
+  // Fetch email accounts from Supabase
+  useEffect(() => {
+    async function fetchEmailAccounts() {
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+        )
+        
+        const { data, error: fetchError } = await supabase
+          .from('email_accounts')
+          .select('id, email_address, account_name, provider')
+          .order('email_address', { ascending: true })
+        
+        if (fetchError) {
+          console.error('Error fetching email accounts:', fetchError)
+          return
+        }
+        
+        if (data) {
+          setEmailAccounts(data as EmailAccount[])
+          if (data.length > 0 && !selectedEmail) {
+            setSelectedEmail(data[0].email_address)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch email accounts:', err)
+      }
+    }
+
+    fetchEmailAccounts()
+  }, [])
 
   useEffect(() => {
     setName(initialData?.name || '')
@@ -360,19 +386,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       return
     }
 
-    const trimmedManualLead = {
-      email: manualLead.email.trim(),
-      first_name: manualLead.first_name.trim(),
-      last_name: manualLead.last_name.trim(),
-      title: manualLead.title.trim(),
-      company_name: manualLead.company_name.trim(),
-      company_domain: manualLead.company_domain.trim(),
-      phone: manualLead.phone.trim(),
-      linkedin_url: manualLead.linkedin_url.trim()
-    }
-
-    if (leadMode === 'manual' && !trimmedManualLead.email) {
-      setError('Lead email is required for manual lead creation')
+    if (!selectedEmail) {
+      setError('Please select a sending email account')
       setSubmitting(false)
       return
     }
@@ -396,28 +411,18 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     }
 
     const leadCreation: LeadCreationConfig =
-      leadMode === 'manual'
+      leadMode === 'apollo'
         ? {
-            mode: 'manual',
+            mode: 'apollo',
             lead: {
-              ...trimmedManualLead,
-              source: 'manual'
+              market_name: apolloLead.market_name.trim().toLowerCase(),
+              product_name: apolloLead.product_name.trim()
             }
           }
-        : leadMode === 'apollo'
-          ? {
-              mode: 'apollo',
-              lead: {
-                market_name: apolloLead.market_name.trim().toLowerCase(),
-                product_name: apolloLead.product_name.trim()
-              }
-            }
-            : leadMode === 'import'
-              ? {
-                  mode: 'import',
-                  leads: leadRows
-                }
-            : { mode: 'none' }
+        : {
+            mode: 'import',
+            leads: leadRows
+          }
 
     try {
       await onSubmit({
@@ -425,14 +430,15 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         sender_info: {
           name: senderInfo.name.trim(),
           company: senderInfo.company.trim(),
-            company_details: senderInfo.company_details.trim(),
-            long_message: senderInfo.long_message.trim(),
+          company_details: senderInfo.company_details.trim(),
+          long_message: senderInfo.long_message.trim(),
           location: senderInfo.location.trim(),
           address: senderInfo.address.trim(),
           booking_calendar_link: senderInfo.booking_calendar_link.trim()
         },
         lead_creation: leadCreation,
-        lead_creation_mode: leadMode
+        lead_creation_mode: leadMode,
+        sending_email: selectedEmail
       })
     } catch (err: any) {
       setError(err?.message || 'Unable to save campaign')
@@ -673,6 +679,27 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
             <p className="text-sm text-slate-600">Choose whether this campaign should create leads immediately after the campaign is created.</p>
           </div>
 
+          <label className="space-y-2">
+            <span className="text-sm font-medium">Sending Email Account</span>
+            {emailAccounts.length > 0 ? (
+              <select
+                value={selectedEmail}
+                onChange={(event) => setSelectedEmail(event.target.value)}
+                className="w-full rounded-lg border px-3 py-2"
+              >
+                {emailAccounts.map((account) => (
+                  <option key={account.id} value={account.email_address}>
+                    {account.account_name} ({account.email_address})
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                No email accounts available. Please sync your Instantly account first.
+              </div>
+            )}
+          </label>
+
           <div className="grid gap-3 md:grid-cols-2">
             {LEAD_MODE_OPTIONS.map((option) => (
               <label key={option.value} className={`rounded-lg border px-4 py-3 ${leadMode === option.value ? 'border-indigo-600 bg-white' : 'bg-white/80'}`}>
@@ -689,49 +716,6 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               </label>
             ))}
           </div>
-
-          {leadMode === 'manual' ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Email</span>
-                <input
-                  type="email"
-                  value={manualLead.email}
-                  onChange={(event) => setManualLead((current) => ({ ...current, email: event.target.value }))}
-                  className="w-full rounded-lg border px-3 py-2"
-                  placeholder="lead@example.com"
-                />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">First Name</span>
-                <input value={manualLead.first_name} onChange={(event) => setManualLead((current) => ({ ...current, first_name: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Last Name</span>
-                <input value={manualLead.last_name} onChange={(event) => setManualLead((current) => ({ ...current, last_name: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Title</span>
-                <input value={manualLead.title} onChange={(event) => setManualLead((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Company</span>
-                <input value={manualLead.company_name} onChange={(event) => setManualLead((current) => ({ ...current, company_name: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Company Domain</span>
-                <input value={manualLead.company_domain} onChange={(event) => setManualLead((current) => ({ ...current, company_domain: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Phone</span>
-                <input value={manualLead.phone} onChange={(event) => setManualLead((current) => ({ ...current, phone: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
-              </label>
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium">LinkedIn URL</span>
-                <input value={manualLead.linkedin_url} onChange={(event) => setManualLead((current) => ({ ...current, linkedin_url: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
-              </label>
-            </div>
-          ) : null}
 
           {leadMode === 'apollo' ? (
             <div className="grid gap-4 md:grid-cols-2">

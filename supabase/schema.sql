@@ -1,5 +1,14 @@
 create extension if not exists pgcrypto;
 
+create table if not exists email_accounts (
+  id uuid primary key default gen_random_uuid(),
+  email_address text not null unique,
+  account_name text,
+  provider text default 'instantly',
+  synced_at timestamptz default now(),
+  created_at timestamptz default now()
+);
+
 create table if not exists organizations (
   id uuid primary key default gen_random_uuid(),
   name text not null,

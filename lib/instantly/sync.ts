@@ -33,8 +33,8 @@ export async function syncInstantly(): Promise<SyncResult> {
       Authorization: `Bearer ${instantlyApiKey}`,
     }
 
-    // Fetch all 3 endpoints in parallel
-    const [campaignsRes, dailyRes, overviewRes] = await Promise.all([
+    // Fetch all 4 endpoints in parallel
+    const [campaignsRes, dailyRes, overviewRes, accountsRes] = await Promise.all([
       axios.get(`${INSTANTLY_BASE_URL}/campaigns/analytics`, { headers }),
       axios.get(`${INSTANTLY_BASE_URL}/accounts/analytics/daily`, {
         headers,
@@ -44,11 +44,13 @@ export async function syncInstantly(): Promise<SyncResult> {
         },
       }),
       axios.get(`${INSTANTLY_BASE_URL}/campaigns/analytics/overview`, { headers }),
+      axios.get(`${INSTANTLY_BASE_URL}/accounts/list`, { headers }).catch(() => ({ data: [] })),
     ])
 
     const campaigns = campaignsRes.data || []
     const daily = dailyRes.data || []
     const overview = overviewRes.data || {}
+    const accounts = accountsRes.data || []
 
     // Upsert campaigns
     if (campaigns.length > 0) {
@@ -70,6 +72,19 @@ export async function syncInstantly(): Promise<SyncResult> {
           synced_at: timestamp,
         })),
         { onConflict: 'campaign_id' }
+      )
+    }
+
+    // Upsert email accounts
+    if (accounts.length > 0) {
+      await supabaseServer.from('email_accounts').upsert(
+        accounts.map((account: any) => ({
+          email_address: account.email || account.email_address,
+          account_name: account.account_name || account.email,
+          provider: 'instantly',
+          synced_at: timestamp,
+        })),
+        { onConflict: 'email_address' }
       )
     }
 
