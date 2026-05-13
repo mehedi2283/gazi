@@ -12,7 +12,7 @@ export default function RegisterPage() {
           <input placeholder="Password" type="password" className="w-full px-3 py-2 border rounded" />
           <button className="w-full bg-indigo-600 text-white py-2 rounded">Register</button>
         </form>
-        <p className="mt-4 text-sm">Already have an account? <Link href="/auth/login" className="text-indigo-600">Sign in</Link></p>
+        <p className="mt-4 text-sm">Already have an account? <Link href="/login" className="text-indigo-600">Sign in</Link></p>
       </div>
     </div>
   )

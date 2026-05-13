@@ -8,7 +8,7 @@ export default function Home() {
         <h1 className="text-4xl font-bold mb-4">LeadGen AI</h1>
         <p className="text-slate-600 mb-6">SaaS outreach platform scaffold.</p>
         <div className="space-x-4">
-          <Link href="/auth/login" className="px-4 py-2 bg-indigo-600 text-white rounded">Get Started</Link>
+          <Link href="/login" className="px-4 py-2 bg-indigo-600 text-white rounded">Get Started</Link>
         </div>
       </div>
     </main>
