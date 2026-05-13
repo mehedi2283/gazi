@@ -289,7 +289,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     } finally {
       setAddingEmail(false)
     }
-  })
+  }
 
   useEffect(() => {
     setName(initialData?.name || '')
