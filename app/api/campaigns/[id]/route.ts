@@ -3,6 +3,15 @@ import { deleteCampaign as deleteInstantlyCampaign, updateCampaign } from '../..
 import supabase from '../../../../lib/supabase/server'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../../../lib/timezones'
 
+type NormalizedSequence = {
+  step_number: number
+  delay_days: number
+  subject_variable: string
+  body_variable: string
+  subject: string
+  body: string
+}
+
 function mapDays(days: any) {
   if (Array.isArray(days)) {
     const [sunday, monday, tuesday, wednesday, thursday, friday, saturday] = days
@@ -145,7 +154,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const sendingDays = schedule.days || existingCampaign?.sending_days || { monday: true, tuesday: true, wednesday: true, thursday: true, friday: true, saturday: false, sunday: false }
     const sequenceSteps = Array.isArray(body.sequences) && body.sequences.length > 0 ? body.sequences : sequenceRows || []
 
-    const normalizedSequences = sequenceSteps.map((sequence: any, index: number) => ({
+    const normalizedSequences: NormalizedSequence[] = sequenceSteps.map((sequence: any, index: number) => ({
       step_number: index + 1,
       delay_days: index === 0 ? 0 : Number(sequence.delay_days ?? index),
       subject_variable: sequence.subject_variable || `{{custom_subject_${index + 1}}}`,
@@ -183,7 +192,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     if (normalizedSequences.length > 0) {
       const { error: insertError } = await supabase.from('sequences').insert(
-        normalizedSequences.map((sequence) => ({
+        normalizedSequences.map((sequence: NormalizedSequence) => ({
           campaign_id: params.id,
           step_number: sequence.step_number,
           delay_days: sequence.delay_days,

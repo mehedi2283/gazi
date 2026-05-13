@@ -76,6 +76,11 @@ function formatDateLabel(date: string) {
   return parsed.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+function formatTooltipValue(value: unknown, name: unknown) {
+  const numericValue = typeof value === 'number' ? value : Number(value || 0)
+  return [numericValue.toLocaleString(), String(name || '')]
+}
+
 function groupDailyRows(rows: DailyRow[]): AggregatedDailyRow[] {
   const grouped = rows.reduce<Record<string, AggregatedDailyRow>>((acc, row) => {
     if (!acc[row.date]) {
@@ -398,7 +403,7 @@ export default function InstantlyDashboard() {
                     <YAxis tick={{ fontSize: 12 }} stroke="#9CA3AF" />
                     <Tooltip
                       labelFormatter={(value) => `Date: ${formatDateLabel(String(value))}`}
-                      formatter={(value: number, name: string) => [value.toLocaleString(), name]}
+                      formatter={formatTooltipValue}
                     />
                     <Legend />
                     <Line
@@ -455,7 +460,7 @@ export default function InstantlyDashboard() {
                         <Cell key={entry.name} fill={DONUT_COLORS[index % DONUT_COLORS.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(value: number, name: string) => [value.toLocaleString(), name]} />
+                    <Tooltip formatter={formatTooltipValue} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
