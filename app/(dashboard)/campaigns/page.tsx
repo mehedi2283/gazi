@@ -23,6 +23,7 @@ function statusStyles(status: string) {
 export default function CampaignsPage() {
   const { data, isLoading, error } = useCampaigns()
   const qc = useQueryClient()
+  const [searchQuery, setSearchQuery] = useState('')
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [copyFor, setCopyFor] = useState<string | null>(null)
   const [copyName, setCopyName] = useState<string>('')
@@ -81,9 +82,20 @@ export default function CampaignsPage() {
       : [{ step_number: 1, delay_days: 0, subject_variable: '{{custom_subject_1}}', body_variable: '{{personalization_1}}' }]
   }), [])
 
+  const filteredCampaigns = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return data || []
+
+    return (data || []).filter((campaign: any) => {
+      return [campaign.name, campaign.status, campaign.instantly_campaign_id, campaign.organization_id]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    })
+  }, [data, searchQuery])
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">Campaigns</h1>
           <p className="text-sm text-slate-500">View and manage campaigns created from the dashboard.</p>
@@ -92,7 +104,7 @@ export default function CampaignsPage() {
           New Campaign
         </Link>
       </div>
-      
+
       <Modal open={Boolean(copyModalFor)} title="Duplicate campaign" onClose={() => setCopyModalFor(null)}>
         <div className="space-y-4">
           <div>
@@ -165,7 +177,7 @@ export default function CampaignsPage() {
           <div className="p-6 text-sm text-red-600">
             Failed to load campaigns.
           </div>
-        ) : data?.length ? (
+        ) : filteredCampaigns.length ? (
           <div className="relative rounded-xl overflow-visible">
             <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
@@ -174,10 +186,21 @@ export default function CampaignsPage() {
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Instantly ID</th>
                   <th className="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Created</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    <label className="inline-flex items-center justify-end">
+                      <span className="sr-only">Search campaigns</span>
+                      <input
+                        value={searchQuery}
+                        onChange={(event) => setSearchQuery(event.target.value)}
+                        className="w-40 rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm font-normal normal-case tracking-normal text-slate-700 placeholder:text-slate-400"
+                        placeholder="Search"
+                      />
+                    </label>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {data.map((campaign: any) => {
+                {filteredCampaigns.map((campaign: any) => {
                   const currentStatus = String(campaign.status || 'draft')
                   const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
                   const canPause = currentStatus === 'active'
@@ -196,7 +219,15 @@ export default function CampaignsPage() {
                       {campaign.created_at ? new Date(campaign.created_at).toLocaleString() : '-'}
                     </td>
                     <td className="px-6 py-4 text-sm text-right relative">
-                      <div className="relative inline-block text-left" data-campaign-actions>
+                      <div className="flex items-center justify-end gap-2" data-campaign-actions>
+                        <Link
+                          href={`/dashboard/campaigns/${campaign.id}`}
+                          className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-700 hover:bg-indigo-100"
+                        >
+                          View leads
+                        </Link>
+
+                        <div className="relative inline-block text-left">
                         <button
                           type="button"
                           onClick={(event) => {
@@ -292,6 +323,7 @@ export default function CampaignsPage() {
                             </button>
                           </div>
                         ) : null}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -302,13 +334,24 @@ export default function CampaignsPage() {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
-            <div className="text-lg font-semibold text-slate-900">No campaigns yet</div>
-            <p className="max-w-md text-sm text-slate-500">
-              Create your first campaign from the dashboard. Once the Supabase schema is installed, it will show up here.
-            </p>
-            <Link href="/dashboard/campaigns/new" className="rounded-lg bg-indigo-600 px-4 py-2 text-white">
-              Create Campaign
-            </Link>
+            {searchQuery.trim() ? (
+              <>
+                <div className="text-lg font-semibold text-slate-900">No campaigns match your search</div>
+                <p className="max-w-md text-sm text-slate-500">
+                  Try a different campaign name, status, or Instantly ID.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-lg font-semibold text-slate-900">No campaigns yet</div>
+                <p className="max-w-md text-sm text-slate-500">
+                  Create your first campaign from the dashboard. Once the Supabase schema is installed, it will show up here.
+                </p>
+                <Link href="/dashboard/campaigns/new" className="rounded-lg bg-indigo-600 px-4 py-2 text-white">
+                  Create Campaign
+                </Link>
+              </>
+            )}
           </div>
         )}
       </div>

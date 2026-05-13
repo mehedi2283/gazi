@@ -1,23 +1,19 @@
 "use client"
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 
-export function useLeads() {
-  const qc = useQueryClient()
+export function useLeads(campaignId?: string) {
   const query = useQuery({
-    queryKey: ['leads'],
+    queryKey: ['leads', campaignId || 'all'],
     queryFn: async () => {
-      const r = await axios.get('/api/leads')
+      const r = await axios.get('/api/leads', {
+        params: campaignId ? { campaign_id: campaignId } : undefined
+      })
       return r.data.data
     }
   })
 
-  const add = useMutation({
-    mutationFn: async (lead: any) => axios.post('/api/leads', lead),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leads'] })
-  })
-
-  return { ...query, add }
+  return { ...query }
 }
 
 export default useLeads

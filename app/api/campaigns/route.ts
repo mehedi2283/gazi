@@ -211,6 +211,19 @@ function normalizeTimezone(timezone: unknown) {
   return DEFAULT_TIMEZONE
 }
 
+function sortCampaignsByCreatedAt(campaigns: LocalCampaign[]) {
+  return [...campaigns].sort((left, right) => {
+    const leftTime = left.created_at ? new Date(left.created_at).getTime() : 0
+    const rightTime = right.created_at ? new Date(right.created_at).getTime() : 0
+
+    if (rightTime !== leftTime) {
+      return rightTime - leftTime
+    }
+
+    return String(right.id || '').localeCompare(String(left.id || ''))
+  })
+}
+
 function formatSchemaError(error: any) {
   if (error?.code === 'PGRST205') {
     return {
@@ -296,14 +309,14 @@ export async function GET() {
       const instantlyIds = new Set(mergedInstantlyCampaigns.map((campaign) => campaign.instantly_campaign_id))
       const localOnlyCampaigns = localCampaigns.filter((campaign) => !campaign.instantly_campaign_id || !instantlyIds.has(campaign.instantly_campaign_id))
 
-      return NextResponse.json({ data: [...mergedInstantlyCampaigns, ...localOnlyCampaigns], error: null })
+      return NextResponse.json({ data: sortCampaignsByCreatedAt([...mergedInstantlyCampaigns, ...localOnlyCampaigns]), error: null })
     }
 
     return NextResponse.json({
-      data: localCampaigns.map((campaign) => ({
+      data: sortCampaignsByCreatedAt(localCampaigns.map((campaign) => ({
         ...campaign,
         status: normalizeCampaignStatus(campaign.status)
-      })),
+      }))),
       error: null
     })
   } catch (err: any) {

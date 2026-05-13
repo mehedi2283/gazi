@@ -9,9 +9,6 @@ export default function Sidebar() {
         <li><Link href="/dashboard" className="block px-3 py-2 rounded hover:bg-indigo-600">Dashboard</Link></li>
         <li><Link href="/dashboard/leads" className="block px-3 py-2 rounded hover:bg-indigo-600">Leads</Link></li>
         <li><Link href="/dashboard/campaigns" className="block px-3 py-2 rounded hover:bg-indigo-600">Campaigns</Link></li>
-        <li><Link href="/dashboard/ai-personalization" className="block px-3 py-2 rounded hover:bg-indigo-600">AI Personalization</Link></li>
-        <li><Link href="/dashboard/integrations" className="block px-3 py-2 rounded hover:bg-indigo-600">Integrations</Link></li>
-        <li><Link href="/dashboard/settings" className="block px-3 py-2 rounded hover:bg-indigo-600">Settings</Link></li>
       </ul>
     </nav>
   )
