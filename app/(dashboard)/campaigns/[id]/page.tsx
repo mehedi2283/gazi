@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
@@ -10,6 +10,25 @@ import useLeads from '../../../../hooks/useLeads'
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
   const { data: leads, isLoading, error } = useLeads(params.id)
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
+  const [campaign, setCampaign] = useState<{ name: string } | null>(null)
+  const [loadingCampaign, setLoadingCampaign] = useState(true)
+
+  useEffect(() => {
+    const fetchCampaign = async () => {
+      try {
+        const response = await fetch(`/api/campaigns/${params.id}`)
+        const result = await response.json()
+        if (result.data) {
+          setCampaign({ name: result.data.name })
+        }
+      } catch (err) {
+        console.error('Failed to fetch campaign:', err)
+      } finally {
+        setLoadingCampaign(false)
+      }
+    }
+    fetchCampaign()
+  }, [params.id])
 
   const campaignLeads = useMemo(() => (Array.isArray(leads) ? leads : []), [leads])
 
@@ -38,7 +57,13 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `campaign-${params.id}-leads.csv`
+    
+    // Sanitize campaign name for filename
+    const sanitizedName = campaign?.name 
+      ? campaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+      : 'campaign'
+    
+    link.download = `${sanitizedName}_${params.id}-leads.csv`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -80,7 +105,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
           >
             Back to campaigns
           </Link>
-          <h1 className="text-2xl font-bold">Campaign Details</h1>
+          <h1 className="text-2xl font-bold">{loadingCampaign ? 'Loading...' : campaign?.name || 'Campaign Details'}</h1>
           <p className="text-slate-600">Campaign ID: {params.id}</p>
         </div>
         <button

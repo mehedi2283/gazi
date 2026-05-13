@@ -2,9 +2,10 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import Papa from 'papaparse'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
-import { Copy, Pause, Play, MoreVertical, Pencil, Trash } from 'lucide-react'
+import { Pause, Play, MoreVertical, Trash } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 
 function statusStyles(status: string) {
@@ -20,16 +21,25 @@ function statusStyles(status: string) {
   }
 }
 
+function downloadCsv(filename: string, rows: Record<string, any>[]) {
+  const csv = Papa.unparse(rows)
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
 export default function CampaignsPage() {
   const { data, isLoading, error } = useCampaigns()
   const qc = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
-  const [copyFor, setCopyFor] = useState<string | null>(null)
-  const [copyName, setCopyName] = useState<string>('')
-  const [copyLoading, setCopyLoading] = useState(false)
   const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
-  const [copyModalFor, setCopyModalFor] = useState<any | null>(null)
   const [deleteModalFor, setDeleteModalFor] = useState<any | null>(null)
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
@@ -43,44 +53,7 @@ export default function CampaignsPage() {
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
 
-  const campaignCopyPayload = useMemo(() => (campaign: any) => ({
-    name: `${campaign.name} (Copy)`,
-    organization_id: campaign.organization_id || null,
-    daily_limit: campaign.daily_limit ?? 50,
-    email_gap: campaign.email_gap ?? 10,
-    stop_on_reply: campaign.stop_on_reply ?? true,
-    open_tracking: campaign.open_tracking ?? false,
-    link_tracking: campaign.link_tracking ?? true,
-    campaign_schedule: {
-      schedules: [
-        {
-          name: 'Default Schedule',
-          timezone: campaign.timezone || 'Etc/GMT+12',
-          timing: {
-            from: campaign.from_time || '09:00',
-            to: campaign.to_time || '17:00'
-          },
-          days: {
-            monday: true,
-            tuesday: true,
-            wednesday: true,
-            thursday: true,
-            friday: true,
-            saturday: false,
-            sunday: false
-          }
-        }
-      ]
-    },
-    sequences: Array.isArray(campaign.sequences) && campaign.sequences.length
-      ? campaign.sequences.map((sequence: any, index: number) => ({
-          step_number: index + 1,
-          delay_days: index === 0 ? 0 : Number(sequence.delay_days || index),
-          subject_variable: sequence.subject_variable || `{{custom_subject_${index + 1}}}`,
-          body_variable: sequence.body_variable || `{{personalization_${index + 1}}}`
-        }))
-      : [{ step_number: 1, delay_days: 0, subject_variable: '{{custom_subject_1}}', body_variable: '{{personalization_1}}' }]
-  }), [])
+
 
   const filteredCampaigns = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
@@ -105,41 +78,6 @@ export default function CampaignsPage() {
         </Link>
       </div>
 
-      <Modal open={Boolean(copyModalFor)} title="Duplicate campaign" onClose={() => setCopyModalFor(null)}>
-        <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">New campaign name</label>
-            <input
-              value={copyName}
-              onChange={(e) => setCopyName(e.target.value)}
-              className="w-full rounded-md border border-slate-200 px-3 py-2"
-            />
-          </div>
-          <div className="flex items-center justify-end gap-2">
-            <button className="rounded border px-3 py-1" onClick={() => setCopyModalFor(null)}>Cancel</button>
-            <button
-              className="rounded bg-indigo-600 px-3 py-1 text-white"
-              disabled={!copyName.trim()}
-              onClick={async () => {
-                try {
-                  setCopyLoading(true)
-                  const body = { ...campaignCopyPayload(copyModalFor), name: copyName }
-                  const resp = await fetch('/api/campaigns', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-                  const json = await resp.json()
-                  if (!resp.ok || json.error) throw new Error(json.error || 'Copy failed')
-                  qc.invalidateQueries({ queryKey: ['campaigns'] })
-                  setCopyModalFor(null)
-                  setCopyName('')
-                } catch (err) {
-                  alert(String(err))
-                } finally { setCopyLoading(false) }
-              }}
-            >
-              Save
-            </button>
-          </div>
-        </div>
-      </Modal>
 
       <Modal open={Boolean(deleteModalFor)} title="Delete campaign" onClose={() => setDeleteModalFor(null)}>
         <div className="space-y-4">
@@ -150,6 +88,18 @@ export default function CampaignsPage() {
               className="rounded bg-red-600 px-3 py-1 text-white"
               onClick={async () => {
                 try {
+                  const leadsResponse = await fetch(`/api/leads?campaign_id=${deleteModalFor.id}`)
+                  const leadsJson = await leadsResponse.json()
+
+                  if (!leadsResponse.ok || leadsJson.error) {
+                    throw new Error(leadsJson.error?.message || leadsJson.error || 'Failed to load related leads')
+                  }
+
+                  const relatedLeads = Array.isArray(leadsJson.data) ? leadsJson.data : []
+                  if (relatedLeads.length > 0) {
+                    downloadCsv(`campaign-${deleteModalFor.id}-leads.csv`, relatedLeads)
+                  }
+
                   const resp = await fetch(`/api/campaigns/${deleteModalFor.id}`, { method: 'DELETE' })
                   const json = await resp.json()
                   if (!resp.ok || json.error) throw new Error(json.error || 'Delete failed')
@@ -204,7 +154,6 @@ export default function CampaignsPage() {
                   const currentStatus = String(campaign.status || 'draft')
                   const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
                   const canPause = currentStatus === 'active'
-                  const canEdit = Boolean(campaign.id)
 
                   return (
                   <tr key={campaign.id} className="hover:bg-slate-50">
@@ -287,31 +236,6 @@ export default function CampaignsPage() {
                                 Pause
                               </button>
                             ) : null}
-
-                            {canEdit ? (
-                              <Link
-                                href={`/dashboard/campaigns/${campaign.id}/edit`}
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
-                                onClick={() => setOpenMenuFor(null)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                                Edit Campaign
-                              </Link>
-                            ) : null}
-
-                            <button
-                              type="button"
-                              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                setOpenMenuFor(null)
-                                setCopyModalFor(campaign)
-                                setCopyName(`${campaign.name} (Copy)`)
-                              }}
-                            >
-                              <Copy className="h-4 w-4" />
-                              Copy
-                            </button>
 
                             <button
                               type="button"

@@ -104,8 +104,16 @@ export async function pauseCampaign(id: string) {
   }
 }
 
+export async function deleteCampaign(id: string) {
+  try {
+    return await retryRequest(() => axios.delete(`${BASE}/campaigns/${id}`, { headers: getAuthHeaders() }))
+  } catch (err: any) {
+    throw getAxiosError(err)
+  }
+}
+
 export async function getCampaignAnalytics(id: string) {
   return axios.get(`${BASE}/campaigns/${id}/analytics/overview/summary`, { headers: getAuthHeaders() })
 }
 
-export default { createCampaign, updateCampaign, listCampaigns, listAllCampaigns, activateCampaign, pauseCampaign, getCampaignAnalytics }
+export default { createCampaign, updateCampaign, listCampaigns, listAllCampaigns, activateCampaign, pauseCampaign, deleteCampaign, getCampaignAnalytics }

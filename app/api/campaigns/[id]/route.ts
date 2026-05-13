@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { updateCampaign } from '../../../../lib/instantly/client'
+import { deleteCampaign as deleteInstantlyCampaign, updateCampaign } from '../../../../lib/instantly/client'
 import supabase from '../../../../lib/supabase/server'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../../../lib/timezones'
 
@@ -207,6 +207,29 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
+    const { data: existingCampaign, error: existingError } = await supabase
+      .from('campaigns')
+      .select('id, instantly_campaign_id')
+      .eq('id', params.id)
+      .single()
+
+    if (existingError) return NextResponse.json({ data: null, error: existingError.message })
+
+    const instantlyCampaignId = existingCampaign?.instantly_campaign_id || null
+
+    if (instantlyCampaignId) {
+      const instantlyDeleteResponse = await deleteInstantlyCampaign(instantlyCampaignId)
+      if (!instantlyDeleteResponse) {
+        return NextResponse.json({ data: null, error: 'Failed to delete campaign in Instantly.' }, { status: 500 })
+      }
+    }
+
+    const { error: leadsDeleteError } = await supabase.from('leads').delete().eq('campaign_id', params.id)
+    if (leadsDeleteError) return NextResponse.json({ data: null, error: leadsDeleteError.message })
+
+    const { error: sequencesDeleteError } = await supabase.from('sequences').delete().eq('campaign_id', params.id)
+    if (sequencesDeleteError) return NextResponse.json({ data: null, error: sequencesDeleteError.message })
+
     const { data, error } = await supabase.from('campaigns').delete().eq('id', params.id).select()
     if (error) return NextResponse.json({ data: null, error: error.message })
     return NextResponse.json({ data: data?.[0], error: null })
