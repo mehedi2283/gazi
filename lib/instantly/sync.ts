@@ -1,12 +1,7 @@
 import axios from 'axios'
-import { supabase } from '../supabase/client'
+import { supabaseServer } from '../supabase/server'
 
 const INSTANTLY_BASE_URL = 'https://api.instantly.ai/api/v2'
-const INSTANTLY_API_KEY = process.env.NEXT_PUBLIC_INSTANTLY_API_KEY
-
-if (!INSTANTLY_API_KEY) {
-  throw new Error('Missing INSTANTLY_API_KEY in environment variables')
-}
 
 interface SyncResult {
   success: boolean
@@ -23,10 +18,19 @@ interface SyncResult {
  */
 export async function syncInstantly(): Promise<SyncResult> {
   const timestamp = new Date().toISOString()
+  const instantlyApiKey = process.env.INSTANTLY_API_KEY
+
+  if (!instantlyApiKey) {
+    return {
+      success: false,
+      error: 'Missing INSTANTLY_API_KEY in environment variables',
+      timestamp,
+    }
+  }
 
   try {
     const headers = {
-      Authorization: `Bearer ${INSTANTLY_API_KEY}`,
+      Authorization: `Bearer ${instantlyApiKey}`,
     }
 
     // Fetch all 3 endpoints in parallel
@@ -48,7 +52,7 @@ export async function syncInstantly(): Promise<SyncResult> {
 
     // Upsert campaigns
     if (campaigns.length > 0) {
-      await supabase.from('instantly_campaigns').upsert(
+      await supabaseServer.from('instantly_campaigns').upsert(
         campaigns.map((c: any) => ({
           campaign_id: c.campaign_id,
           campaign_name: c.campaign_name,
@@ -71,7 +75,7 @@ export async function syncInstantly(): Promise<SyncResult> {
 
     // Upsert daily analytics
     if (daily.length > 0) {
-      await supabase.from('instantly_daily').upsert(
+      await supabaseServer.from('instantly_daily').upsert(
         daily.map((d: any) => ({
           date: d.date,
           email_account: d.email_account || 'default',
@@ -92,7 +96,7 @@ export async function syncInstantly(): Promise<SyncResult> {
     }
 
     // Insert overview (new row each sync)
-    await supabase.from('instantly_overview').insert({
+    await supabaseServer.from('instantly_overview').insert({
       emails_sent_count: overview.emails_sent_count || 0,
       open_count_unique: overview.open_count_unique || 0,
       reply_count_unique: overview.reply_count_unique || 0,

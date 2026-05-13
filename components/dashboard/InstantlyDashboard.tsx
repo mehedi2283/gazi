@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { syncInstantly } from '@/lib/instantly/sync'
 import { supabase } from '@/lib/supabase/client'
 
 interface KPIs {
@@ -116,13 +115,22 @@ export default function InstantlyDashboard() {
 
   const handleSync = async () => {
     setIsSyncing(true)
-    const result = await syncInstantly()
+    try {
+      const response = await fetch('/api/instantly/sync', {
+        method: 'POST',
+      })
 
-    if (result.success) {
-      setLastSynced(new Date().toLocaleTimeString())
-      await loadCampaigns()
-    } else {
-      console.error('Sync failed:', result.error)
+      const result = await response.json()
+
+      if (response.ok && result.success) {
+        setLastSynced(new Date().toLocaleTimeString())
+        await loadCampaigns()
+        await loadKPIs()
+      } else {
+        console.error('Sync failed:', result.error)
+      }
+    } catch (error) {
+      console.error('Sync failed:', error)
     }
 
     setIsSyncing(false)
