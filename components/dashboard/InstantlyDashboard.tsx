@@ -4,6 +4,13 @@ import React, { useState, useEffect } from 'react'
 import { syncInstantly } from '@/lib/instantly/sync'
 import { supabase } from '@/lib/supabase/client'
 
+interface KPIs {
+  emailsSent: number
+  openRate: number
+  replyRate: number
+  bounceRate: number
+}
+
 export default function InstantlyDashboard() {
   const [dateRange, setDateRange] = useState<7 | 30 | 90>(30)
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null)
@@ -11,11 +18,23 @@ export default function InstantlyDashboard() {
   const [isSyncing, setIsSyncing] = useState(false)
   const [lastSynced, setLastSynced] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [kpis, setKpis] = useState<KPIs>({
+    emailsSent: 0,
+    openRate: 0,
+    replyRate: 0,
+    bounceRate: 0,
+  })
+  const [kpiLoading, setKpiLoading] = useState(true)
 
   // Load campaigns on mount
   useEffect(() => {
     loadCampaigns()
   }, [])
+
+  // Reload KPIs when date range or campaign changes
+  useEffect(() => {
+    loadKPIs()
+  }, [dateRange, selectedCampaign])
 
   const loadCampaigns = async () => {
     try {
@@ -29,6 +48,69 @@ export default function InstantlyDashboard() {
       console.error('Error loading campaigns:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const getDateRange = () => {
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - dateRange)
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0],
+    }
+  }
+
+  const loadKPIs = async () => {
+    setKpiLoading(true)
+    try {
+      const { start, end } = getDateRange()
+
+      let query = supabase
+        .from('instantly_daily')
+        .select('*')
+        .gte('date', start)
+        .lte('date', end)
+
+      const { data: dailyData } = await query
+
+      if (!dailyData || dailyData.length === 0) {
+        setKpis({
+          emailsSent: 0,
+          openRate: 0,
+          replyRate: 0,
+          bounceRate: 0,
+        })
+        setKpiLoading(false)
+        return
+      }
+
+      // Aggregate data
+      const totals = dailyData.reduce(
+        (acc, row) => ({
+          sent: acc.sent + (row.sent || 0),
+          unique_opened: acc.unique_opened + (row.unique_opened || 0),
+          unique_replies: acc.unique_replies + (row.unique_replies || 0),
+          bounced: acc.bounced + (row.bounced || 0),
+        }),
+        { sent: 0, unique_opened: 0, unique_replies: 0, bounced: 0 }
+      )
+
+      const emailsSent = totals.sent
+      const openRate = emailsSent > 0 ? (totals.unique_opened / emailsSent) * 100 : 0
+      const replyRate = emailsSent > 0 ? (totals.unique_replies / emailsSent) * 100 : 0
+      const bounceRate = emailsSent > 0 ? (totals.bounced / emailsSent) * 100 : 0
+
+      setKpis({
+        emailsSent,
+        openRate,
+        replyRate,
+        bounceRate,
+      })
+    } catch (error) {
+      console.error('Error loading KPIs:', error)
+    } finally {
+      setKpiLoading(false)
     }
   }
 
@@ -121,18 +203,60 @@ export default function InstantlyDashboard() {
 
       {/* Main Content */}
       <div className="space-y-6">
-        {/* KPI Cards Placeholder */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div
-              key={i}
-              className="bg-white rounded-lg shadow p-6 h-24 animate-pulse"
-            >
-              <div className="h-4 bg-gray-200 rounded w-1/2 mb-2"></div>
-              <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Emails Sent */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-sm font-medium text-gray-600 mb-2">Emails Sent</div>
+          {kpiLoading ? (
+            <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+          ) : (
+            <div className="text-3xl font-bold text-gray-900">
+              {kpis.emailsSent.toLocaleString()}
             </div>
-          ))}
+          )}
+          <div className="text-xs text-gray-500 mt-2">total sent</div>
         </div>
+
+        {/* Open Rate */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-sm font-medium text-gray-600 mb-2">Open Rate</div>
+          {kpiLoading ? (
+            <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+          ) : (
+            <div className="text-3xl font-bold text-gray-900">
+              {kpis.openRate.toFixed(1)}%
+            </div>
+          )}
+          <div className="text-xs text-gray-500 mt-2">unique opens</div>
+        </div>
+
+        {/* Reply Rate */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-sm font-medium text-gray-600 mb-2">Reply Rate</div>
+          {kpiLoading ? (
+            <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+          ) : (
+            <div className="text-3xl font-bold text-gray-900">
+              {kpis.replyRate.toFixed(1)}%
+            </div>
+          )}
+          <div className="text-xs text-gray-500 mt-2">unique replies</div>
+        </div>
+
+        {/* Bounce Rate */}
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="text-sm font-medium text-gray-600 mb-2">Bounce Rate</div>
+          {kpiLoading ? (
+            <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+          ) : (
+            <div className="text-3xl font-bold text-gray-900">
+              {kpis.bounceRate.toFixed(1)}%
+            </div>
+          )}
+          <div className="text-xs text-gray-500 mt-2">of sent</div>
+        </div>
+      </div>
 
         {/* Charts Placeholder */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
