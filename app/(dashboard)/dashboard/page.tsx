@@ -4,6 +4,7 @@ import CampaignPerformanceChart from '../../../components/dashboard/CampaignPerf
 import RecentCampaigns from '../../../components/dashboard/RecentCampaigns'
 import LeadSourcesChart from '../../../components/dashboard/LeadSourcesChart'
 import LeadStatusChart from '../../../components/dashboard/LeadStatusChart'
+import DashboardTabs from '../../../components/dashboard/DashboardTabs'
 import { headers } from 'next/headers'
 
 async function getDashboardData() {
@@ -24,9 +25,8 @@ export default async function DashboardPage() {
   const leadSources = data?.leadSources || {}
   const leadStatuses = data?.leadStatuses || {}
 
-  return (
-    <div>
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+  const overviewContent = (
+    <>
       <StatsGrid initialData={data} />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
         <CampaignPerformanceChart data={campaignPerformance} />
@@ -36,6 +36,13 @@ export default async function DashboardPage() {
         <LeadSourcesChart data={leadSources} />
         <LeadStatusChart data={leadStatuses} />
       </div>
+    </>
+  )
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
+      <DashboardTabs>{overviewContent}</DashboardTabs>
     </div>
   )
 }
