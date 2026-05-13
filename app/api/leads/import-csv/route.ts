@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 import Papa from 'papaparse'
-import { mapLeadsForWebhook, sendLeadsToWebhook } from '../../../../lib/webhook/leads'
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { csv, campaign_id, organization_id } = body
+    const { csv, campaign_id, organization_id, sender_info } = body
     if (!csv) return NextResponse.json({ data: null, error: 'Missing csv payload' })
 
     const parsed = Papa.parse(csv, { header: true })
@@ -41,6 +40,7 @@ export async function POST(req: Request) {
       return {
         organization_id: organization_id || null,
         campaign_id: campaign_id || null,
+        sender_info: sender_info || null,
         email: findByKeys(nr, ['Email'], 'Email'),
         first_name: findByKeys(nr, ['First Name'], 'First Name'),
         last_name: findByKeys(nr, ['Last Name'], 'Last Name'),
@@ -113,16 +113,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const webhookPayload = mapLeadsForWebhook(savedLeads, campaignMetaByLocalId)
-
-    let webhookError: string | null = null
-    try {
-      await sendLeadsToWebhook(webhookPayload)
-    } catch (e) {
-      webhookError = e instanceof Error ? e.message : String(e)
-    }
-
-    return NextResponse.json({ data: savedLeads, error: null, webhookError })
+    return NextResponse.json({ data: savedLeads, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }

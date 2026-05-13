@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 import { searchPeople } from '../../../../lib/apollo/client'
-import { mapLeadsForWebhook, sendLeadsToWebhook } from '../../../../lib/webhook/leads'
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
     const filters = body.filters || {}
+    const sender_info = body.sender_info || null
 
     const resp = await searchPeople(filters)
     const people = resp?.people || resp?.results || []
@@ -24,6 +24,7 @@ export async function POST(req: Request) {
       country: p.country,
       industry: p.industry,
       employees: p.organization?.employee_count || null,
+      sender_info,
       source: 'apollo'
     }))
 
@@ -66,16 +67,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const webhookPayload = mapLeadsForWebhook(savedLeads, campaignMetaByLocalId)
-
-    let webhookError: string | null = null
-    try {
-      await sendLeadsToWebhook(webhookPayload)
-    } catch (e) {
-      webhookError = e instanceof Error ? e.message : String(e)
-    }
-
-    return NextResponse.json({ data: savedLeads, error: null, webhookError })
+    return NextResponse.json({ data: savedLeads, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }

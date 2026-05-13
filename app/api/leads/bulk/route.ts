@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
-import { mapLeadsForWebhook, sendLeadsToWebhook } from '../../../../lib/webhook/leads'
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { leads, campaign_id, organization_id } = body
+    const { leads, campaign_id, organization_id, sender_info } = body
 
     // validate minimal shape
     const sanitized = (leads || []).map((l: any) => ({
@@ -40,6 +39,7 @@ export async function POST(req: Request) {
       last_raised_at: l.last_raised_at,
       sent_at: l.sent_at,
       phone: l.phone || l.company_phone || null,
+      sender_info: l.sender_info || sender_info || null,
       source: l.source || 'manual'
     }))
 
@@ -82,16 +82,7 @@ export async function POST(req: Request) {
       }
     }
 
-    const webhookPayload = mapLeadsForWebhook(savedLeads, campaignMetaByLocalId)
-
-    let webhookError: string | null = null
-    try {
-      await sendLeadsToWebhook(webhookPayload)
-    } catch (e) {
-      webhookError = e instanceof Error ? e.message : String(e)
-    }
-
-    return NextResponse.json({ data: savedLeads, error: null, webhookError })
+    return NextResponse.json({ data: savedLeads, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }

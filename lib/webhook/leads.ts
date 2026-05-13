@@ -15,13 +15,17 @@ export async function sendLeadsToWebhook(payload: unknown) {
   const response = await fetch(LEAD_WEBHOOK_URL, {
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     },
     body: JSON.stringify(payload)
   })
 
   if (!response.ok) {
-    throw new Error(`Webhook request failed with status ${response.status}`)
+    const responseText = await response.text().catch(() => '')
+    throw new Error(
+      `Webhook request failed with status ${response.status}${responseText ? `: ${responseText}` : ''}`
+    )
   }
 
   return response

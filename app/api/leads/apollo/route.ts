@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { sendLeadsToWebhook } from '../../../../lib/webhook/leads'
 
 export async function POST(req: Request) {
   try {
@@ -7,6 +6,7 @@ export async function POST(req: Request) {
 
     const payload = {
       source: 'apollo',
+      sender_info: body.sender_info || null,
       market_name: body.market_name || null,
       market_segments: Array.isArray(body.market_segments) && body.market_segments.length ? body.market_segments : null,
       product_name: body.product_name || null,
@@ -15,8 +15,6 @@ export async function POST(req: Request) {
       campaign_name: body.campaign_name || null,
       organization_id: body.organization_id || null
     }
-
-    await sendLeadsToWebhook(payload)
 
     return NextResponse.json({ data: payload, error: null })
   } catch (err: any) {

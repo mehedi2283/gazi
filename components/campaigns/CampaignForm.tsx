@@ -1,8 +1,31 @@
 "use client"
 
 import React, { useEffect, useMemo, useState } from 'react'
+import Papa from 'papaparse'
+import * as XLSX from 'xlsx'
+import toast from 'react-hot-toast'
 import { Lock, Plus, Trash2 } from 'lucide-react'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../lib/timezones'
+
+type LeadCreationMode = 'none' | 'manual' | 'apollo' | 'import'
+
+type LeadCreationConfig =
+  | { mode: 'none' }
+  | {
+      mode: 'manual'
+      lead: Record<string, any>
+    }
+  | {
+      mode: 'apollo'
+      lead: {
+        market_name: string
+        product_name: string
+      }
+    }
+  | {
+      mode: 'import'
+      leads: Record<string, any>[]
+    }
 
 type SequenceStep = {
   delay_days: number
@@ -49,6 +72,27 @@ type CampaignFormProps = {
   initialData?: CampaignInitialData | null
   onSubmit: (payload: any) => Promise<void>
 }
+
+const LEAD_MODE_OPTIONS: Array<{ value: LeadCreationMode; label: string; description: string }> = [
+  { value: 'none', label: 'No leads', description: 'Create the campaign only' },
+  { value: 'manual', label: 'Manual', description: 'Add one lead after launch' },
+  { value: 'apollo', label: 'Apollo', description: 'Send country and product data to the webhook' },
+  { value: 'import', label: 'Import', description: 'Upload a CSV or spreadsheet of leads' }
+]
+
+const COUNTRY_OPTIONS = [
+  'Afghanistan', 'Albania', 'Algeria', 'Andorra', 'Angola', 'Argentina', 'Armenia', 'Australia', 'Austria',
+  'Azerbaijan', 'Bahamas', 'Bahrain', 'Bangladesh', 'Belgium', 'Belize', 'Benin', 'Bhutan', 'Bolivia', 'Bosnia and Herzegovina',
+  'Botswana', 'Brazil', 'Brunei', 'Bulgaria', 'Burkina Faso', 'Cambodia', 'Cameroon', 'Canada', 'Chile', 'China',
+  'Colombia', 'Costa Rica', 'Croatia', 'Cuba', 'Cyprus', 'Czech Republic', 'Denmark', 'Dominican Republic', 'Ecuador', 'Egypt',
+  'El Salvador', 'Estonia', 'Ethiopia', 'Finland', 'France', 'Germany', 'Ghana', 'Greece', 'Guatemala', 'Honduras',
+  'Hungary', 'Iceland', 'India', 'Indonesia', 'Ireland', 'Israel', 'Italy', 'Jamaica', 'Japan', 'Jordan',
+  'Kazakhstan', 'Kenya', 'Kuwait', 'Latvia', 'Lebanon', 'Lithuania', 'Luxembourg', 'Malaysia', 'Mexico', 'Morocco',
+  'Netherlands', 'New Zealand', 'Nigeria', 'Norway', 'Pakistan', 'Panama', 'Peru', 'Philippines', 'Poland', 'Portugal',
+  'Qatar', 'Romania', 'Saudi Arabia', 'Serbia', 'Singapore', 'Slovakia', 'Slovenia', 'South Africa', 'South Korea', 'Spain',
+  'Sweden', 'Switzerland', 'Taiwan', 'Thailand', 'Tunisia', 'Turkey', 'Ukraine', 'United Arab Emirates', 'United Kingdom', 'United States',
+  'Uruguay', 'Venezuela', 'Vietnam', 'Zimbabwe'
+]
 
 const CONTENT_LOCK_TOOLTIP = 'Email content is AI-personalized per lead and cannot be edited manually'
 
@@ -110,6 +154,35 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [stopOnReply, setStopOnReply] = useState(initialData?.stop_on_reply ?? true)
   const [openTracking, setOpenTracking] = useState(initialData?.open_tracking ?? false)
   const [linkTracking, setLinkTracking] = useState(initialData?.link_tracking ?? true)
+  const [leadMode, setLeadMode] = useState<LeadCreationMode>('none')
+  const [leadRows, setLeadRows] = useState<Record<string, any>[]>([])
+  const [leadFileName, setLeadFileName] = useState('')
+  const [manualLead, setManualLead] = useState({
+    email: '',
+    first_name: '',
+    last_name: '',
+    title: '',
+    company_name: '',
+    company_domain: '',
+    phone: '',
+    linkedin_url: ''
+  })
+  const [apolloLead, setApolloLead] = useState({
+    market_name: '',
+    product_name: ''
+  })
+  const [senderInfo, setSenderInfo] = useState({
+    name: '',
+    company: '',
+    company_details: '',
+    long_message: '',
+    location: '',
+    address: '',
+    booking_calendar_link: ''
+  })
+  const [countryOpen, setCountryOpen] = useState(false)
+  const [countryHighlight, setCountryHighlight] = useState(0)
+  const countryRef = React.useRef<HTMLDivElement | null>(null)
   const [days, setDays] = useState({
     monday: initialData?.sending_days?.monday ?? initialData?.days?.monday ?? true,
     tuesday: initialData?.sending_days?.tuesday ?? initialData?.days?.tuesday ?? true,
@@ -159,6 +232,23 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   }, [initialData])
 
   const sequenceError = useMemo(() => getSequenceError(steps), [steps])
+  const filteredCountries = useMemo(() => {
+    const query = apolloLead.market_name.trim().toLowerCase()
+    if (!query) return COUNTRY_OPTIONS
+    return COUNTRY_OPTIONS.filter((country) => country.toLowerCase().includes(query))
+  }, [apolloLead.market_name])
+
+  useEffect(() => {
+    function handleOutsideClick(event: MouseEvent) {
+      if (!countryRef.current) return
+      if (!countryRef.current.contains(event.target as Node)) {
+        setCountryOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', handleOutsideClick)
+    return () => window.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
 
   function addStep() {
     setSteps((current) => {
@@ -185,6 +275,38 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         delay_days: Number.isFinite(nextValue) ? Math.max(minimum, nextValue) : minimum
       }
     }))
+  }
+
+  async function handleLeadFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    const extension = file.name.split('.').pop()?.toLowerCase()
+
+    try {
+      if (extension === 'csv' || extension === 'txt') {
+        const text = await file.text()
+        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true })
+        setLeadRows((parsed.data as Record<string, any>[]) || [])
+        setLeadFileName(file.name)
+        return
+      }
+
+      if (extension === 'xlsx' || extension === 'xls') {
+        const buffer = await file.arrayBuffer()
+        const workbook = XLSX.read(buffer, { type: 'array' })
+        const firstSheet = workbook.SheetNames[0]
+        const sheet = workbook.Sheets[firstSheet]
+        const json = XLSX.utils.sheet_to_json(sheet) as Record<string, any>[]
+        setLeadRows(json || [])
+        setLeadFileName(file.name)
+        return
+      }
+
+      toast.error('Please upload a CSV or Excel file')
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to parse lead file')
+    }
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -238,8 +360,80 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       return
     }
 
+    const trimmedManualLead = {
+      email: manualLead.email.trim(),
+      first_name: manualLead.first_name.trim(),
+      last_name: manualLead.last_name.trim(),
+      title: manualLead.title.trim(),
+      company_name: manualLead.company_name.trim(),
+      company_domain: manualLead.company_domain.trim(),
+      phone: manualLead.phone.trim(),
+      linkedin_url: manualLead.linkedin_url.trim()
+    }
+
+    if (leadMode === 'manual' && !trimmedManualLead.email) {
+      setError('Lead email is required for manual lead creation')
+      setSubmitting(false)
+      return
+    }
+
+    if (leadMode === 'apollo' && (!apolloLead.market_name.trim() || !apolloLead.product_name.trim())) {
+      setError('Country and product name are required for Apollo lead creation')
+      setSubmitting(false)
+      return
+    }
+
+    if (leadMode === 'import' && !leadRows.length) {
+      setError('Upload a CSV or spreadsheet before creating imported leads')
+      setSubmitting(false)
+      return
+    }
+
+    if (!senderInfo.name.trim() || !senderInfo.company.trim() || !senderInfo.location.trim() || !senderInfo.address.trim() || !senderInfo.booking_calendar_link.trim()) {
+      setError('Complete sender information is required')
+      setSubmitting(false)
+      return
+    }
+
+    const leadCreation: LeadCreationConfig =
+      leadMode === 'manual'
+        ? {
+            mode: 'manual',
+            lead: {
+              ...trimmedManualLead,
+              source: 'manual'
+            }
+          }
+        : leadMode === 'apollo'
+          ? {
+              mode: 'apollo',
+              lead: {
+                market_name: apolloLead.market_name.trim().toLowerCase(),
+                product_name: apolloLead.product_name.trim()
+              }
+            }
+            : leadMode === 'import'
+              ? {
+                  mode: 'import',
+                  leads: leadRows
+                }
+            : { mode: 'none' }
+
     try {
-      await onSubmit(payload)
+      await onSubmit({
+        ...payload,
+        sender_info: {
+          name: senderInfo.name.trim(),
+          company: senderInfo.company.trim(),
+            company_details: senderInfo.company_details.trim(),
+            long_message: senderInfo.long_message.trim(),
+          location: senderInfo.location.trim(),
+          address: senderInfo.address.trim(),
+          booking_calendar_link: senderInfo.booking_calendar_link.trim()
+        },
+        lead_creation: leadCreation,
+        lead_creation_mode: leadMode
+      })
     } catch (err: any) {
       setError(err?.message || 'Unable to save campaign')
     } finally {
@@ -301,6 +495,84 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
             <input type="checkbox" name="link_tracking" checked={linkTracking} onChange={(event) => setLinkTracking(event.target.checked)} />
             <span className="text-sm font-medium">Link Tracking</span>
           </label>
+        </div>
+
+        <div className="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+          <div>
+            <h2 className="text-lg font-semibold">Sender Information</h2>
+            <p className="text-sm text-slate-600">This section is required and will be sent with the campaign webhook after the campaign is created.</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="space-y-2">
+              <span className="text-sm font-medium">Sender Name</span>
+              <input
+                value={senderInfo.name}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, name: event.target.value }))}
+                className="w-full rounded-lg border px-3 py-2"
+                placeholder="John Doe"
+                required
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-medium">Company</span>
+              <input
+                value={senderInfo.company}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, company: event.target.value }))}
+                className="w-full rounded-lg border px-3 py-2"
+                placeholder="Company name"
+                required
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-medium">Location</span>
+              <input
+                value={senderInfo.location}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, location: event.target.value }))}
+                className="w-full rounded-lg border px-3 py-2"
+                placeholder="City, Country"
+                required
+              />
+            </label>
+            <label className="space-y-2">
+              <span className="text-sm font-medium">Address</span>
+              <input
+                value={senderInfo.address}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, address: event.target.value }))}
+                className="w-full rounded-lg border px-3 py-2"
+                placeholder="Street address"
+                required
+              />
+            </label>
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium">Booking Calendar Link</span>
+              <input
+                value={senderInfo.booking_calendar_link}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, booking_calendar_link: event.target.value }))}
+                className="w-full rounded-lg border px-3 py-2"
+                placeholder="https://cal.com/..."
+                required
+              />
+            </label>
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium">Company Details</span>
+              <textarea
+                value={senderInfo.company_details}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, company_details: event.target.value }))}
+                className="min-h-28 w-full rounded-lg border px-3 py-2"
+                placeholder="Share the company summary, positioning, or offer context"
+              />
+            </label>
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium">Long Message</span>
+              <textarea
+                value={senderInfo.long_message}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, long_message: event.target.value }))}
+                className="min-h-28 w-full rounded-lg border px-3 py-2"
+                placeholder="Paste the long-form sender note or outreach message"
+              />
+            </label>
+          </div>
         </div>
 
         <div className="space-y-3">
@@ -393,6 +665,179 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           </div>
 
           {sequenceError ? <p className="text-sm text-red-600">{sequenceError}</p> : null}
+        </div>
+
+        <div className="space-y-4 rounded-lg border border-indigo-200 bg-indigo-50/50 p-4">
+          <div>
+            <h2 className="text-lg font-semibold">Lead Creation</h2>
+            <p className="text-sm text-slate-600">Choose whether this campaign should create leads immediately after the campaign is created.</p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            {LEAD_MODE_OPTIONS.map((option) => (
+              <label key={option.value} className={`rounded-lg border px-4 py-3 ${leadMode === option.value ? 'border-indigo-600 bg-white' : 'bg-white/80'}`}>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="lead_mode"
+                    checked={leadMode === option.value}
+                    onChange={() => setLeadMode(option.value)}
+                  />
+                  <span className="font-medium">{option.label}</span>
+                </div>
+                <p className="mt-1 text-sm text-slate-600">{option.description}</p>
+              </label>
+            ))}
+          </div>
+
+          {leadMode === 'manual' ? (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Email</span>
+                <input
+                  type="email"
+                  value={manualLead.email}
+                  onChange={(event) => setManualLead((current) => ({ ...current, email: event.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2"
+                  placeholder="lead@example.com"
+                />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">First Name</span>
+                <input value={manualLead.first_name} onChange={(event) => setManualLead((current) => ({ ...current, first_name: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Last Name</span>
+                <input value={manualLead.last_name} onChange={(event) => setManualLead((current) => ({ ...current, last_name: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Title</span>
+                <input value={manualLead.title} onChange={(event) => setManualLead((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Company</span>
+                <input value={manualLead.company_name} onChange={(event) => setManualLead((current) => ({ ...current, company_name: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Company Domain</span>
+                <input value={manualLead.company_domain} onChange={(event) => setManualLead((current) => ({ ...current, company_domain: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Phone</span>
+                <input value={manualLead.phone} onChange={(event) => setManualLead((current) => ({ ...current, phone: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+              <label className="space-y-2 md:col-span-2">
+                <span className="text-sm font-medium">LinkedIn URL</span>
+                <input value={manualLead.linkedin_url} onChange={(event) => setManualLead((current) => ({ ...current, linkedin_url: event.target.value }))} className="w-full rounded-lg border px-3 py-2" />
+              </label>
+            </div>
+          ) : null}
+
+          {leadMode === 'apollo' ? (
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Country</span>
+                <div ref={countryRef} className="relative">
+                  <input
+                    value={apolloLead.market_name}
+                    onChange={(event) => {
+                      setApolloLead((current) => ({ ...current, market_name: event.target.value }))
+                      setCountryOpen(true)
+                      setCountryHighlight(0)
+                    }}
+                    onFocus={() => {
+                      setCountryOpen(true)
+                      setCountryHighlight(0)
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') {
+                        setCountryOpen(false)
+                        return
+                      }
+
+                      if (!countryOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+                        setCountryOpen(true)
+                        return
+                      }
+
+                      if (event.key === 'ArrowDown') {
+                        event.preventDefault()
+                        setCountryHighlight((current) => Math.min(current + 1, Math.max(filteredCountries.length - 1, 0)))
+                      }
+
+                      if (event.key === 'ArrowUp') {
+                        event.preventDefault()
+                        setCountryHighlight((current) => Math.max(current - 1, 0))
+                      }
+
+                      if (event.key === 'Enter') {
+                        const selected = filteredCountries[countryHighlight] || filteredCountries[0]
+                        if (selected) {
+                          event.preventDefault()
+                          setApolloLead((current) => ({ ...current, market_name: selected }))
+                          setCountryOpen(false)
+                        }
+                      }
+                    }}
+                    className="w-full rounded-lg border px-3 py-2"
+                    placeholder="United States"
+                    aria-autocomplete="list"
+                    aria-expanded={countryOpen}
+                    aria-controls="country-listbox"
+                    role="combobox"
+                  />
+                  {countryOpen && filteredCountries.length > 0 ? (
+                    <ul id="country-listbox" role="listbox" className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border bg-white shadow-lg">
+                      {filteredCountries.slice(0, 100).map((country, index) => (
+                        <li
+                          key={country}
+                          role="option"
+                          aria-selected={index === countryHighlight}
+                          onMouseEnter={() => setCountryHighlight(index)}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => {
+                            setApolloLead((current) => ({ ...current, market_name: country }))
+                            setCountryOpen(false)
+                          }}
+                          className={`cursor-pointer px-3 py-2 text-sm ${index === countryHighlight ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}`}
+                        >
+                          {country}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              </label>
+              <label className="space-y-2">
+                <span className="text-sm font-medium">Product name</span>
+                <input
+                  value={apolloLead.product_name}
+                  onChange={(event) => setApolloLead((current) => ({ ...current, product_name: event.target.value }))}
+                  className="w-full rounded-lg border px-3 py-2"
+                  placeholder="e.g. CRM automation"
+                />
+              </label>
+            </div>
+          ) : null}
+
+          {leadMode === 'import' ? (
+            <div className="space-y-3">
+              <label className="space-y-2 block">
+                <span className="text-sm font-medium">Upload CSV or Spreadsheet</span>
+                <input
+                  type="file"
+                  accept=".csv,.txt,.xlsx,.xls"
+                  onChange={handleLeadFileChange}
+                  className="w-full rounded-lg border px-3 py-2"
+                />
+              </label>
+              <div className="rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                {leadFileName ? `Loaded file: ${leadFileName}` : 'No lead file loaded yet'}
+                <span className="ml-2">{leadRows.length} rows ready</span>
+              </div>
+            </div>
+          ) : null}
+
         </div>
 
         <div className="space-y-3 rounded-lg border bg-slate-50 p-4">

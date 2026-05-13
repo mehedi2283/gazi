@@ -19,7 +19,9 @@ export default function NewCampaignPage() {
       throw new Error(json.error?.message || json.error || 'Unable to launch campaign')
     }
 
-    router.push('/dashboard/campaigns')
+    const campaign = json.data
+
+    router.push(`/dashboard/campaigns/${campaign.id}`)
     router.refresh()
   }
 

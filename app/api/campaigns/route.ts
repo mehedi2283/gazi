@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createCampaign, listAllCampaigns, updateCampaign } from '../../../lib/instantly/client'
 import supabase from '../../../lib/supabase/server'
+import { sendLeadsToWebhook } from '../../../lib/webhook/leads'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../../lib/timezones'
 
 type LocalCampaign = {
@@ -32,6 +33,43 @@ type NormalizedSequenceStep = {
   delay_days: number
   subject_variable: string
   body_variable: string
+}
+
+type LeadCreationPayload =
+  | { mode: 'none' }
+  | { mode: 'manual'; lead?: Record<string, any> }
+  | { mode: 'apollo'; lead?: Record<string, any> }
+  | { mode: 'import'; leads?: Record<string, any>[] }
+
+function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: string | null) {
+  const senderInfo = body?.sender_info || null
+  const leadCreation: LeadCreationPayload = body?.lead_creation || { mode: 'none' }
+  const sequenceCount = normalizeSequenceSteps(body?.sequences).length
+
+  return {
+    source: 'campaign_launch',
+    campaign_id: campaign?.id || null,
+    campaign_name: campaign?.name || body?.name || null,
+    organization_id: campaign?.organization_id || null,
+    instantly_campaign_id: instantlyCampaignId,
+    sequence_count: sequenceCount,
+    sender_info: senderInfo,
+    lead_creation_mode: leadCreation.mode,
+    lead_creation: leadCreation,
+    campaign: {
+      id: campaign?.id || null,
+      name: campaign?.name || body?.name || null,
+      status: campaign?.status || null,
+      daily_limit: campaign?.daily_limit ?? null,
+      email_gap: campaign?.email_gap ?? null,
+      stop_on_reply: campaign?.stop_on_reply ?? null,
+      open_tracking: campaign?.open_tracking ?? null,
+      link_tracking: campaign?.link_tracking ?? null,
+      timezone: campaign?.timezone || null,
+      from_time: campaign?.from_time || null,
+      to_time: campaign?.to_time || null
+    }
+  }
 }
 
 function mapDays(days: any) {
@@ -456,7 +494,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ data: campaign, error: formatSchemaError(updateError) }, { status: 500 })
       }
 
-      return NextResponse.json({ data: updatedRows?.[0] || { ...campaign, instantly_campaign_id: instantlyCampaignId, status: instantlyStatus }, error: null })
+      const updatedCampaign = updatedRows?.[0] || { ...campaign, instantly_campaign_id: instantlyCampaignId, status: instantlyStatus }
+
+      let webhookError: string | null = null
+      try {
+        const webhookPayload = buildWebhookPayload(updatedCampaign, body, instantlyCampaignId)
+        await sendLeadsToWebhook(webhookPayload)
+      } catch (error: any) {
+        webhookError = error?.message || String(error)
+      }
+
+      return NextResponse.json({ data: updatedCampaign, error: null, webhookError })
     } catch (instantlyError: any) {
       await supabase
         .from('campaigns')
