@@ -2,10 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #__next {
+html,
+body,
+#__next {
   height: 100%;
 }
 
-/* basic colors per UI spec */
-.sidebar-bg { background-color: #0f172a; }
-.main-bg { background-color: #f8fafc; }
+@layer utilities {
+  .text-gradient-accent {
+    @apply bg-gradient-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent;
+  }
+
+  .sidebar-gradient-edge {
+    background: linear-gradient(
+      180deg,
+      rgba(59, 130, 246, 0.55) 0%,
+      rgba(139, 92, 246, 0.45) 45%,
+      rgba(59, 130, 246, 0.15) 100%
+    );
+  }
+}

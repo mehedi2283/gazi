@@ -4,30 +4,72 @@ import React, { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
-import { ChevronDown, ChevronUp, Download } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { ArrowLeft, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import useLeads from '../../../../hooks/useLeads'
+import { TableRowSkeleton } from '../../../../components/ui/Skeleton'
 
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
-  const { data: leads, isLoading, error } = useLeads(params.id)
+  const { data: leads, isLoading, error: leadsQueryError } = useLeads(params.id)
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
   const [campaign, setCampaign] = useState<{ name: string } | null>(null)
-  const [loadingCampaign, setLoadingCampaign] = useState(true)
+  const [campaignLoadState, setCampaignLoadState] = useState<'loading' | 'ok' | 'error'>('loading')
+  const [campaignLoadError, setCampaignLoadError] = useState<string | null>(null)
 
   useEffect(() => {
+    let cancelled = false
+
     const fetchCampaign = async () => {
+      setCampaignLoadState('loading')
+      setCampaignLoadError(null)
+
       try {
         const response = await fetch(`/api/campaigns/${params.id}`)
-        const result = await response.json()
-        if (result.data) {
-          setCampaign({ name: result.data.name })
+        const result = await response.json().catch(() => ({}))
+
+        if (cancelled) return
+
+        if (!response.ok) {
+          setCampaign(null)
+          setCampaignLoadError(typeof result?.error === 'string' ? result.error : 'Unable to load campaign')
+          setCampaignLoadState('error')
+          return
         }
-      } catch (err) {
-        console.error('Failed to fetch campaign:', err)
-      } finally {
-        setLoadingCampaign(false)
+
+        if (result?.error && !result?.data) {
+          setCampaign(null)
+          setCampaignLoadError(String(result.error))
+          setCampaignLoadState('error')
+          return
+        }
+
+        const row = result?.data
+        if (!row || typeof row !== 'object') {
+          setCampaign(null)
+          setCampaignLoadError('Campaign not found')
+          setCampaignLoadState('error')
+          return
+        }
+
+        const rawName = row.name
+        const name =
+          typeof rawName === 'string' && rawName.trim().length > 0 ? rawName.trim() : 'Untitled campaign'
+
+        setCampaign({ name })
+        setCampaignLoadState('ok')
+      } catch {
+        if (!cancelled) {
+          setCampaign(null)
+          setCampaignLoadError('Unable to load campaign')
+          setCampaignLoadState('error')
+        }
       }
     }
+
     fetchCampaign()
+    return () => {
+      cancelled = true
+    }
   }, [params.id])
 
   const campaignLeads = useMemo(() => (Array.isArray(leads) ? leads : []), [leads])
@@ -57,29 +99,25 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    
-    // Sanitize campaign name for filename
-    const sanitizedName = campaign?.name 
+
+    const sanitizedName = campaign?.name
       ? campaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
       : 'campaign'
-    
+
     link.download = `${sanitizedName}_${params.id}-leads.csv`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+    toast.success('Export started')
   }
 
   function getLeadLabel(lead: Record<string, any>, index: number) {
     return lead.email || [lead.first_name, lead.last_name].filter(Boolean).join(' ') || `Lead ${index + 1}`
   }
 
-  function getLeadSubtitle(lead: Record<string, any>) {
-    return lead.company_name || lead.title || lead.company_domain || 'Lead record'
-  }
-
   function renderValue(value: any) {
-    if (value == null || value === '') return '-'
+    if (value == null || value === '') return '—'
     if (typeof value === 'object') return JSON.stringify(value, null, 2)
     return String(value)
   }
@@ -87,101 +125,173 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   function renderLeadDetails(lead: Record<string, any>) {
     const entries = Object.entries(lead || {}).filter(([, value]) => value != null && value !== '')
 
-    return entries.length ? entries.map(([key, value]) => (
-      <div key={key} className="grid gap-1 border-b border-slate-100 py-2 last:border-b-0 md:grid-cols-[160px_1fr]">
-        <span className="text-sm font-medium text-slate-500">{key.replace(/_/g, ' ')}</span>
-        <div className="whitespace-pre-wrap text-sm text-slate-800">{renderValue(value)}</div>
-      </div>
-    )) : <p className="text-sm text-slate-500">No additional lead details available.</p>
+    return entries.length ? (
+      entries.map(([key, value]) => (
+        <div
+          key={key}
+          className="grid gap-1 border-b border-white/[0.06] py-2.5 last:border-b-0 md:grid-cols-[minmax(0,160px)_1fr]"
+        >
+          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{key.replace(/_/g, ' ')}</span>
+          <div className="whitespace-pre-wrap break-words text-sm text-zinc-300">{renderValue(value)}</div>
+        </div>
+      ))
+    ) : (
+      <p className="text-sm text-zinc-500">No additional lead details available.</p>
+    )
   }
 
+  const displayName =
+    campaignLoadState === 'loading'
+      ? null
+      : campaignLoadState === 'error'
+        ? null
+        : campaign?.name || 'Untitled campaign'
+
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="space-y-2">
+    <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
+      {/* Action Bar */}
+      <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4">
           <Link
             href="/dashboard/campaigns"
-            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="group inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-300"
           >
+            <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
             Back to campaigns
           </Link>
-          <h1 className="text-2xl font-bold">{loadingCampaign ? 'Loading...' : campaign?.name || 'Campaign Details'}</h1>
-          <p className="text-slate-600">Campaign ID: {params.id}</p>
+          
+          {campaignLoadState === 'loading' ? (
+            <div className="h-10 w-64 animate-pulse rounded-lg bg-zinc-800/80" />
+          ) : (
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+                {displayName}
+              </h1>
+              <span className="mt-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 font-mono text-[10px] text-zinc-500">
+                ID: {params.id.slice(0, 8)}...
+              </span>
+            </div>
+          )}
         </div>
+
         <button
           type="button"
           onClick={handleExport}
-          className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-indigo-300"
+          className="inline-flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/10 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
           disabled={!campaignLeads.length}
         >
-          <Download className="h-4 w-4" aria-hidden="true" />
+          <Download className="h-4 w-4" />
           Export leads
         </button>
       </div>
 
-      <div className="rounded-xl bg-white p-6 shadow">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold">Campaign Leads</h2>
-            <p className="text-sm text-slate-600">{campaignLeads.length} lead{campaignLeads.length === 1 ? '' : 's'} found for this campaign.</p>
+      {/* Main Content Area */}
+      <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] shadow-2xl backdrop-blur-xl overflow-hidden">
+        <div className="border-b border-white/[0.06] bg-white/[0.02] px-6 py-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+              Campaign leads
+            </h2>
+            <div className="flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 ring-1 ring-blue-500/20">
+              <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-xs font-bold text-blue-400">
+                {campaignLeads.length} Total
+              </span>
+            </div>
           </div>
         </div>
 
         {isLoading ? (
-          <p className="text-sm text-slate-600">Loading campaign leads...</p>
-        ) : error ? (
-          <p className="text-sm text-red-600">Unable to load campaign leads.</p>
+          <div className="p-6">
+            <TableRowSkeleton rows={5} />
+          </div>
+        ) : leadsQueryError ? (
+          <div className="p-12 text-center">
+            <p className="text-sm text-red-400">Unable to load campaign leads.</p>
+          </div>
         ) : campaignLeads.length ? (
-          <div className="overflow-hidden rounded-xl border border-slate-200">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="border-b border-white/[0.06] bg-white/[0.01]">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Lead</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Company</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Title</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Details</th>
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Contact</th>
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Professional</th>
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Status</th>
+                  <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200 bg-white">
+              <tbody className="divide-y divide-white/[0.04]">
                 {campaignLeads.map((lead, index) => {
                   const leadId = String(lead.id || lead.email || index)
                   const isExpanded = expandedLeadId === leadId
 
                   return (
-                    <React.Fragment key={lead.id || `${lead.email || 'lead'}-${index}`}>
-                      <tr className="align-top hover:bg-slate-50">
-                        <td className="px-4 py-4">
-                          <div className="font-medium text-slate-900">{getLeadLabel(lead, index)}</div>
-                          <div className="text-sm text-slate-500">ID: {lead.id || '-'}</div>
+                    <React.Fragment key={leadId}>
+                      <tr className={`group transition-colors ${isExpanded ? 'bg-blue-500/[0.03]' : 'hover:bg-white/[0.02]'}`}>
+                        <td className="px-6 py-5">
+                          <div className="font-semibold text-zinc-100">{getLeadLabel(lead, index)}</div>
+                          <div className="mt-1 text-xs text-zinc-500 truncate max-w-[200px]">
+                            {lead.email || 'No email provided'}
+                          </div>
                         </td>
-                        <td className="px-4 py-4 text-sm text-slate-700">{lead.company_name || '-'}</td>
-                        <td className="px-4 py-4 text-sm text-slate-700">{lead.title || '-'}</td>
-                        <td className="px-4 py-4 text-sm text-slate-700">{lead.status || lead.source || '-'}</td>
-                        <td className="px-4 py-4 text-right">
+                        <td className="px-6 py-5">
+                          <div className="font-medium text-zinc-300">{lead.company_name || '—'}</div>
+                          <div className="mt-1 text-xs text-zinc-500 italic">{lead.title || '—'}</div>
+                        </td>
+                        <td className="px-6 py-5">
+                          <span className="inline-flex rounded-md border border-white/10 bg-zinc-900/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                            {lead.status || lead.source || 'new'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-5 text-right">
                           <button
                             type="button"
                             onClick={() => setExpandedLeadId((current) => (current === leadId ? null : leadId))}
-                            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                              isExpanded 
+                                ? 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40' 
+                                : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100 border border-white/10'
+                            }`}
                           >
-                            {isExpanded ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
-                            {isExpanded ? 'Hide' : 'Show'}
+                            {isExpanded ? 'Hide info' : 'View info'}
+                            {isExpanded ? (
+                              <ChevronUp className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                            )}
                           </button>
                         </td>
                       </tr>
                       {isExpanded ? (
-                        <tr className="bg-slate-50">
-                          <td colSpan={5} className="px-4 py-4">
-                            <div className="rounded-lg border border-slate-200 bg-white p-4">
-                              <div className="mb-3 flex items-center justify-between gap-3">
-                                <div>
-                                  <h3 className="text-base font-semibold text-slate-900">{getLeadLabel(lead, index)}</h3>
-                                  <p className="text-sm text-slate-500">{getLeadSubtitle(lead)}</p>
+                        <tr>
+                          <td colSpan={4} className="px-6 py-0">
+                            <motion.div 
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              className="overflow-hidden"
+                            >
+                              <div className="my-4 rounded-xl border border-white/[0.08] bg-black/40 p-6 shadow-inner">
+                                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                                  <div className="space-y-4">
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500">Lead Metadata</h4>
+                                    <div className="space-y-1">{renderLeadDetails(lead)}</div>
+                                  </div>
+                                  <div className="rounded-lg bg-white/[0.02] p-4 border border-white/[0.04]">
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Quick Context</h4>
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="text-[10px] text-zinc-600 block uppercase font-bold">Campaign ID</label>
+                                        <code className="text-xs text-zinc-400 break-all">{lead.campaign_id || params.id}</code>
+                                      </div>
+                                      <div>
+                                        <label className="text-[10px] text-zinc-600 block uppercase font-bold">Lead Ref</label>
+                                        <code className="text-xs text-zinc-400">{lead.id || 'N/A'}</code>
+                                      </div>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="text-sm text-slate-500">Campaign ID: {lead.campaign_id || params.id}</div>
                               </div>
-                              <div className="grid gap-x-8 gap-y-2 md:grid-cols-2">{renderLeadDetails(lead)}</div>
-                            </div>
+                            </motion.div>
                           </td>
                         </tr>
                       ) : null}
@@ -192,7 +302,13 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
             </table>
           </div>
         ) : (
-          <p className="text-slate-600">No leads yet or leads are generating, please wait.</p>
+          <div className="p-20 text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.03] border border-white/10">
+              <Download className="h-6 w-6 text-zinc-600" />
+            </div>
+            <h3 className="text-base font-semibold text-zinc-200">No leads found</h3>
+            <p className="mt-1 text-sm text-zinc-500">Try importing some leads to this campaign.</p>
+          </div>
         )}
       </div>
     </div>

@@ -315,10 +315,13 @@ async function ensureSequenceVariableColumns() {
 
 export async function GET() {
   try {
-    const { data, error } = await supabase.from('campaigns').select('*').order('created_at', { ascending: false })
-    if (error) return NextResponse.json({ data: null, error })
+    const { data, error } = await supabase.from('campaigns').select('*, leads:leads(count)').order('created_at', { ascending: false })
+    if (error) return NextResponse.json({ data: null, error: formatSchemaError(error) })
 
-    let localCampaigns = (data || []) as LocalCampaign[]
+    let localCampaigns = (data || []).map((c) => ({
+      ...c,
+      total_leads: c.leads?.[0]?.count ?? c.total_leads ?? 0
+    })) as LocalCampaign[]
 
     if (process.env.INSTANTLY_API_KEY) {
       const instantlyCampaigns = await listAllCampaigns()

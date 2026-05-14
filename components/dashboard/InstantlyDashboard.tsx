@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useState } from 'react'
+import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase/client'
 import {
   Cell,
@@ -15,6 +16,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { chartAxisTick, chartGridStroke, chartTooltipProps } from '@/lib/chart-theme'
 
 interface KPIs {
   emailsSent: number
@@ -69,7 +71,7 @@ interface AggregatedDailyRow {
   new_leads_contacted: number
 }
 
-const DONUT_COLORS = ['#2563EB', '#059669', '#D97706', '#DC2626']
+const DONUT_COLORS = ['#3b82f6', '#8b5cf6', '#06b6d4', '#f43f5e']
 
 function formatDateLabel(date: string) {
   const parsed = new Date(`${date}T00:00:00`)
@@ -124,14 +126,14 @@ function getStatusLabel(status: number | null) {
 }
 
 function getStatusBadgeClasses(status: number | null) {
-  if (status === 1) return 'bg-emerald-100 text-emerald-700'
-  if (status === 2) return 'bg-amber-100 text-amber-700'
-  if (status === 3) return 'bg-slate-100 text-slate-700'
-  return 'bg-indigo-100 text-indigo-700'
+  if (status === 1) return 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
+  if (status === 2) return 'border border-amber-500/30 bg-amber-500/10 text-amber-200'
+  if (status === 3) return 'border border-zinc-500/30 bg-zinc-800/80 text-zinc-300'
+  return 'border border-blue-500/30 bg-blue-500/10 text-blue-200'
 }
 
 function LoadingBlock({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-gray-100 ${className || ''}`} />
+  return <div className={`animate-pulse rounded-md bg-zinc-800/80 ${className || ''}`} />
 }
 
 export default function InstantlyDashboard() {
@@ -236,11 +238,12 @@ export default function InstantlyDashboard() {
       if (response.ok && result.success) {
         setLastSynced(new Date(result.timestamp || Date.now()).toLocaleString())
         await loadDashboardData()
+        toast.success('Instantly data synced')
       } else {
-        console.error('Sync failed:', result.error)
+        toast.error(typeof result.error === 'string' ? result.error : 'Sync failed')
       }
-    } catch (error) {
-      console.error('Sync failed:', error)
+    } catch {
+      toast.error('Sync failed')
     } finally {
       setIsSyncing(false)
     }
@@ -278,34 +281,35 @@ export default function InstantlyDashboard() {
   const totalCampaignLeads = visibleCampaigns.reduce((sum, campaign) => sum + (campaign.leads_count || 0), 0)
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <div className="flex justify-between items-center mb-8 gap-4 flex-wrap">
+    <div className="space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Instantly Analytics</h1>
-          <p className="text-sm text-gray-500 mt-1">Data is read from Supabase only.</p>
+          <h2 className="text-xl font-semibold tracking-tight text-zinc-50">Instantly analytics</h2>
+          <p className="mt-1 text-sm text-zinc-500">Data is read from Supabase only.</p>
         </div>
-        <div className="flex items-center gap-4 flex-wrap justify-end">
-          {lastSynced && <span className="text-sm text-gray-600">Last synced: {lastSynced}</span>}
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          {lastSynced ? <span className="text-sm text-zinc-500">Last synced: {lastSynced}</span> : null}
           <button
             onClick={handleSync}
             disabled={isSyncing}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50"
+            className="rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:opacity-95 disabled:opacity-50"
           >
-            {isSyncing ? 'Syncing...' : 'Sync Now'}
+            {isSyncing ? 'Syncing...' : 'Sync now'}
           </button>
         </div>
       </div>
 
-      <div className="flex gap-4 mb-8 flex-wrap">
-        <div className="flex gap-2 bg-white rounded-lg p-1 shadow-sm border border-gray-200">
+      <div className="flex flex-wrap gap-4">
+        <div className="flex gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] p-1 backdrop-blur-xl">
           {[7, 30, 90].map((days) => (
             <button
               key={days}
+              type="button"
               onClick={() => setDateRange(days as 7 | 30 | 90)}
-              className={`px-3 py-1 rounded font-medium text-sm transition ${
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                 dateRange === days
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-100'
+                  ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-md'
+                  : 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100'
               }`}
             >
               {days}d
@@ -316,7 +320,7 @@ export default function InstantlyDashboard() {
         <select
           value={selectedCampaign}
           onChange={(e) => setSelectedCampaign(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 font-medium hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-600"
+          className="rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-2 text-sm font-medium text-zinc-100 outline-none ring-blue-500/30 transition focus:ring-2"
         >
           <option value="all">All campaigns</option>
           {campaigns.map((campaign) => (
@@ -327,98 +331,90 @@ export default function InstantlyDashboard() {
         </select>
       </div>
 
-      {selectedCampaign !== 'all' && (
-        <div className="mb-6 inline-flex items-center gap-2 px-3 py-1 bg-indigo-100 text-indigo-700 rounded-lg text-sm">
+      {selectedCampaign !== 'all' ? (
+        <div className="inline-flex items-center gap-2 rounded-lg border border-blue-500/25 bg-blue-500/10 px-3 py-1.5 text-sm text-blue-200">
           <span>
             {campaigns.find((c) => c.campaign_id === selectedCampaign)?.campaign_name || selectedCampaign}
           </span>
-          <button
-            onClick={() => setSelectedCampaign('all')}
-            className="ml-2 text-indigo-700 hover:text-indigo-900"
-          >
+          <button type="button" onClick={() => setSelectedCampaign('all')} className="ml-1 text-blue-300 hover:text-white">
             ×
           </button>
         </div>
-      )}
+      ) : null}
 
       <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-2">Emails Sent</div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-zinc-500">Emails sent</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-24" />
             ) : (
-              <div className="text-3xl font-bold text-gray-900">{kpis.emailsSent.toLocaleString()}</div>
+              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.emailsSent.toLocaleString()}</div>
             )}
-            <div className="text-xs text-gray-500 mt-2">total sent</div>
+            <div className="mt-2 text-xs text-zinc-500">total sent</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-2">Open Rate</div>
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-zinc-500">Open rate</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-20" />
             ) : (
-              <div className="text-3xl font-bold text-gray-900">{kpis.openRate.toFixed(1)}%</div>
+              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.openRate.toFixed(1)}%</div>
             )}
-            <div className="text-xs text-gray-500 mt-2">unique opens</div>
+            <div className="mt-2 text-xs text-zinc-500">unique opens</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-2">Reply Rate</div>
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-zinc-500">Reply rate</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-20" />
             ) : (
-              <div className="text-3xl font-bold text-gray-900">{kpis.replyRate.toFixed(1)}%</div>
+              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.replyRate.toFixed(1)}%</div>
             )}
-            <div className="text-xs text-gray-500 mt-2">unique replies</div>
+            <div className="mt-2 text-xs text-zinc-500">unique replies</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="text-sm font-medium text-gray-600 mb-2">Bounce Rate</div>
+          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-zinc-500">Bounce rate</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-20" />
             ) : (
-              <div className="text-3xl font-bold text-gray-900">{kpis.bounceRate.toFixed(1)}%</div>
+              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.bounceRate.toFixed(1)}%</div>
             )}
-            <div className="text-xs text-gray-500 mt-2">of sent</div>
+            <div className="mt-2 text-xs text-zinc-500">of sent</div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow p-6 min-h-[360px]">
-            <div className="text-sm font-semibold text-gray-700 mb-4">Daily trend</div>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div className="min-h-[360px] rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-4 text-sm font-semibold text-zinc-200">Daily trend</div>
             {loading ? (
               <LoadingBlock className="h-[280px] w-full" />
             ) : chartData.length > 0 ? (
               <div className="h-[280px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} vertical={false} />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatDateLabel}
-                      tick={{ fontSize: 12 }}
-                      stroke="#9CA3AF"
+                      tick={chartAxisTick}
+                      axisLine={false}
+                      tickLine={false}
                     />
-                    <YAxis tick={{ fontSize: 12 }} stroke="#9CA3AF" />
+                    <YAxis tick={chartAxisTick} axisLine={false} tickLine={false} width={40} />
                     <Tooltip
+                      {...chartTooltipProps}
                       labelFormatter={(value) => `Date: ${formatDateLabel(String(value))}`}
                       formatter={formatTooltipValue}
                     />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="sent"
-                      name="Sent"
-                      stroke="#2563EB"
-                      strokeWidth={2}
-                      dot={false}
-                    />
+                    <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12 }} />
+                    <Line type="monotone" dataKey="sent" name="Sent" stroke="#3b82f6" strokeWidth={2} dot={false} />
                     <Line
                       type="monotone"
                       dataKey="unique_replies"
                       name="Replies"
-                      stroke="#059669"
+                      stroke="#8b5cf6"
                       strokeWidth={2}
                       dot={false}
                     />
@@ -426,7 +422,7 @@ export default function InstantlyDashboard() {
                       type="monotone"
                       dataKey="unique_opened"
                       name="Opens"
-                      stroke="#D97706"
+                      stroke="#06b6d4"
                       strokeWidth={2}
                       dot={false}
                     />
@@ -434,18 +430,18 @@ export default function InstantlyDashboard() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[280px] flex items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+              <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-zinc-950/40 text-sm text-zinc-500">
                 No daily data available for this range.
               </div>
             )}
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6 min-h-[360px]">
-            <div className="text-sm font-semibold text-gray-700 mb-4">Engagement breakdown</div>
+          <div className="min-h-[360px] rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-4 text-sm font-semibold text-zinc-200">Engagement breakdown</div>
             {loading ? (
               <LoadingBlock className="h-[280px] w-full" />
             ) : donutData.some((entry) => entry.value > 0) ? (
-              <div className="h-[280px] w-full flex items-center justify-center">
+              <div className="flex h-[280px] w-full items-center justify-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -457,20 +453,20 @@ export default function InstantlyDashboard() {
                       paddingAngle={2}
                     >
                       {donutData.map((entry, index) => (
-                        <Cell key={entry.name} fill={DONUT_COLORS[index % DONUT_COLORS.length]} />
+                        <Cell key={entry.name} fill={DONUT_COLORS[index % DONUT_COLORS.length]} stroke="rgba(10,10,10,0.4)" strokeWidth={1} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={formatTooltipValue} />
+                    <Tooltip {...chartTooltipProps} formatter={formatTooltipValue} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[280px] flex flex-col items-center justify-center text-sm text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+              <div className="flex h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-zinc-950/40 text-sm text-zinc-500">
                 <div>No campaign engagement data available.</div>
-                <div className="mt-2 text-xs text-gray-400">Sync Instantly data to populate this chart.</div>
+                <div className="mt-2 text-xs text-zinc-600">Sync Instantly data to populate this chart.</div>
               </div>
             )}
-            <div className="mt-4 flex flex-wrap gap-3 text-xs text-gray-600">
+            <div className="mt-4 flex flex-wrap gap-3 text-xs text-zinc-400">
               {donutData.map((entry, index) => (
                 <span key={entry.name} className="inline-flex items-center gap-2">
                   <span
@@ -480,16 +476,16 @@ export default function InstantlyDashboard() {
                   {entry.name} {entry.value.toLocaleString()}
                 </span>
               ))}
-              <span className="inline-flex items-center gap-2 font-medium text-gray-700">
-                <span className="h-2.5 w-2.5 rounded-sm bg-slate-400" />
+              <span className="inline-flex items-center gap-2 font-medium text-zinc-300">
+                <span className="h-2.5 w-2.5 rounded-sm bg-zinc-600" />
                 Leads {totalCampaignLeads.toLocaleString()}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="text-sm font-semibold text-gray-700 mb-4">Campaign performance</div>
+        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
+          <div className="mb-4 text-sm font-semibold text-zinc-200">Campaign performance</div>
           {loading ? (
             <div className="space-y-3">
               <LoadingBlock className="h-10 w-full" />
@@ -501,16 +497,16 @@ export default function InstantlyDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-gray-500 border-b border-gray-200">
-                    <th className="py-3 pr-4 font-medium">Campaign</th>
-                    <th className="py-3 pr-4 font-medium">Status</th>
-                    <th className="py-3 pr-4 font-medium">Leads</th>
-                    <th className="py-3 pr-4 font-medium">Sent</th>
-                    <th className="py-3 pr-4 font-medium">Opens</th>
-                    <th className="py-3 pr-4 font-medium">Replies</th>
-                    <th className="py-3 pr-4 font-medium">Clicks</th>
-                    <th className="py-3 pr-4 font-medium">Bounce</th>
-                    <th className="py-3 pr-4 font-medium">Open%</th>
+                  <tr className="border-b border-white/[0.08] text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
+                    <th className="py-3 pr-4">Campaign</th>
+                    <th className="py-3 pr-4">Status</th>
+                    <th className="py-3 pr-4">Leads</th>
+                    <th className="py-3 pr-4">Sent</th>
+                    <th className="py-3 pr-4">Opens</th>
+                    <th className="py-3 pr-4">Replies</th>
+                    <th className="py-3 pr-4">Clicks</th>
+                    <th className="py-3 pr-4">Bounce</th>
+                    <th className="py-3 pr-4">Open%</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -520,24 +516,27 @@ export default function InstantlyDashboard() {
                     const openPercent = sent > 0 ? (openCount / sent) * 100 : 0
 
                     return (
-                      <tr key={campaign.campaign_id} className="border-b border-gray-100 last:border-b-0">
-                        <td className="py-3 pr-4 font-medium text-gray-900 max-w-[280px] truncate">
+                      <tr
+                        key={campaign.campaign_id}
+                        className="border-b border-white/[0.04] transition-colors last:border-b-0 hover:bg-white/[0.03]"
+                      >
+                        <td className="max-w-[280px] truncate py-3 pr-4 font-medium text-zinc-100">
                           {campaign.campaign_name || campaign.campaign_id}
                         </td>
                         <td className="py-3 pr-4">
                           <span
-                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(campaign.campaign_status)}`}
+                            className={`inline-flex rounded-xl px-2.5 py-1 text-xs font-medium ${getStatusBadgeClasses(campaign.campaign_status)}`}
                           >
                             {getStatusLabel(campaign.campaign_status)}
                           </span>
                         </td>
-                        <td className="py-3 pr-4">{(campaign.leads_count || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4">{sent.toLocaleString()}</td>
-                        <td className="py-3 pr-4">{openCount.toLocaleString()}</td>
-                        <td className="py-3 pr-4">{(campaign.reply_count_unique || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4">{(campaign.link_click_count_unique || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4">{(campaign.bounced_count || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4">{sent > 0 ? `${openPercent.toFixed(1)}%` : '0.0%'}</td>
+                        <td className="py-3 pr-4 text-zinc-300">{(campaign.leads_count || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-zinc-300">{sent.toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-zinc-300">{openCount.toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-zinc-300">{(campaign.reply_count_unique || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-zinc-300">{(campaign.link_click_count_unique || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-zinc-300">{(campaign.bounced_count || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-zinc-300">{sent > 0 ? `${openPercent.toFixed(1)}%` : '0.0%'}</td>
                       </tr>
                     )
                   })}
@@ -545,7 +544,7 @@ export default function InstantlyDashboard() {
               </table>
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-gray-200 bg-gray-50 px-6 py-10 text-center text-sm text-gray-500">
+            <div className="rounded-lg border border-dashed border-white/10 bg-zinc-950/40 px-6 py-10 text-center text-sm text-zinc-500">
               No campaigns found for the current view.
             </div>
           )}

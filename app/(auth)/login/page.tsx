@@ -40,16 +40,16 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 main-bg">
-      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow">
-        <h2 className="text-2xl font-bold mb-4">Sign in</h2>
+    <div className="flex min-h-screen items-center justify-center bg-canvas p-6">
+      <div className="w-full max-w-md rounded-xl border border-white/[0.08] bg-white/[0.03] p-8 shadow-glass backdrop-blur-xl">
+        <h2 className="mb-6 text-2xl font-bold tracking-tight text-zinc-50">Sign in</h2>
         <form className="space-y-4" onSubmit={handleSubmit}>
           <input
             placeholder="Email"
             type="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            className="w-full px-3 py-2 border rounded"
+            className="w-full rounded-lg border border-white/10 bg-zinc-950/50 px-3 py-2.5 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
             required
           />
           <input
@@ -57,15 +57,23 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="w-full px-3 py-2 border rounded"
+            className="w-full rounded-lg border border-white/10 bg-zinc-950/50 px-3 py-2.5 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
             required
           />
-          {error ? <p className="text-sm text-red-600">{error}</p> : null}
-          <button disabled={submitting} className="w-full bg-indigo-600 text-white py-2 rounded disabled:opacity-60">
+          {error ? <p className="text-sm text-red-400">{error}</p> : null}
+          <button
+            disabled={submitting}
+            className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/25 disabled:opacity-60"
+          >
             {submitting ? 'Signing in...' : 'Sign in'}
           </button>
         </form>
-        <p className="mt-4 text-sm">Don&apos;t have an account? <Link href="/register" className="text-indigo-600">Register</Link></p>
+        <p className="mt-4 text-sm text-zinc-500">
+          Don&apos;t have an account?{' '}
+          <Link href="/register" className="font-medium text-blue-400 hover:text-blue-300">
+            Register
+          </Link>
+        </p>
       </div>
     </div>
   )

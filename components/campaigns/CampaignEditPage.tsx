@@ -53,11 +53,11 @@ export default function CampaignEditPage({ id }: CampaignEditPageProps) {
   }
 
   if (loading) {
-    return <div className="rounded-xl bg-white p-6 shadow">Loading campaign...</div>
+    return <div className="rounded-lg bg-white p-6 shadow">Loading campaign...</div>
   }
 
   if (error) {
-    return <div className="rounded-xl bg-white p-6 shadow text-red-600">{error}</div>
+    return <div className="rounded-lg bg-white p-6 shadow text-red-600">{error}</div>
   }
 
   return (

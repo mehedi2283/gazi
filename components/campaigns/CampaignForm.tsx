@@ -131,7 +131,7 @@ function LockedLabel({ children }: { children: React.ReactNode }) {
     <span className="flex items-center gap-2 text-sm font-medium">
       {children}
       <span className="group relative inline-flex" tabIndex={0}>
-        <Lock className="h-4 w-4 text-slate-500" aria-hidden="true" />
+        <Lock className="h-4 w-4 text-zinc-500" aria-hidden="true" />
         <span
           role="tooltip"
           className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-64 -translate-x-1/2 rounded-md bg-slate-900 px-3 py-2 text-xs font-normal leading-5 text-white shadow-lg group-hover:block group-focus:block"
@@ -531,19 +531,22 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">{title}</h1>
-        <p className="text-slate-600">{subtitle}</p>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{title}</h1>
+        <p className="text-zinc-500">{subtitle}</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6 rounded-lg bg-white p-6 shadow">
+      <form
+        onSubmit={handleSubmit}
+        className="space-y-6 rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl"
+      >
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-2">
             <span className="text-sm font-medium">Campaign Name</span>
-            <input name="name" value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-lg border px-3 py-2" placeholder="Apollo Outreach Campaign 1" />
+            <input name="name" value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" placeholder="Apollo Outreach Campaign 1" />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-medium">Timezone</span>
-            <select name="timezone" className="w-full rounded-lg border px-3 py-2" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+            <select name="timezone" className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
               {INSTANTLY_TIMEZONES.map((tz) => (
                 <option key={tz} value={tz}>
                   {tz}
@@ -553,41 +556,41 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           </label>
           <label className="space-y-2">
             <span className="text-sm font-medium">Daily Limit</span>
-            <input name="daily_limit" type="number" min={1} className="w-full rounded-lg border px-3 py-2" value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)} />
+            <input name="daily_limit" type="number" min={1} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)} />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-medium">Email Gap</span>
-            <input name="email_gap" type="number" min={0} className="w-full rounded-lg border px-3 py-2" value={emailGap} onChange={(event) => setEmailGap(event.target.value)} />
+            <input name="email_gap" type="number" min={0} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={emailGap} onChange={(event) => setEmailGap(event.target.value)} />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-medium">From Time</span>
-            <input name="from_time" className="w-full rounded-lg border px-3 py-2" value={fromTime} onChange={(event) => setFromTime(event.target.value)} />
+            <input name="from_time" className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={fromTime} onChange={(event) => setFromTime(event.target.value)} />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-medium">To Time</span>
-            <input name="to_time" className="w-full rounded-lg border px-3 py-2" value={toTime} onChange={(event) => setToTime(event.target.value)} />
+            <input name="to_time" className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={toTime} onChange={(event) => setToTime(event.target.value)} />
           </label>
         </div>
 
         <div className="grid gap-3 md:grid-cols-3">
-          <label className="flex items-center gap-2 rounded-lg border px-3 py-2">
+          <label className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-3 py-2 text-zinc-200">
             <input type="checkbox" name="stop_on_reply" checked={stopOnReply} onChange={(event) => setStopOnReply(event.target.checked)} />
             <span className="text-sm font-medium">Stop On Reply</span>
           </label>
-          <label className="flex items-center gap-2 rounded-lg border px-3 py-2">
+          <label className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-3 py-2 text-zinc-200">
             <input type="checkbox" name="open_tracking" checked={openTracking} onChange={(event) => setOpenTracking(event.target.checked)} />
             <span className="text-sm font-medium">Open Tracking</span>
           </label>
-          <label className="flex items-center gap-2 rounded-lg border px-3 py-2">
+          <label className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-3 py-2 text-zinc-200">
             <input type="checkbox" name="link_tracking" checked={linkTracking} onChange={(event) => setLinkTracking(event.target.checked)} />
             <span className="text-sm font-medium">Link Tracking</span>
           </label>
         </div>
 
-        <div className="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+        <div className="space-y-4 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-4">
           <div>
-            <h2 className="text-lg font-semibold">Sender Information</h2>
-            <p className="text-sm text-slate-600">This section is required and will be sent with the campaign webhook after the campaign is created.</p>
+            <h2 className="text-lg font-semibold text-zinc-100">Sender Information</h2>
+            <p className="text-sm text-zinc-500">This section is required and will be sent with the campaign webhook after the campaign is created.</p>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -596,7 +599,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <input
                 value={senderInfo.name}
                 onChange={(event) => setSenderInfo((current) => ({ ...current, name: event.target.value }))}
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 placeholder="John Doe"
                 required
               />
@@ -606,7 +609,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <input
                 value={senderInfo.company}
                 onChange={(event) => setSenderInfo((current) => ({ ...current, company: event.target.value }))}
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 placeholder="Company name"
                 required
               />
@@ -616,7 +619,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <input
                 value={senderInfo.location}
                 onChange={(event) => setSenderInfo((current) => ({ ...current, location: event.target.value }))}
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 placeholder="City, Country"
                 required
               />
@@ -626,7 +629,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <input
                 value={senderInfo.address}
                 onChange={(event) => setSenderInfo((current) => ({ ...current, address: event.target.value }))}
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 placeholder="Street address"
                 required
               />
@@ -636,7 +639,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <input
                 value={senderInfo.booking_calendar_link}
                 onChange={(event) => setSenderInfo((current) => ({ ...current, booking_calendar_link: event.target.value }))}
-                className="w-full rounded-lg border px-3 py-2"
+                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 placeholder="https://cal.com/..."
                 required
               />
@@ -646,7 +649,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <textarea
                 value={senderInfo.company_details}
                 onChange={(event) => setSenderInfo((current) => ({ ...current, company_details: event.target.value }))}
-                className="min-h-28 w-full rounded-lg border px-3 py-2"
+                className="min-h-28 w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 placeholder="Share the company summary, positioning, or offer context"
               />
             </label>
@@ -655,7 +658,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <textarea
                 value={senderInfo.long_message}
                 onChange={(event) => setSenderInfo((current) => ({ ...current, long_message: event.target.value }))}
-                className="min-h-28 w-full rounded-lg border px-3 py-2"
+                className="min-h-28 w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 placeholder="Paste the long-form sender note or outreach message"
               />
             </label>
@@ -666,7 +669,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           <h2 className="text-lg font-semibold">Sending Days</h2>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => (
-              <label key={day} className="flex items-center gap-2 rounded-lg border px-3 py-2 capitalize">
+              <label key={day} className="flex items-center gap-2 rounded-md border px-3 py-2 capitalize">
                 <input
                   type="checkbox"
                   name={day}
@@ -685,7 +688,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
             <button
               type="button"
               onClick={addStep}
-              className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white"
+              className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white"
             >
               <Plus className="h-4 w-4" aria-hidden="true" />
               Add Step
@@ -698,14 +701,14 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               const minimumDelay = index === 0 ? 0 : (steps[index - 1]?.delay_days ?? 0) + 1
 
               return (
-                <div key={stepNumber} className="space-y-4 rounded-lg border p-4">
+                <div key={stepNumber} className="space-y-4 rounded-lg border border-white/10 bg-zinc-950/30 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-base font-semibold">Step {stepNumber}</h3>
+                    <h3 className="text-base font-semibold text-zinc-100">Step {stepNumber}</h3>
                     {index > 0 ? (
                       <button
                         type="button"
                         onClick={() => removeStep(index)}
-                        className="inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium text-slate-700"
+                        className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5"
                       >
                         <Trash2 className="h-4 w-4" aria-hidden="true" />
                         Remove Step
@@ -720,7 +723,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         value={getSubjectVariable(stepNumber)}
                         disabled
                         readOnly
-                        className="w-full rounded-lg border bg-slate-100 px-3 py-2 text-slate-700"
+                        className="w-full rounded-md border border-white/10 bg-zinc-900/60 px-3 py-2 text-zinc-400"
                       />
                     </label>
 
@@ -730,7 +733,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         value={getBodyVariable(stepNumber)}
                         disabled
                         readOnly
-                        className="w-full rounded-lg border bg-slate-100 px-3 py-2 text-slate-700"
+                        className="w-full rounded-md border border-white/10 bg-zinc-900/60 px-3 py-2 text-zinc-400"
                       />
                     </label>
 
@@ -742,7 +745,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         value={index === 0 ? 0 : step.delay_days}
                         disabled={index === 0}
                         onChange={(event) => updateDelay(index, event.target.value)}
-                        className="w-full rounded-lg border px-3 py-2 disabled:bg-slate-100 disabled:text-slate-500"
+                        className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30 disabled:bg-zinc-900/50 disabled:text-zinc-600"
                       />
                     </label>
                   </div>
@@ -754,10 +757,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           {sequenceError ? <p className="text-sm text-red-600">{sequenceError}</p> : null}
         </div>
 
-        <div className="space-y-4 rounded-lg border border-indigo-200 bg-indigo-50/50 p-4">
+        <div className="space-y-4 rounded-lg border border-blue-500/20 bg-blue-500/[0.06] p-4">
           <div>
-            <h2 className="text-lg font-semibold">Lead Creation</h2>
-            <p className="text-sm text-slate-600">Choose whether this campaign should create leads immediately after the campaign is created.</p>
+            <h2 className="text-lg font-semibold text-zinc-100">Lead Creation</h2>
+            <p className="text-sm text-zinc-500">Choose whether this campaign should create leads immediately after the campaign is created.</p>
           </div>
 
           <div className="space-y-2">
@@ -767,7 +770,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                 <button
                   type="button"
                   onClick={() => setEmailMenuOpen((current) => !current)}
-                  className="flex h-10 w-full items-center justify-between rounded-lg border bg-white px-3 text-left text-sm text-slate-800 shadow-sm"
+                  className="flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-zinc-950/60 px-3 text-left text-sm text-zinc-100 shadow-sm"
                 >
                   <span className="truncate">
                     {selectedEmail
@@ -776,14 +779,14 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         : selectedEmail
                       : 'No sender selected'}
                   </span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-500" aria-hidden="true" />
+                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-zinc-500" aria-hidden="true" />
                 </button>
 
                 {emailMenuOpen ? (
-                  <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-lg border bg-white py-1 shadow-lg">
+                  <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-md border border-white/10 bg-zinc-950 py-1 shadow-2xl backdrop-blur-xl">
                     <button
                       type="button"
-                      className={`flex w-full items-center px-3 py-2 text-left text-sm hover:bg-slate-50 ${!selectedEmail ? 'font-semibold text-indigo-700' : 'text-slate-700'}`}
+                      className={`flex w-full items-center px-3 py-2 text-left text-sm hover:bg-white/10 ${!selectedEmail ? 'font-semibold text-blue-300' : 'text-zinc-300'}`}
                       onClick={() => {
                         setSelectedEmail('')
                         setNewEmailAddress('')
@@ -799,7 +802,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         <div key={account.id} className="flex items-center gap-1 px-1">
                           <button
                             type="button"
-                            className={`min-w-0 flex-1 rounded-md px-2 py-2 text-left text-sm hover:bg-slate-50 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-indigo-700' : 'text-slate-700'}`}
+                            className={`min-w-0 flex-1 rounded-md px-2 py-2 text-left text-sm hover:bg-white/10 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-blue-300' : 'text-zinc-300'}`}
                             onClick={() => {
                               setSelectedEmail(account.email_address)
                               setNewEmailAddress('')
@@ -808,7 +811,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                             }}
                           >
                             <span className="block truncate">{account.account_name || account.email_address}</span>
-                            <span className="block truncate text-xs font-normal text-slate-500">{account.email_address}</span>
+                            <span className="block truncate text-xs font-normal text-zinc-500">{account.email_address}</span>
                           </button>
                           <button
                             type="button"
@@ -817,7 +820,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                               handleDeleteEmailAccount(account)
                             }}
                             disabled={deletingEmailId === account.id}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 transition hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
                             aria-label={`Delete ${account.email_address}`}
                           >
                             <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -825,7 +828,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         </div>
                       ))
                     ) : (
-                      <div className="px-3 py-2 text-sm text-slate-500">No saved email accounts</div>
+                      <div className="px-3 py-2 text-sm text-zinc-500">No saved email accounts</div>
                     )}
                   </div>
                 ) : null}
@@ -837,20 +840,20 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                   value={newEmailAddress}
                   onChange={(event) => setNewEmailAddress(event.target.value)}
                   placeholder="new@email.com"
-                  className="h-10 min-w-0 rounded-lg border bg-white px-3 text-sm"
+                  className="h-10 min-w-0 rounded-md border border-white/10 bg-zinc-950/50 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40"
                 />
                 <input
                   type="text"
                   value={newEmailName}
                   onChange={(event) => setNewEmailName(event.target.value)}
                   placeholder="Name"
-                  className="h-10 min-w-0 rounded-lg border bg-white px-3 text-sm"
+                  className="h-10 min-w-0 rounded-md border border-white/10 bg-zinc-950/50 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40"
                 />
                 <button
                   type="button"
                   onClick={handleAddEmailAccount}
                   disabled={addingEmail || !newEmailAddress.trim()}
-                  className="h-10 rounded-lg bg-slate-900 px-3 text-sm font-medium text-white disabled:opacity-50"
+                  className="h-10 rounded-md bg-gradient-to-r from-blue-600 to-violet-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
                 >
                   Use
                 </button>
@@ -860,7 +863,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
           <div className="grid gap-3 md:grid-cols-2">
             {LEAD_MODE_OPTIONS.map((option) => (
-              <label key={option.value} className={`rounded-lg border px-4 py-3 ${leadMode === option.value ? 'border-indigo-600 bg-white' : 'bg-white/80'}`}>
+              <label key={option.value} className={`rounded-lg border px-4 py-3 transition ${leadMode === option.value ? 'border-blue-500/50 bg-blue-500/10 ring-1 ring-blue-500/30' : 'border-white/10 bg-zinc-950/40 hover:border-white/15'}`}>
                 <div className="flex items-center gap-2">
                   <input
                     type="radio"
@@ -870,7 +873,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                   />
                   <span className="font-medium">{option.label}</span>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{option.description}</p>
+                <p className="mt-1 text-sm text-zinc-500">{option.description}</p>
               </label>
             ))}
           </div>
@@ -921,7 +924,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         }
                       }
                     }}
-                    className="w-full rounded-lg border px-3 py-2"
+                    className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                     placeholder="United States"
                     aria-autocomplete="list"
                     aria-expanded={countryOpen}
@@ -929,7 +932,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                     role="combobox"
                   />
                   {countryOpen && filteredCountries.length > 0 ? (
-                    <ul id="country-listbox" role="listbox" className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg border bg-white shadow-lg">
+                    <ul id="country-listbox" role="listbox" className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-white/10 bg-zinc-950 py-1 shadow-2xl backdrop-blur-xl">
                       {filteredCountries.slice(0, 100).map((country, index) => (
                         <li
                           key={country}
@@ -941,7 +944,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                             setApolloLead((current) => ({ ...current, market_name: country }))
                             setCountryOpen(false)
                           }}
-                          className={`cursor-pointer px-3 py-2 text-sm ${index === countryHighlight ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700'}`}
+                          className={`cursor-pointer px-3 py-2 text-sm ${index === countryHighlight ? 'bg-blue-500/15 text-blue-200' : 'text-zinc-300 hover:bg-white/5'}`}
                         >
                           {country}
                         </li>
@@ -955,7 +958,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                 <input
                   value={apolloLead.product_name}
                   onChange={(event) => setApolloLead((current) => ({ ...current, product_name: event.target.value }))}
-                  className="w-full rounded-lg border px-3 py-2"
+                  className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                   placeholder="e.g. CRM automation"
                 />
               </label>
@@ -970,10 +973,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                   type="file"
                   accept=".csv,.txt,.xlsx,.xls"
                   onChange={handleLeadFileChange}
-                  className="w-full rounded-lg border px-3 py-2"
+                  className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
                 />
               </label>
-              <div className="rounded-lg border bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              <div className="rounded-md border border-white/10 bg-zinc-950/40 px-4 py-3 text-sm text-zinc-400">
                 {leadFileName ? `Loaded file: ${leadFileName}` : 'No lead file loaded yet'}
                 <span className="ml-2">{leadRows.length} rows ready</span>
               </div>
@@ -982,11 +985,11 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
         </div>
 
-        <div className="space-y-3 rounded-lg border bg-slate-50 p-4">
-          <h2 className="text-lg font-semibold">Launch Preview</h2>
-          <div className="overflow-x-auto rounded-lg border bg-white">
+        <div className="space-y-3 rounded-lg border border-white/10 bg-zinc-950/40 p-4">
+          <h2 className="text-lg font-semibold text-zinc-100">Launch Preview</h2>
+          <div className="overflow-x-auto rounded-md border border-white/10 bg-zinc-950/30">
             <table className="min-w-full text-left text-sm">
-              <thead className="bg-slate-100 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wide text-zinc-500">
                 <tr>
                   <th className="px-4 py-3">Step</th>
                   <th className="px-4 py-3">Day</th>
@@ -994,16 +997,16 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                   <th className="px-4 py-3">Body</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-white/[0.06]">
                 {steps.map((step, index) => {
                   const stepNumber = index + 1
 
                   return (
-                    <tr key={`preview-${stepNumber}`}>
-                      <td className="px-4 py-3 font-medium text-slate-900">Step {stepNumber}</td>
-                      <td className="px-4 py-3 text-slate-700">{index === 0 ? 0 : step.delay_days}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-700">{getSubjectVariable(stepNumber)}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-slate-700">{getBodyVariable(stepNumber)}</td>
+                    <tr key={`preview-${stepNumber}`} className="hover:bg-white/[0.02]">
+                      <td className="px-4 py-3 font-medium text-zinc-100">Step {stepNumber}</td>
+                      <td className="px-4 py-3 text-zinc-400">{index === 0 ? 0 : step.delay_days}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-zinc-400">{getSubjectVariable(stepNumber)}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-zinc-400">{getBodyVariable(stepNumber)}</td>
                     </tr>
                   )
                 })}
@@ -1012,13 +1015,13 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           </div>
         </div>
 
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
+        {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
         <div className="flex items-center gap-3">
           <button
             type="submit"
             disabled={submitting || Boolean(sequenceError)}
-            className="rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white disabled:opacity-60"
+            className="rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/20 disabled:opacity-60"
           >
             {submitting ? 'Saving...' : submitLabel}
           </button>

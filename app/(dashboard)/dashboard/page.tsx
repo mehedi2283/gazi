@@ -1,3 +1,4 @@
+"use client"
 import React from 'react'
 import StatsGrid from '../../../components/dashboard/StatsGrid'
 import CampaignPerformanceChart from '../../../components/dashboard/CampaignPerformanceChart'
@@ -5,28 +6,45 @@ import RecentCampaigns from '../../../components/dashboard/RecentCampaigns'
 import LeadSourcesChart from '../../../components/dashboard/LeadSourcesChart'
 import LeadStatusChart from '../../../components/dashboard/LeadStatusChart'
 import DashboardTabs from '../../../components/dashboard/DashboardTabs'
-import { headers } from 'next/headers'
+import useDashboardStats from '../../../hooks/useDashboardStats'
+import { StatCardSkeleton, Skeleton } from '../../../components/ui/Skeleton'
 
-async function getDashboardData() {
-  const requestHeaders = headers()
-  const host = requestHeaders.get('host')
-  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https'
-  const baseUrl = host ? `${protocol}://${host}` : process.env.NEXT_PUBLIC_APP_URL || ''
-  const res = await fetch(`${baseUrl}/api/stats/dashboard`, { cache: 'no-store' })
-  if (!res.ok) return null
-  const json = await res.json()
-  return json.data
-}
+export default function DashboardPage() {
+  const { data, isLoading, error } = useDashboardStats()
 
-export default async function DashboardPage() {
-  const data = await getDashboardData()
   const recentCampaigns = data?.recentCampaigns || []
   const campaignPerformance = data?.campaignPerformance || []
   const leadSources = data?.leadSources || {}
   const leadStatuses = data?.leadStatuses || {}
 
+  if (isLoading) {
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+          <StatCardSkeleton />
+        </div>
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <Skeleton className="h-[400px] w-full" />
+          <Skeleton className="h-[400px] w-full" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-red-500/20 bg-red-500/5 p-6 text-center">
+        <h3 className="text-lg font-semibold text-red-400">Unable to load dashboard</h3>
+        <p className="mt-1 text-sm text-zinc-400">Please try refreshing the page.</p>
+      </div>
+    )
+  }
+
   const overviewContent = (
-    <>
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
       <StatsGrid initialData={data} />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
         <CampaignPerformanceChart data={campaignPerformance} />
@@ -36,12 +54,11 @@ export default async function DashboardPage() {
         <LeadSourcesChart data={leadSources} />
         <LeadStatusChart data={leadStatuses} />
       </div>
-    </>
+    </div>
   )
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
       <DashboardTabs>{overviewContent}</DashboardTabs>
     </div>
   )
