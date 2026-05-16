@@ -4,8 +4,9 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
-import { ChevronDown, Lock, Plus, Trash2 } from 'lucide-react'
+import { ChevronDown, Lock, Plus, Trash2, Paperclip, Loader2, X } from 'lucide-react'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../lib/timezones'
+import { supabase } from '../../lib/supabase/client'
 
 type LeadCreationMode = 'apollo' | 'import'
 
@@ -64,6 +65,9 @@ type CampaignInitialData = {
   sequences?: Array<{
     delay_days?: number | null
   }>
+  target_lead_count?: number | null
+  attachment_url?: string | null
+  signature?: string | null
 }
 
 type CampaignFormProps = {
@@ -176,8 +180,13 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     long_message: '',
     location: '',
     address: '',
-    booking_calendar_link: ''
+    booking_calendar_link: '',
+    signature: ''
   })
+  const [targetLeadCount, setTargetLeadCount] = useState(String(initialData?.target_lead_count ?? 100))
+  const [attachmentUrl, setAttachmentUrl] = useState(initialData?.attachment_url || '')
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const [uploadingSignature, setUploadingSignature] = useState(false)
   const [countryOpen, setCountryOpen] = useState(false)
   const [countryHighlight, setCountryHighlight] = useState(0)
   const countryRef = React.useRef<HTMLDivElement | null>(null)
@@ -308,6 +317,12 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           }))
         : [{ delay_days: 0 }]
     )
+    setTargetLeadCount(String(initialData?.target_lead_count ?? 100))
+    setAttachmentUrl(initialData?.attachment_url || '')
+    setSenderInfo((prev) => ({
+      ...prev,
+      signature: initialData?.signature || ''
+    }))
     setError('')
   }, [initialData])
 
@@ -372,35 +387,111 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     }))
   }
 
-  async function handleLeadFileChange(event: React.ChangeEvent<HTMLInputElement>) {
+  const handleLeadFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    const extension = file.name.split('.').pop()?.toLowerCase()
+    setLeadFileName(file.name)
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const content = e.target?.result
+      if (typeof content !== 'string') return
+
+      if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
+        const parsed = Papa.parse(content, { header: true, skipEmptyLines: true })
+        setLeadRows(parsed.data as Record<string, any>[])
+      } else {
+        const workbook = XLSX.read(content, { type: 'binary' })
+        const sheetName = workbook.SheetNames[0]
+        const worksheet = workbook.Sheets[sheetName]
+        const data = XLSX.utils.sheet_to_json(worksheet)
+        setLeadRows(data as Record<string, any>[])
+      }
+    }
+
+    if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
+      reader.readAsText(file)
+    } else {
+      reader.readAsBinaryString(file)
+    }
+  }
+
+  const handleAttachmentUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Limit to 5MB
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size exceeds 5MB limit')
+      return
+    }
+
+    // Allowed types
+    const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/msword']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Only PDF, JPG, PNG, and Word docs are allowed')
+      return
+    }
 
     try {
-      if (extension === 'csv' || extension === 'txt') {
-        const text = await file.text()
-        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true })
-        setLeadRows((parsed.data as Record<string, any>[]) || [])
-        setLeadFileName(file.name)
-        return
-      }
+      setUploadingAttachment(true)
+      const fileName = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+      const { error } = await supabase.storage
+        .from('attachments')
+        .upload(fileName, file)
 
-      if (extension === 'xlsx' || extension === 'xls') {
-        const buffer = await file.arrayBuffer()
-        const workbook = XLSX.read(buffer, { type: 'array' })
-        const firstSheet = workbook.SheetNames[0]
-        const sheet = workbook.Sheets[firstSheet]
-        const json = XLSX.utils.sheet_to_json(sheet) as Record<string, any>[]
-        setLeadRows(json || [])
-        setLeadFileName(file.name)
-        return
-      }
+      if (error) throw error
 
-      toast.error('Please upload a CSV or Excel file')
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(fileName)
+
+      setAttachmentUrl(publicUrl)
+      toast.success('File uploaded successfully')
     } catch (err: any) {
-      toast.error(err?.message || 'Failed to parse lead file')
+      console.error('Upload error:', err)
+      toast.error(err.message || 'Failed to upload file')
+    } finally {
+      setUploadingAttachment(false)
+    }
+  }
+
+  const handleSignatureUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    // Limit to 2MB for signatures
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('Signature image exceeds 2MB limit')
+      return
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a JPG, PNG, or GIF for your signature')
+      return
+    }
+
+    try {
+      setUploadingSignature(true)
+      const fileName = `sig_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+      const { error } = await supabase.storage
+        .from('attachments')
+        .upload(fileName, file)
+
+      if (error) throw error
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('attachments')
+        .getPublicUrl(fileName)
+
+      setSenderInfo(prev => ({ ...prev, signature_url: publicUrl }))
+      toast.success('Signature image uploaded')
+    } catch (err: any) {
+      console.error('Signature upload error:', err)
+      toast.error(err.message || 'Failed to upload signature')
+    } finally {
+      setUploadingSignature(false)
     }
   }
 
@@ -512,10 +603,14 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           long_message: senderInfo.long_message.trim(),
           location: senderInfo.location.trim(),
           address: senderInfo.address.trim(),
-          booking_calendar_link: senderInfo.booking_calendar_link.trim()
+          booking_calendar_link: senderInfo.booking_calendar_link.trim(),
+          attachment_url: attachmentUrl.trim(),
+          signature: senderInfo.signature.trim(),
+          signature_url: senderInfo.signature_url
         },
         lead_creation: leadCreation,
         lead_creation_mode: leadMode,
+        target_lead_count: Number(targetLeadCount || 0),
         ...(sendingEmail ? {
           sending_email: sendingEmail,
           sending_email_account_name: sendingEmailAccountName
@@ -561,6 +656,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           <label className="space-y-2">
             <span className="text-sm font-medium">Email Gap</span>
             <input name="email_gap" type="number" min={0} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={emailGap} onChange={(event) => setEmailGap(event.target.value)} />
+          </label>
+          <label className="space-y-2">
+            <span className="text-sm font-medium">Target Lead Count</span>
+            <input name="target_lead_count" type="number" min={0} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={targetLeadCount} onChange={(event) => setTargetLeadCount(event.target.value)} placeholder="100" />
           </label>
           <label className="space-y-2">
             <span className="text-sm font-medium">From Time</span>
@@ -644,6 +743,48 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                 required
               />
             </label>
+            <div className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium">Attachment (Optional)</span>
+              <div className="flex items-center gap-3">
+                {attachmentUrl ? (
+                  <div className="flex flex-1 items-center justify-between rounded-md border border-blue-500/30 bg-blue-500/5 px-3 py-2">
+                    <div className="flex items-center gap-2 overflow-hidden">
+                      <Paperclip className="h-4 w-4 shrink-0 text-blue-400" />
+                      <span className="truncate text-sm text-blue-200">{attachmentUrl.split('/').pop()}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAttachmentUrl('')}
+                      className="rounded-full p-1 text-zinc-500 hover:bg-white/10 hover:text-red-400"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-white/20 bg-zinc-950/50 px-3 py-6 transition hover:border-blue-500/40 hover:bg-blue-500/5">
+                    {uploadingAttachment ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                    ) : (
+                      <Paperclip className="h-5 w-5 text-zinc-500" />
+                    )}
+                    <span className="text-sm text-zinc-400 text-center">
+                      {uploadingAttachment ? 'Uploading...' : 'Click to upload attachment (Max 5MB)'}
+                    </span>
+                    <input
+                      type="file"
+                      onChange={handleAttachmentUpload}
+                      disabled={uploadingAttachment}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+                {attachmentUrl && (
+                  <div className="text-[10px] text-zinc-500 italic">
+                    File is uploaded to Supabase Storage
+                  </div>
+                )}
+              </div>
+            </div>
             <label className="space-y-2 md:col-span-2">
               <span className="text-sm font-medium">Company Details</span>
               <textarea
@@ -662,6 +803,55 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                 placeholder="Paste the long-form sender note or outreach message"
               />
             </label>
+
+            <label className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium">Text Signature</span>
+              <textarea
+                value={senderInfo.signature}
+                onChange={(event) => setSenderInfo((current) => ({ ...current, signature: event.target.value }))}
+                className="min-h-24 w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
+                placeholder="Best regards, ... "
+              />
+            </label>
+
+            <div className="space-y-2 md:col-span-2">
+              <span className="text-sm font-medium">Signature Image (Optional)</span>
+              <div className="flex items-center gap-3">
+                {senderInfo.signature_url ? (
+                  <div className="flex flex-1 items-center justify-between rounded-md border border-blue-500/30 bg-blue-500/5 px-3 py-2">
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <img src={senderInfo.signature_url} alt="Signature" className="h-10 w-auto rounded border border-white/10 bg-white/5" />
+                      <span className="truncate text-xs text-blue-200">Signature uploaded</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSenderInfo(prev => ({ ...prev, signature_url: '' }))}
+                      className="rounded-full p-1 text-zinc-500 hover:bg-white/10 hover:text-red-400"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-white/20 bg-zinc-950/50 px-3 py-4 transition hover:border-blue-500/40 hover:bg-blue-500/5">
+                    {uploadingSignature ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                    ) : (
+                      <Paperclip className="h-5 w-5 text-zinc-500" />
+                    )}
+                    <span className="text-sm text-zinc-400">
+                      {uploadingSignature ? 'Uploading Signature...' : 'Upload Image Signature'}
+                    </span>
+                    <input
+                      type="file"
+                      onChange={handleSignatureUpload}
+                      disabled={uploadingSignature}
+                      className="hidden"
+                      accept="image/*"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 

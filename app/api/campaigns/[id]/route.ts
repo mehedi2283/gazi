@@ -175,6 +175,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       timezone,
       from_time: fromTime,
       to_time: toTime,
+      target_lead_count: Number(body.target_lead_count ?? existingCampaign?.target_lead_count ?? 0),
+      attachment_url: body.attachment_url ?? existingCampaign?.attachment_url ?? null,
+      signature: body.signature ?? existingCampaign?.signature ?? null,
+      signature_url: body.signature_url ?? body?.sender_info?.signature_url ?? existingCampaign?.signature_url ?? null,
       updated_at: new Date().toISOString()
     }
 

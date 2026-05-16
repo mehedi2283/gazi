@@ -41,6 +41,9 @@ export async function sendImportedLeadsToWebhook(
     sending_email?: string | null
     instantly_campaign_id?: string | null
     sequence_count?: number
+    target_lead_count?: number | null
+    attachment_url?: string | null
+    signature?: string | null
   } = {}
 ) {
   const payload = {
@@ -52,6 +55,9 @@ export async function sendImportedLeadsToWebhook(
     email_list: options.sending_email ? [options.sending_email] : [],
     instantly_campaign_id: options.instantly_campaign_id || null,
     sequence_count: options.sequence_count ?? 0,
+    target_lead_count: options.target_lead_count ?? 0,
+    attachment_url: options.attachment_url || null,
+    signature: options.signature || null,
     total_leads: leads.length,
     leads: leads
   }

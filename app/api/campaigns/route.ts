@@ -19,6 +19,10 @@ type LocalCampaign = {
   timezone: string | null
   from_time: string | null
   to_time: string | null
+  target_lead_count: number | null
+  attachment_url: string | null
+  signature: string | null
+  signature_url: string | null
   created_at: string | null
   updated_at: string | null
 }
@@ -96,11 +100,18 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
     organization_id: campaign?.organization_id || null,
     instantly_campaign_id: instantlyCampaignId,
     sequence_count: sequenceCount,
-    sender_info: senderInfo,
+    sender_info: {
+      address: body?.sender_info?.address || null,
+      booking_calendar_link: body?.sender_info?.booking_calendar_link || null,
+      attachment_url: body?.attachment_url || body?.sender_info?.attachment_url || null,
+      signature: body?.signature || body?.sender_info?.signature || null,
+      signature_url: body?.signature_url || body?.sender_info?.signature_url || null
+    },
     sending_email: sendingEmail || null,
     email_list: sendingEmail ? [sendingEmail] : [],
     lead_creation_mode: leadCreation.mode,
     lead_creation: leadCreation,
+    target_lead_count: body?.target_lead_count ?? 0,
     campaign: {
       id: campaign?.id || null,
       name: campaign?.name || body?.name || null,
@@ -428,6 +439,10 @@ export async function POST(req: Request) {
       timezone,
       from_time: fromTime,
       to_time: toTime,
+      target_lead_count: Number(body.target_lead_count ?? 0),
+      attachment_url: body.attachment_url || body?.sender_info?.attachment_url || null,
+      signature: body.signature || body?.sender_info?.signature || null,
+      signature_url: body.signature_url || body?.sender_info?.signature_url || null,
       created_by: createdBy,
       total_leads: 0,
       emails_sent: 0,
@@ -592,7 +607,10 @@ export async function POST(req: Request) {
               sender_info: body?.sender_info || null,
               sending_email: sendingEmail || null,
               instantly_campaign_id: instantlyCampaignId,
-              sequence_count: sequenceCount
+              sequence_count: sequenceCount,
+              target_lead_count: Number(body.target_lead_count ?? 0),
+              attachment_url: body.attachment_url || null,
+              signature: body.signature || null
             }
           )
         } catch (error: any) {
