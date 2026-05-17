@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
+export const revalidate = 0
+
+
+
 function safeRate(numerator: number, denominator: number) {
   if (!denominator) return '0%'
   return `${Math.round((numerator / denominator) * 100)}%`

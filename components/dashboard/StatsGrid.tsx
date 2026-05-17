@@ -81,8 +81,8 @@ export default function StatsGrid({ initialData }: StatsGridProps) {
                   <Icon className="h-5 w-5 text-white" aria-hidden />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-xs font-medium uppercase tracking-wider text-zinc-500">{card.label}</div>
-                  <div className="mt-1 text-2xl font-semibold tracking-tight text-zinc-50">{card.value}</div>
+                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{card.label}</div>
+                  <div className="mt-1 text-2xl font-extrabold tracking-tight text-slate-850">{card.value}</div>
                 </div>
               </div>
             </GlassCard>

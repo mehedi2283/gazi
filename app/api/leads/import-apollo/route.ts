@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 import { searchPeople } from '../../../../lib/apollo/client'
+import { upsertLeadsWithCampaigns } from '../../../../lib/supabase/leads'
 
 export async function POST(req: Request) {
   try {
@@ -25,10 +26,11 @@ export async function POST(req: Request) {
       industry: p.industry,
       employees: p.organization?.employee_count || null,
       sender_info,
+      campaign_id: body.campaign_id || null,
       source: 'apollo'
     }))
 
-    const { data, error } = await supabase.from('leads').insert(mapped).select()
+    const { data, error } = await upsertLeadsWithCampaigns(mapped)
     if (error) return NextResponse.json({ data: null, error })
 
     const savedLeads = data || mapped

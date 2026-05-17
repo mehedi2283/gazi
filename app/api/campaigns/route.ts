@@ -131,18 +131,27 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
 
 function mapDays(days: any) {
   if (Array.isArray(days)) {
-    const [sunday, monday, tuesday, wednesday, thursday, friday, saturday] = days
-    return { sunday, monday, tuesday, wednesday, thursday, friday, saturday }
+    // If it's an array, assume it's ordered from monday to sunday
+    const [monday, tuesday, wednesday, thursday, friday, saturday, sunday] = days
+    return {
+      "0": Boolean(monday),
+      "1": Boolean(tuesday),
+      "2": Boolean(wednesday),
+      "3": Boolean(thursday),
+      "4": Boolean(friday),
+      "5": Boolean(saturday),
+      "6": Boolean(sunday)
+    }
   }
 
   return {
-    monday: Boolean(days?.monday),
-    tuesday: Boolean(days?.tuesday),
-    wednesday: Boolean(days?.wednesday),
-    thursday: Boolean(days?.thursday),
-    friday: Boolean(days?.friday),
-    saturday: Boolean(days?.saturday),
-    sunday: Boolean(days?.sunday)
+    "0": Boolean(days?.monday),
+    "1": Boolean(days?.tuesday),
+    "2": Boolean(days?.wednesday),
+    "3": Boolean(days?.thursday),
+    "4": Boolean(days?.friday),
+    "5": Boolean(days?.saturday),
+    "6": Boolean(days?.sunday)
   }
 }
 
@@ -369,6 +378,27 @@ export async function GET() {
       const instantlyIds = new Set(mergedInstantlyCampaigns.map((campaign) => campaign.instantly_campaign_id))
       const localOnlyCampaigns = localCampaigns.filter((campaign) => !campaign.instantly_campaign_id || !instantlyIds.has(campaign.instantly_campaign_id))
 
+      const statusUpdates = mergedInstantlyCampaigns
+        .map((merged) => {
+          const local = latestLocalByInstantlyId.get(merged.instantly_campaign_id!)
+          if (local && local.status !== merged.status) {
+            return { id: merged.id, status: merged.status }
+          }
+          return null
+        })
+        .filter(Boolean)
+
+      if (statusUpdates.length > 0) {
+        await Promise.all(
+          statusUpdates.map((update) =>
+            supabase
+              .from('campaigns')
+              .update({ status: update!.status, updated_at: new Date().toISOString() })
+              .eq('id', update!.id)
+          )
+        )
+      }
+
       return NextResponse.json({ data: sortCampaignsByCreatedAt([...mergedInstantlyCampaigns, ...localOnlyCampaigns]), error: null })
     }
 
@@ -440,6 +470,7 @@ export async function POST(req: Request) {
       from_time: fromTime,
       to_time: toTime,
       target_lead_count: Number(body.target_lead_count ?? 0),
+      report_email: body.report_email || null,
       attachment_url: body.attachment_url || body?.sender_info?.attachment_url || null,
       signature: body.signature || body?.sender_info?.signature || null,
       signature_url: body.signature_url || body?.sender_info?.signature_url || null,
@@ -539,17 +570,26 @@ export async function POST(req: Request) {
       const instantlySequencePayload = {
         sequences: [
           {
-            steps: sequenceSteps.map((sequence) => ({
-              type: 'email',
-              delay: sequence.delay_days,
-              delay_unit: 'days',
-              variants: [
-                {
-                  subject: sequence.subject_variable,
-                  body: sequence.body_variable
-                }
-              ]
-            }))
+            steps: sequenceSteps.map((sequence, index, arr) => {
+              // Instantly expects the delay on Step N to be the wait time before Step N+1.
+              // We calculate the relative delay from the absolute delay_days we store.
+              let relativeDelay = 0;
+              if (index < arr.length - 1) {
+                relativeDelay = arr[index + 1].delay_days - sequence.delay_days;
+              }
+
+              return {
+                type: 'email',
+                delay: relativeDelay,
+                delay_unit: 'days',
+                variants: [
+                  {
+                    subject: sequence.subject_variable,
+                    body: sequence.body_variable
+                  }
+                ]
+              };
+            })
           }
         ]
       }

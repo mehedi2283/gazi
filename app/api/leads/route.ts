@@ -9,7 +9,7 @@ export async function GET(req: Request) {
     let query = supabase.from('leads').select('*').order('created_at', { ascending: false })
 
     if (campaignId) {
-      query = query.eq('campaign_id', campaignId)
+      query = query.contains('campaign_ids', [campaignId])
     } else {
       query = query.limit(100)
     }

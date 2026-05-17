@@ -237,8 +237,34 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       }
     }
 
-    const { error: leadsDeleteError } = await supabase.from('leads').delete().eq('campaign_id', params.id)
-    if (leadsDeleteError) return NextResponse.json({ data: null, error: leadsDeleteError.message })
+    // Detach leads instead of deleting them
+    const { data: leadsToUpdate, error: leadsFetchError } = await supabase
+      .from('leads')
+      .select('id, campaign_id, campaign_ids')
+      .or(`campaign_id.eq.${params.id},campaign_ids.cs.{${params.id}}`)
+
+    if (leadsFetchError) return NextResponse.json({ data: null, error: leadsFetchError.message })
+
+    if (leadsToUpdate && leadsToUpdate.length > 0) {
+      const updatePromises = leadsToUpdate.map((lead: any) => {
+        const updatedCampaignIds = (lead.campaign_ids || []).filter((id: string) => id !== params.id)
+        const updatedCampaignId = lead.campaign_id === params.id ? null : lead.campaign_id
+        const isNowEmpty = updatedCampaignIds.length === 0
+        
+        return supabase
+          .from('leads')
+          .update({
+            campaign_id: updatedCampaignId,
+            campaign_ids: updatedCampaignIds,
+            ...(isNowEmpty ? { status: 'unassigned' } : {})
+          })
+          .eq('id', lead.id)
+      })
+
+      const results = await Promise.all(updatePromises)
+      const firstError = results.find(r => r.error)?.error
+      if (firstError) return NextResponse.json({ data: null, error: firstError.message })
+    }
 
     const { error: sequencesDeleteError } = await supabase.from('sequences').delete().eq('campaign_id', params.id)
     if (sequencesDeleteError) return NextResponse.json({ data: null, error: sequencesDeleteError.message })

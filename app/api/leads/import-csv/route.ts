@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 import Papa from 'papaparse'
+import { upsertLeadsWithCampaigns } from '../../../../lib/supabase/leads'
 
 export async function POST(req: Request) {
   try {
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
       }
     })
 
-    const { data, error } = await supabase.from('leads').insert(mapped).select()
+    const { data, error } = await upsertLeadsWithCampaigns(mapped)
     if (error) return NextResponse.json({ data: null, error })
 
     const savedLeads = data || mapped

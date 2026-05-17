@@ -48,6 +48,7 @@ create table if not exists campaigns (
   from_time text default '09:00',
   to_time text default '17:00',
   sending_days jsonb default '{"monday":true,"tuesday":true,"wednesday":true,"thursday":true,"friday":true,"saturday":false,"sunday":false}'::jsonb,
+  report_email text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );
@@ -110,8 +111,10 @@ create table if not exists leads (
   email_reply_count int default 0,
   email_click_count int default 0,
   personalization text,
+  campaign_ids uuid[] default '{}',
   created_at timestamptz default now(),
-  updated_at timestamptz default now()
+  updated_at timestamptz default now(),
+  unique (email)
 );
 
 create table if not exists campaign_stats (
@@ -148,3 +151,64 @@ create policy "Users see own org stats" on campaign_stats
       select organization_id from profiles where id = auth.uid()
     )
   ));
+
+-- Instantly Analytics Tables
+
+create table if not exists instantly_campaigns (
+  campaign_id text primary key,
+  campaign_name text,
+  campaign_status int,
+  leads_count int default 0,
+  contacted_count int default 0,
+  emails_sent_count int default 0,
+  new_leads_contacted_count int default 0,
+  open_count_unique int default 0,
+  reply_count_unique int default 0,
+  link_click_count_unique int default 0,
+  bounced_count int default 0,
+  unsubscribed_count int default 0,
+  completed_count int default 0,
+  synced_at timestamptz default now()
+);
+
+create table if not exists instantly_daily (
+  id uuid primary key default gen_random_uuid(),
+  date text not null,
+  email_account text not null,
+  sent int default 0,
+  bounced int default 0,
+  opened int default 0,
+  unique_opened int default 0,
+  replies int default 0,
+  unique_replies int default 0,
+  clicks int default 0,
+  unique_clicks int default 0,
+  contacted int default 0,
+  new_leads_contacted int default 0,
+  synced_at timestamptz default now(),
+  unique (date, email_account)
+);
+
+create table if not exists instantly_overview (
+  id uuid primary key default gen_random_uuid(),
+  emails_sent_count int default 0,
+  open_count_unique int default 0,
+  reply_count_unique int default 0,
+  link_click_count_unique int default 0,
+  bounced_count int default 0,
+  contacted_count int default 0,
+  total_interested int default 0,
+  total_meeting_booked int default 0,
+  total_meeting_completed int default 0,
+  total_closed int default 0,
+  synced_at timestamptz default now()
+);
+
+-- Enable RLS and add public read policies for the dashboard
+alter table instantly_campaigns enable row level security;
+alter table instantly_daily enable row level security;
+alter table instantly_overview enable row level security;
+
+create policy "Allow public read instantly_campaigns" on instantly_campaigns for select using (true);
+create policy "Allow public read instantly_daily" on instantly_daily for select using (true);
+create policy "Allow public read instantly_overview" on instantly_overview for select using (true);

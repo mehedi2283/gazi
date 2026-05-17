@@ -129,14 +129,14 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
       entries.map(([key, value]) => (
         <div
           key={key}
-          className="grid gap-1 border-b border-white/[0.06] py-2.5 last:border-b-0 md:grid-cols-[minmax(0,160px)_1fr]"
+          className="grid gap-1 border-b border-slate-200/60 py-2.5 last:border-b-0 md:grid-cols-[minmax(0,160px)_1fr]"
         >
-          <span className="text-xs font-medium uppercase tracking-wide text-zinc-500">{key.replace(/_/g, ' ')}</span>
-          <div className="whitespace-pre-wrap break-words text-sm text-zinc-300">{renderValue(value)}</div>
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{key.replace(/_/g, ' ')}</span>
+          <div className="whitespace-pre-wrap break-words text-sm text-slate-700 font-medium">{renderValue(value)}</div>
         </div>
       ))
     ) : (
-      <p className="text-sm text-zinc-500">No additional lead details available.</p>
+      <p className="text-sm text-slate-400 font-medium">No additional lead details available.</p>
     )
   }
 
@@ -154,20 +154,20 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
         <div className="flex flex-col gap-4">
           <Link
             href="/dashboard/campaigns"
-            className="group inline-flex items-center gap-2 text-sm font-medium text-zinc-500 transition-colors hover:text-zinc-300"
+            className="group inline-flex items-center gap-2 text-sm font-semibold text-slate-500 transition-colors hover:text-slate-800"
           >
             <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
             Back to campaigns
           </Link>
           
           {campaignLoadState === 'loading' ? (
-            <div className="h-10 w-64 animate-pulse rounded-lg bg-zinc-800/80" />
+            <div className="h-10 w-64 animate-pulse rounded-lg bg-slate-200" />
           ) : (
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight text-white md:text-4xl">
+              <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 md:text-4xl">
                 {displayName}
               </h1>
-              <span className="mt-1 rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-0.5 font-mono text-[10px] text-zinc-500">
+              <span className="mt-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 font-mono text-[10px] text-slate-500">
                 ID: {params.id.slice(0, 8)}...
               </span>
             </div>
@@ -177,7 +177,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
         <button
           type="button"
           onClick={handleExport}
-          className="inline-flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/10 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition hover:bg-white/[0.08] hover:text-white disabled:opacity-40"
+          className="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-250 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm disabled:opacity-45"
           disabled={!campaignLeads.length}
         >
           <Download className="h-4 w-4" />
@@ -186,15 +186,15 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
       </div>
 
       {/* Main Content Area */}
-      <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] shadow-2xl backdrop-blur-xl overflow-hidden">
-        <div className="border-b border-white/[0.06] bg-white/[0.02] px-6 py-4">
+      <div className="rounded-xl border border-slate-200 bg-white/70 shadow-glass backdrop-blur-xl overflow-hidden">
+        <div className="border-b border-slate-200/65 bg-white/40 px-6 py-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-400">
+            <h2 className="text-xs font-black uppercase tracking-widest text-slate-500">
               Campaign leads
             </h2>
-            <div className="flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 ring-1 ring-blue-500/20">
-              <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-xs font-bold text-blue-400">
+            <div className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1 ring-1 ring-indigo-500/20">
+              <div className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
+              <span className="text-xs font-bold text-indigo-600">
                 {campaignLeads.length} Total
               </span>
             </div>
@@ -207,39 +207,39 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
           </div>
         ) : leadsQueryError ? (
           <div className="p-12 text-center">
-            <p className="text-sm text-red-400">Unable to load campaign leads.</p>
+            <p className="text-sm text-red-500 font-semibold">Unable to load campaign leads.</p>
           </div>
         ) : campaignLeads.length ? (
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-white/[0.06] bg-white/[0.01]">
+              <thead className="border-b border-slate-200 bg-slate-50/50">
                 <tr>
-                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Contact</th>
-                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Professional</th>
-                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-zinc-500">Status</th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-zinc-500">Actions</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Contact</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Professional</th>
+                  <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-400">Status</th>
+                  <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-400">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-white/[0.04]">
+              <tbody className="divide-y divide-slate-100 bg-transparent">
                 {campaignLeads.map((lead, index) => {
                   const leadId = String(lead.id || lead.email || index)
                   const isExpanded = expandedLeadId === leadId
 
                   return (
                     <React.Fragment key={leadId}>
-                      <tr className={`group transition-colors ${isExpanded ? 'bg-blue-500/[0.03]' : 'hover:bg-white/[0.02]'}`}>
+                      <tr className={`group transition-colors ${isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50/40'}`}>
                         <td className="px-6 py-5">
-                          <div className="font-semibold text-zinc-100">{getLeadLabel(lead, index)}</div>
-                          <div className="mt-1 text-xs text-zinc-500 truncate max-w-[200px]">
+                          <div className="font-bold text-slate-800">{getLeadLabel(lead, index)}</div>
+                          <div className="mt-1 text-xs text-slate-400 font-medium truncate max-w-[200px]">
                             {lead.email || 'No email provided'}
                           </div>
                         </td>
                         <td className="px-6 py-5">
-                          <div className="font-medium text-zinc-300">{lead.company_name || '—'}</div>
-                          <div className="mt-1 text-xs text-zinc-500 italic">{lead.title || '—'}</div>
+                          <div className="font-semibold text-slate-700">{lead.company_name || '—'}</div>
+                          <div className="mt-1 text-xs text-slate-400 font-medium italic">{lead.title || '—'}</div>
                         </td>
                         <td className="px-6 py-5">
-                          <span className="inline-flex rounded-md border border-white/10 bg-zinc-900/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-zinc-400">
+                          <span className="inline-flex rounded-md border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                             {lead.status || lead.source || 'new'}
                           </span>
                         </td>
@@ -249,8 +249,8 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                             onClick={() => setExpandedLeadId((current) => (current === leadId ? null : leadId))}
                             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                               isExpanded 
-                                ? 'bg-blue-500/20 text-blue-300 ring-1 ring-blue-500/40' 
-                                : 'bg-white/[0.04] text-zinc-400 hover:bg-white/[0.08] hover:text-zinc-100 border border-white/10'
+                                ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500/20' 
+                                : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200 shadow-sm'
                             }`}
                           >
                             {isExpanded ? 'Hide info' : 'View info'}
@@ -270,22 +270,22 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                               animate={{ opacity: 1, height: 'auto' }}
                               className="overflow-hidden"
                             >
-                              <div className="my-4 rounded-xl border border-white/[0.08] bg-black/40 p-6 shadow-inner">
+                              <div className="my-4 rounded-xl border border-slate-200 bg-slate-50/50 p-6 shadow-sm">
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                   <div className="space-y-4">
-                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500">Lead Metadata</h4>
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">Lead Metadata</h4>
                                     <div className="space-y-1">{renderLeadDetails(lead)}</div>
                                   </div>
-                                  <div className="rounded-lg bg-white/[0.02] p-4 border border-white/[0.04]">
-                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500 mb-4">Quick Context</h4>
+                                  <div className="rounded-lg bg-white p-4 border border-slate-200 shadow-sm">
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">Quick Context</h4>
                                     <div className="space-y-3">
                                       <div>
-                                        <label className="text-[10px] text-zinc-600 block uppercase font-bold">Campaign ID</label>
-                                        <code className="text-xs text-zinc-400 break-all">{lead.campaign_id || params.id}</code>
+                                        <label className="text-[10px] text-slate-400 block uppercase font-bold">Campaign ID</label>
+                                        <code className="text-xs text-slate-600 font-medium break-all">{lead.campaign_id || params.id}</code>
                                       </div>
                                       <div>
-                                        <label className="text-[10px] text-zinc-600 block uppercase font-bold">Lead Ref</label>
-                                        <code className="text-xs text-zinc-400">{lead.id || 'N/A'}</code>
+                                        <label className="text-[10px] text-slate-400 block uppercase font-bold">Lead Ref</label>
+                                        <code className="text-xs text-slate-600 font-medium">{lead.id || 'N/A'}</code>
                                       </div>
                                     </div>
                                   </div>
@@ -303,11 +303,11 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
           </div>
         ) : (
           <div className="p-20 text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-white/[0.03] border border-white/10">
-              <Download className="h-6 w-6 text-zinc-600" />
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 border border-slate-200">
+              <Download className="h-6 w-6 text-slate-400" />
             </div>
-            <h3 className="text-base font-semibold text-zinc-200">No leads found</h3>
-            <p className="mt-1 text-sm text-zinc-500">Try importing some leads to this campaign.</p>
+            <h3 className="text-base font-bold text-slate-700">No leads found</h3>
+            <p className="mt-1 text-sm text-slate-400 font-medium">Try importing some leads to this campaign.</p>
           </div>
         )}
       </div>

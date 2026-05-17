@@ -54,7 +54,7 @@ export async function syncInstantly(): Promise<SyncResult> {
 
     // Upsert campaigns
     if (campaigns.length > 0) {
-      await supabaseServer.from('instantly_campaigns').upsert(
+      const { error: campErr } = await supabaseServer.from('instantly_campaigns').upsert(
         campaigns.map((c: any) => ({
           campaign_id: c.campaign_id,
           campaign_name: c.campaign_name,
@@ -73,6 +73,7 @@ export async function syncInstantly(): Promise<SyncResult> {
         })),
         { onConflict: 'campaign_id' }
       )
+      if (campErr) console.error('Error upserting campaigns:', campErr)
     }
 
     // Upsert email accounts
@@ -90,7 +91,7 @@ export async function syncInstantly(): Promise<SyncResult> {
 
     // Upsert daily analytics
     if (daily.length > 0) {
-      await supabaseServer.from('instantly_daily').upsert(
+      const { error: dailyErr } = await supabaseServer.from('instantly_daily').upsert(
         daily.map((d: any) => ({
           date: d.date,
           email_account: d.email_account || 'default',
@@ -106,12 +107,13 @@ export async function syncInstantly(): Promise<SyncResult> {
           new_leads_contacted: d.new_leads_contacted || 0,
           synced_at: timestamp,
         })),
-        { onConflict: 'date,email_account' }
+        { onConflict: 'date, email_account' }
       )
+      if (dailyErr) console.error('Error upserting daily:', dailyErr)
     }
 
     // Insert overview (new row each sync)
-    await supabaseServer.from('instantly_overview').insert({
+    const { error: overviewErr } = await supabaseServer.from('instantly_overview').insert({
       emails_sent_count: overview.emails_sent_count || 0,
       open_count_unique: overview.open_count_unique || 0,
       reply_count_unique: overview.reply_count_unique || 0,
@@ -124,6 +126,7 @@ export async function syncInstantly(): Promise<SyncResult> {
       total_closed: overview.total_closed || 0,
       synced_at: timestamp,
     })
+    if (overviewErr) console.error('Error inserting overview:', overviewErr)
 
     return {
       success: true,

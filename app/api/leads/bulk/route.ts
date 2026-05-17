@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
+import { upsertLeadsWithCampaigns } from '../../../../lib/supabase/leads'
 
 export async function POST(req: Request) {
   try {
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
       source: l.source || 'manual'
     }))
 
-    const { data, error } = await supabase.from('leads').insert(sanitized).select()
+    const { data, error } = await upsertLeadsWithCampaigns(sanitized)
     if (error) return NextResponse.json({ data: null, error })
 
     const savedLeads = data || sanitized

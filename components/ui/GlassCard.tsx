@@ -9,7 +9,7 @@ type GlassCardProps = HTMLMotionProps<'div'> & {
 }
 
 const base =
-  'rounded-xl border border-white/[0.08] bg-white/[0.03] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] backdrop-blur-xl'
+  'rounded-xl border border-slate-200 bg-white/70 shadow-glass backdrop-blur-xl'
 
 export function GlassCard({ children, className = '', hover = true, ...props }: GlassCardProps) {
   if (!hover) {

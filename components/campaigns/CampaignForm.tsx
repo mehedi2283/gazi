@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
-import { ChevronDown, Lock, Plus, Trash2, Paperclip, Loader2, X } from 'lucide-react'
+import { ChevronDown, Lock, Plus, Trash2, Paperclip, Loader2, X, Settings, Calendar, UserCircle, ListOrdered, Users } from 'lucide-react'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../lib/timezones'
 import { supabase } from '../../lib/supabase/client'
 
@@ -68,6 +68,7 @@ type CampaignInitialData = {
   target_lead_count?: number | null
   attachment_url?: string | null
   signature?: string | null
+  report_email?: string | null
 }
 
 type CampaignFormProps = {
@@ -132,22 +133,27 @@ function getSequenceError(steps: SequenceStep[]) {
 
 function LockedLabel({ children }: { children: React.ReactNode }) {
   return (
-    <span className="flex items-center gap-2 text-sm font-medium">
+    <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
       {children}
-      <span className="group relative inline-flex" tabIndex={0}>
-        <Lock className="h-4 w-4 text-zinc-500" aria-hidden="true" />
+      <span className="group relative inline-flex cursor-help" tabIndex={0}>
+        <Lock className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 transition-colors" aria-hidden="true" />
         <span
           role="tooltip"
-          className="pointer-events-none absolute left-1/2 top-6 z-20 hidden w-64 -translate-x-1/2 rounded-md bg-slate-900 px-3 py-2 text-xs font-normal leading-5 text-white shadow-lg group-hover:block group-focus:block"
+          className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2.5 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl transition-all animate-in fade-in slide-in-from-bottom-1 duration-200 group-hover:block group-focus:block"
         >
           {CONTENT_LOCK_TOOLTIP}
+          <span className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[3px] rotate-45 border-r border-b border-slate-200 bg-white" />
         </span>
       </span>
     </span>
   )
 }
 
+const TABS = ['Basics', 'Schedule', 'Sender Profile', 'Sequences', 'Leads'] as const
+type Tab = typeof TABS[number]
+
 export default function CampaignForm({ title, subtitle, submitLabel, mode, initialData, onSubmit }: CampaignFormProps) {
+  const [activeTab, setActiveTab] = useState<Tab>('Basics')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [name, setName] = useState(initialData?.name || '')
@@ -181,8 +187,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     location: '',
     address: '',
     booking_calendar_link: '',
-    signature: ''
+    signature: '',
+    signature_url: ''
   })
+  const [reportEmail, setReportEmail] = useState(initialData?.report_email || '')
   const [targetLeadCount, setTargetLeadCount] = useState(String(initialData?.target_lead_count ?? 100))
   const [attachmentUrl, setAttachmentUrl] = useState(initialData?.attachment_url || '')
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
@@ -323,6 +331,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       ...prev,
       signature: initialData?.signature || ''
     }))
+    setReportEmail(initialData?.report_email || '')
     setError('')
   }, [initialData])
 
@@ -596,6 +605,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     try {
       await onSubmit({
         ...payload,
+        report_email: reportEmail.trim() || null,
         sender_info: {
           name: senderInfo.name.trim(),
           company: senderInfo.company.trim(),
@@ -626,595 +636,714 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-zinc-50">{title}</h1>
-        <p className="text-zinc-500">{subtitle}</p>
+        <h1 className="text-3xl font-bold tracking-tight text-zinc-50">{title}</h1>
+        <p className="mt-1 text-zinc-500">{subtitle}</p>
+      </div>
+
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-white/10 pb-4">
+        {(
+          [
+            { id: 'Basics', icon: Settings },
+            { id: 'Schedule', icon: Calendar },
+            { id: 'Sender Profile', icon: UserCircle },
+            { id: 'Sequences', icon: ListOrdered },
+            { id: 'Leads', icon: Users }
+          ] as const
+        ).map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveTab(tab.id)}
+            className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+              activeTab === tab.id
+                ? 'text-indigo-600 bg-indigo-50 font-bold border border-indigo-100 shadow-sm'
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-850'
+            }`}
+          >
+            <span
+              className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
+                activeTab === tab.id
+                  ? 'bg-gradient-to-br from-indigo-500 to-sky-600 text-white shadow-md shadow-indigo-500/25'
+                  : 'bg-slate-100 text-slate-400 group-hover:text-slate-650'
+              }`}
+            >
+              <tab.icon className="h-4 w-4" aria-hidden />
+            </span>
+            <span className="relative z-10 whitespace-nowrap">{tab.id}</span>
+          </button>
+        ))}
       </div>
 
       <form
         onSubmit={handleSubmit}
-        className="space-y-6 rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl"
+        className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl"
       >
-        <div className="grid gap-4 md:grid-cols-2">
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Campaign Name</span>
-            <input name="name" value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" placeholder="Apollo Outreach Campaign 1" />
-          </label>
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Timezone</span>
-            <select name="timezone" className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
-              {INSTANTLY_TIMEZONES.map((tz) => (
-                <option key={tz} value={tz}>
-                  {tz}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Daily Limit</span>
-            <input name="daily_limit" type="number" min={1} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)} />
-          </label>
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Email Gap</span>
-            <input name="email_gap" type="number" min={0} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={emailGap} onChange={(event) => setEmailGap(event.target.value)} />
-          </label>
-          <label className="space-y-2">
-            <span className="text-sm font-medium">Target Lead Count</span>
-            <input name="target_lead_count" type="number" min={0} className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={targetLeadCount} onChange={(event) => setTargetLeadCount(event.target.value)} placeholder="100" />
-          </label>
-          <label className="space-y-2">
-            <span className="text-sm font-medium">From Time</span>
-            <input name="from_time" className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={fromTime} onChange={(event) => setFromTime(event.target.value)} />
-          </label>
-          <label className="space-y-2">
-            <span className="text-sm font-medium">To Time</span>
-            <input name="to_time" className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30" value={toTime} onChange={(event) => setToTime(event.target.value)} />
-          </label>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-3">
-          <label className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-3 py-2 text-zinc-200">
-            <input type="checkbox" name="stop_on_reply" checked={stopOnReply} onChange={(event) => setStopOnReply(event.target.checked)} />
-            <span className="text-sm font-medium">Stop On Reply</span>
-          </label>
-          <label className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-3 py-2 text-zinc-200">
-            <input type="checkbox" name="open_tracking" checked={openTracking} onChange={(event) => setOpenTracking(event.target.checked)} />
-            <span className="text-sm font-medium">Open Tracking</span>
-          </label>
-          <label className="flex items-center gap-2 rounded-md border border-white/10 bg-zinc-950/40 px-3 py-2 text-zinc-200">
-            <input type="checkbox" name="link_tracking" checked={linkTracking} onChange={(event) => setLinkTracking(event.target.checked)} />
-            <span className="text-sm font-medium">Link Tracking</span>
-          </label>
-        </div>
-
-        <div className="space-y-4 rounded-lg border border-emerald-500/20 bg-emerald-500/[0.06] p-4">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-100">Sender Information</h2>
-            <p className="text-sm text-zinc-500">This section is required and will be sent with the campaign webhook after the campaign is created.</p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Sender Name</span>
-              <input
-                value={senderInfo.name}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, name: event.target.value }))}
-                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="John Doe"
-                required
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Company</span>
-              <input
-                value={senderInfo.company}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, company: event.target.value }))}
-                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="Company name"
-                required
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Location</span>
-              <input
-                value={senderInfo.location}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, location: event.target.value }))}
-                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="City, Country"
-                required
-              />
-            </label>
-            <label className="space-y-2">
-              <span className="text-sm font-medium">Address</span>
-              <input
-                value={senderInfo.address}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, address: event.target.value }))}
-                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="Street address"
-                required
-              />
-            </label>
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Booking Calendar Link</span>
-              <input
-                value={senderInfo.booking_calendar_link}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, booking_calendar_link: event.target.value }))}
-                className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="https://cal.com/..."
-                required
-              />
-            </label>
-            <div className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Attachment (Optional)</span>
-              <div className="flex items-center gap-3">
-                {attachmentUrl ? (
-                  <div className="flex flex-1 items-center justify-between rounded-md border border-blue-500/30 bg-blue-500/5 px-3 py-2">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                      <Paperclip className="h-4 w-4 shrink-0 text-blue-400" />
-                      <span className="truncate text-sm text-blue-200">{attachmentUrl.split('/').pop()}</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setAttachmentUrl('')}
-                      className="rounded-full p-1 text-zinc-500 hover:bg-white/10 hover:text-red-400"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-white/20 bg-zinc-950/50 px-3 py-6 transition hover:border-blue-500/40 hover:bg-blue-500/5">
-                    {uploadingAttachment ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                    ) : (
-                      <Paperclip className="h-5 w-5 text-zinc-500" />
-                    )}
-                    <span className="text-sm text-zinc-400 text-center">
-                      {uploadingAttachment ? 'Uploading...' : 'Click to upload attachment (Max 5MB)'}
-                    </span>
-                    <input
-                      type="file"
-                      onChange={handleAttachmentUpload}
-                      disabled={uploadingAttachment}
-                      className="hidden"
-                    />
-                  </label>
-                )}
-                {attachmentUrl && (
-                  <div className="text-[10px] text-zinc-500 italic">
-                    File is uploaded to Supabase Storage
-                  </div>
-                )}
+        <div className="min-h-[400px]">
+          {activeTab === 'Basics' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Basic Configuration</h2>
+                <p className="text-sm text-slate-400 font-medium">Configure the primary settings and limits for this campaign.</p>
               </div>
-            </div>
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Company Details</span>
-              <textarea
-                value={senderInfo.company_details}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, company_details: event.target.value }))}
-                className="min-h-28 w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="Share the company summary, positioning, or offer context"
-              />
-            </label>
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Long Message</span>
-              <textarea
-                value={senderInfo.long_message}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, long_message: event.target.value }))}
-                className="min-h-28 w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="Paste the long-form sender note or outreach message"
-              />
-            </label>
 
-            <label className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Text Signature</span>
-              <textarea
-                value={senderInfo.signature}
-                onChange={(event) => setSenderInfo((current) => ({ ...current, signature: event.target.value }))}
-                className="min-h-24 w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                placeholder="Best regards, ... "
-              />
-            </label>
-
-            <div className="space-y-2 md:col-span-2">
-              <span className="text-sm font-medium">Signature Image (Optional)</span>
-              <div className="flex items-center gap-3">
-                {senderInfo.signature_url ? (
-                  <div className="flex flex-1 items-center justify-between rounded-md border border-blue-500/30 bg-blue-500/5 px-3 py-2">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <img src={senderInfo.signature_url} alt="Signature" className="h-10 w-auto rounded border border-white/10 bg-white/5" />
-                      <span className="truncate text-xs text-blue-200">Signature uploaded</span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setSenderInfo(prev => ({ ...prev, signature_url: '' }))}
-                      className="rounded-full p-1 text-zinc-500 hover:bg-white/10 hover:text-red-400"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-white/20 bg-zinc-950/50 px-3 py-4 transition hover:border-blue-500/40 hover:bg-blue-500/5">
-                    {uploadingSignature ? (
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-                    ) : (
-                      <Paperclip className="h-5 w-5 text-zinc-500" />
-                    )}
-                    <span className="text-sm text-zinc-400">
-                      {uploadingSignature ? 'Uploading Signature...' : 'Upload Image Signature'}
-                    </span>
-                    <input
-                      type="file"
-                      onChange={handleSignatureUpload}
-                      disabled={uploadingSignature}
-                      className="hidden"
-                      accept="image/*"
-                    />
+              <div className="grid gap-6 md:grid-cols-2">
+                <label className="space-y-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-slate-700">Campaign Name</span>
+                  <input name="name" value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" placeholder="Apollo Outreach Campaign 1" />
+                </label>
+                
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Target Lead Count</span>
+                  <input name="target_lead_count" type="number" min={0} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={targetLeadCount} onChange={(event) => setTargetLeadCount(event.target.value)} placeholder="100" />
+                  <p className="text-xs text-slate-400 font-medium">Total number of leads to fetch</p>
+                </label>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-700">Daily Limit</span>
+                    <input name="daily_limit" type="number" min={1} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)} />
                   </label>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Sending Days</h2>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => (
-              <label key={day} className="flex items-center gap-2 rounded-md border px-3 py-2 capitalize">
-                <input
-                  type="checkbox"
-                  name={day}
-                  checked={days[day]}
-                  onChange={(event) => setDays((current) => ({ ...current, [day]: event.target.checked }))}
-                />
-                <span>{day}</span>
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold">Sequence Setup</h2>
-            <button
-              type="button"
-              onClick={addStep}
-              className="inline-flex items-center gap-2 rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white"
-            >
-              <Plus className="h-4 w-4" aria-hidden="true" />
-              Add Step
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            {steps.map((step, index) => {
-              const stepNumber = index + 1
-              const minimumDelay = index === 0 ? 0 : (steps[index - 1]?.delay_days ?? 0) + 1
-
-              return (
-                <div key={stepNumber} className="space-y-4 rounded-lg border border-white/10 bg-zinc-950/30 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h3 className="text-base font-semibold text-zinc-100">Step {stepNumber}</h3>
-                    {index > 0 ? (
-                      <button
-                        type="button"
-                        onClick={() => removeStep(index)}
-                        className="inline-flex items-center gap-2 rounded-md border border-white/10 px-3 py-2 text-sm font-medium text-zinc-300 transition hover:bg-white/5"
-                      >
-                        <Trash2 className="h-4 w-4" aria-hidden="true" />
-                        Remove Step
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div className="grid gap-4 lg:grid-cols-[1fr_1fr_180px]">
-                    <label className="space-y-2">
-                      <LockedLabel>Subject</LockedLabel>
-                      <input
-                        value={getSubjectVariable(stepNumber)}
-                        disabled
-                        readOnly
-                        className="w-full rounded-md border border-white/10 bg-zinc-900/60 px-3 py-2 text-zinc-400"
-                      />
-                    </label>
-
-                    <label className="space-y-2">
-                      <LockedLabel>Body</LockedLabel>
-                      <input
-                        value={getBodyVariable(stepNumber)}
-                        disabled
-                        readOnly
-                        className="w-full rounded-md border border-white/10 bg-zinc-900/60 px-3 py-2 text-zinc-400"
-                      />
-                    </label>
-
-                    <label className="space-y-2">
-                      <span className="text-sm font-medium">Day</span>
-                      <input
-                        type="number"
-                        min={minimumDelay}
-                        value={index === 0 ? 0 : step.delay_days}
-                        disabled={index === 0}
-                        onChange={(event) => updateDelay(index, event.target.value)}
-                        className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30 disabled:bg-zinc-900/50 disabled:text-zinc-600"
-                      />
-                    </label>
-                  </div>
+                  <label className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-700">Email Gap (mins)</span>
+                    <input name="email_gap" type="number" min={0} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={emailGap} onChange={(event) => setEmailGap(event.target.value)} />
+                  </label>
                 </div>
-              )
-            })}
-          </div>
+              </div>
 
-          {sequenceError ? <p className="text-sm text-red-600">{sequenceError}</p> : null}
-        </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-750 transition hover:bg-slate-50 cursor-pointer shadow-sm">
+                  <input type="checkbox" name="stop_on_reply" checked={stopOnReply} onChange={(event) => setStopOnReply(event.target.checked)} className="h-4 w-4 rounded border-slate-350 bg-transparent text-indigo-650 focus:ring-indigo-500/20" />
+                  <span className="text-sm font-bold">Stop On Reply</span>
+                </label>
+                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-750 transition hover:bg-slate-50 cursor-pointer shadow-sm">
+                  <input type="checkbox" name="open_tracking" checked={openTracking} onChange={(event) => setOpenTracking(event.target.checked)} className="h-4 w-4 rounded border-slate-350 bg-transparent text-indigo-650 focus:ring-indigo-500/20" />
+                  <span className="text-sm font-bold">Open Tracking</span>
+                </label>
+                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-750 transition hover:bg-slate-50 cursor-pointer shadow-sm">
+                  <input type="checkbox" name="link_tracking" checked={linkTracking} onChange={(event) => setLinkTracking(event.target.checked)} className="h-4 w-4 rounded border-slate-350 bg-transparent text-indigo-650 focus:ring-indigo-500/20" />
+                  <span className="text-sm font-bold">Link Tracking</span>
+                </label>
+              </div>
+            </div>
+          )}
 
-        <div className="space-y-4 rounded-lg border border-blue-500/20 bg-blue-500/[0.06] p-4">
-          <div>
-            <h2 className="text-lg font-semibold text-zinc-100">Lead Creation</h2>
-            <p className="text-sm text-zinc-500">Choose whether this campaign should create leads immediately after the campaign is created.</p>
-          </div>
+          {activeTab === 'Schedule' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Sending Schedule</h2>
+                <p className="text-sm text-slate-400 font-medium">Define the timezone, window, and days for sending emails.</p>
+              </div>
 
-          <div className="space-y-2">
-            <span className="text-sm font-medium">Sending Email Account</span>
-            <div className="grid max-w-5xl gap-3 xl:grid-cols-[minmax(280px,360px)_minmax(520px,1fr)]">
-              <div ref={emailPickerRef} className="relative w-full">
-                <button
-                  type="button"
-                  onClick={() => setEmailMenuOpen((current) => !current)}
-                  className="flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-zinc-950/60 px-3 text-left text-sm text-zinc-100 shadow-sm"
-                >
-                  <span className="truncate">
-                    {selectedEmail
-                      ? selectedEmailAccount
-                        ? `${selectedEmailAccount.account_name || selectedEmailAccount.email_address} (${selectedEmailAccount.email_address})`
-                        : selectedEmail
-                      : 'No sender selected'}
-                  </span>
-                  <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-zinc-500" aria-hidden="true" />
-                </button>
+              <div className="grid gap-6 md:grid-cols-3">
+                <label className="space-y-2 md:col-span-3">
+                  <span className="text-sm font-semibold text-slate-700">Timezone</span>
+                  <select name="timezone" className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
+                    {INSTANTLY_TIMEZONES.map((tz) => (
+                      <option key={tz} value={tz}>{tz}</option>
+                    ))}
+                  </select>
+                </label>
+                
+                <label className="space-y-2 md:col-span-1">
+                  <span className="text-sm font-semibold text-slate-700">From Time</span>
+                  <input type="time" name="from_time" className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={fromTime} onChange={(event) => setFromTime(event.target.value)} />
+                </label>
+                
+                <label className="space-y-2 md:col-span-1">
+                  <span className="text-sm font-semibold text-slate-700">To Time</span>
+                  <input type="time" name="to_time" className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={toTime} onChange={(event) => setToTime(event.target.value)} />
+                </label>
+              </div>
 
-                {emailMenuOpen ? (
-                  <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-md border border-white/10 bg-zinc-950 py-1 shadow-2xl backdrop-blur-xl">
-                    <button
-                      type="button"
-                      className={`flex w-full items-center px-3 py-2 text-left text-sm hover:bg-white/10 ${!selectedEmail ? 'font-semibold text-blue-300' : 'text-zinc-300'}`}
-                      onClick={() => {
-                        setSelectedEmail('')
-                        setNewEmailAddress('')
-                        setNewEmailName('')
-                        setEmailMenuOpen(false)
-                      }}
-                    >
-                      No sender selected
-                    </button>
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-slate-700">Sending Days</h3>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+                  {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => (
+                    <label key={day} className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-3 text-sm capitalize transition-all ${days[day] ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500/20 font-bold shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-350 shadow-sm font-semibold'}`}>
+                      <input
+                        type="checkbox"
+                        name={day}
+                        checked={days[day]}
+                        onChange={(event) => setDays((current) => ({ ...current, [day]: event.target.checked }))}
+                        className="sr-only"
+                      />
+                      <span className="font-semibold">{day.slice(0, 3)}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
-                    {emailAccounts.length ? (
-                      emailAccounts.map((account) => (
-                        <div key={account.id} className="flex items-center gap-1 px-1">
-                          <button
-                            type="button"
-                            className={`min-w-0 flex-1 rounded-md px-2 py-2 text-left text-sm hover:bg-white/10 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-blue-300' : 'text-zinc-300'}`}
-                            onClick={() => {
-                              setSelectedEmail(account.email_address)
-                              setNewEmailAddress('')
-                              setNewEmailName('')
-                              setEmailMenuOpen(false)
-                            }}
-                          >
-                            <span className="block truncate">{account.account_name || account.email_address}</span>
-                            <span className="block truncate text-xs font-normal text-zinc-500">{account.email_address}</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleDeleteEmailAccount(account)
-                            }}
-                            disabled={deletingEmailId === account.id}
-                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-zinc-500 transition hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
-                            aria-label={`Delete ${account.email_address}`}
-                          >
-                            <Trash2 className="h-4 w-4" aria-hidden="true" />
-                          </button>
+          {activeTab === 'Sender Profile' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Sender Information</h2>
+                <p className="text-sm text-slate-400 font-medium">Details sent with the campaign webhook for AI personalization and reporting.</p>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Sender Name</span>
+                  <input
+                    value={senderInfo.name}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, name: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="John Doe"
+                    required
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-bold text-indigo-600">Report Email</span>
+                  <input
+                    type="email"
+                    value={reportEmail}
+                    onChange={(event) => setReportEmail(event.target.value)}
+                    className="w-full rounded-md border border-indigo-200 bg-indigo-50/50 px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="reports@client.com"
+                    required
+                  />
+                  <p className="text-[10px] text-indigo-600 font-semibold">Weekly reports will be sent here.</p>
+                </label>
+                
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Company</span>
+                  <input
+                    value={senderInfo.company}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, company: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="Company name"
+                    required
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Location</span>
+                  <input
+                    value={senderInfo.location}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, location: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="City, Country"
+                    required
+                  />
+                </label>
+                
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Address</span>
+                  <input
+                    value={senderInfo.address}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, address: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="Street address"
+                    required
+                  />
+                </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Booking Calendar Link</span>
+                  <input
+                    value={senderInfo.booking_calendar_link}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, booking_calendar_link: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="https://cal.com/..."
+                    required
+                  />
+                </label>
+ 
+                <label className="space-y-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-slate-700">Company Details</span>
+                  <textarea
+                    value={senderInfo.company_details}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, company_details: event.target.value }))}
+                    className="min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="Share the company summary, positioning, or offer context"
+                  />
+                </label>
+ 
+                <label className="space-y-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-slate-700">Long Message</span>
+                  <textarea
+                    value={senderInfo.long_message}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, long_message: event.target.value }))}
+                    className="min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="Paste the long-form sender note or outreach message"
+                  />
+                </label>
+ 
+                <label className="space-y-2 md:col-span-2">
+                  <span className="text-sm font-semibold text-slate-700">Text Signature</span>
+                  <textarea
+                    value={senderInfo.signature}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, signature: event.target.value }))}
+                    className="min-h-20 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="Best regards, ... "
+                  />
+                </label>
+ 
+                <div className="space-y-2 md:col-span-2 lg:col-span-1">
+                  <span className="text-sm font-semibold text-slate-700">Attachment (Optional)</span>
+                  <div className="flex items-center gap-3">
+                    {attachmentUrl ? (
+                      <div className="flex flex-1 items-center justify-between rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          <Paperclip className="h-4 w-4 shrink-0 text-indigo-500" />
+                          <span className="truncate text-sm text-indigo-700 font-semibold">{attachmentUrl.split('/').pop()}</span>
                         </div>
-                      ))
+                        <button
+                          type="button"
+                          onClick={() => setAttachmentUrl('')}
+                          className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
                     ) : (
-                      <div className="px-3 py-2 text-sm text-zinc-500">No saved email accounts</div>
+                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-6 transition hover:border-indigo-500 hover:bg-indigo-50/20 shadow-sm">
+                        {uploadingAttachment ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+                        ) : (
+                          <Paperclip className="h-5 w-5 text-slate-400" />
+                        )}
+                        <span className="text-sm text-slate-500 font-semibold text-center">
+                          {uploadingAttachment ? 'Uploading...' : 'Click to upload attachment (Max 5MB)'}
+                        </span>
+                        <input
+                          type="file"
+                          onChange={handleAttachmentUpload}
+                          disabled={uploadingAttachment}
+                          className="hidden"
+                        />
+                      </label>
                     )}
                   </div>
-                ) : null}
+                </div>
+ 
+                <div className="space-y-2 md:col-span-2 lg:col-span-1">
+                  <span className="text-sm font-semibold text-slate-700">Signature Image (Optional)</span>
+                  <div className="flex items-center gap-3">
+                    {senderInfo.signature_url ? (
+                      <div className="flex flex-1 items-center justify-between rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <img src={senderInfo.signature_url} alt="Signature" className="h-10 w-auto rounded border border-slate-200 bg-white" />
+                          <span className="truncate text-xs text-indigo-700 font-semibold">Signature uploaded</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setSenderInfo(prev => ({ ...prev, signature_url: '' }))}
+                          className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-red-650"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-4 transition hover:border-indigo-500 hover:bg-indigo-50/20 shadow-sm">
+                        {uploadingSignature ? (
+                          <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
+                        ) : (
+                          <Paperclip className="h-5 w-5 text-slate-400" />
+                        )}
+                        <span className="text-sm text-slate-500 font-semibold">
+                          {uploadingSignature ? 'Uploading Signature...' : 'Upload Image Signature'}
+                        </span>
+                        <input
+                          type="file"
+                          onChange={handleSignatureUpload}
+                          disabled={uploadingSignature}
+                          className="hidden"
+                          accept="image/*"
+                        />
+                      </label>
+                    )}
+                  </div>
+                </div>
               </div>
+            </div>
+          )}
 
-              <div className="grid w-full gap-2 sm:grid-cols-[minmax(260px,1fr)_minmax(180px,240px)_56px]">
-                <input
-                  type="email"
-                  value={newEmailAddress}
-                  onChange={(event) => setNewEmailAddress(event.target.value)}
-                  placeholder="new@email.com"
-                  className="h-10 min-w-0 rounded-md border border-white/10 bg-zinc-950/50 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40"
-                />
-                <input
-                  type="text"
-                  value={newEmailName}
-                  onChange={(event) => setNewEmailName(event.target.value)}
-                  placeholder="Name"
-                  className="h-10 min-w-0 rounded-md border border-white/10 bg-zinc-950/50 px-3 text-sm text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40"
-                />
+          {activeTab === 'Sequences' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">Sequence Setup</h2>
+                  <p className="text-sm text-slate-400 font-medium">Configure delays for your automated email steps.</p>
+                </div>
                 <button
                   type="button"
-                  onClick={handleAddEmailAccount}
-                  disabled={addingEmail || !newEmailAddress.trim()}
-                  className="h-10 rounded-md bg-gradient-to-r from-blue-600 to-violet-600 px-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 disabled:opacity-50"
+                  onClick={addStep}
+                  className="inline-flex items-center gap-2 rounded-md bg-white border border-slate-200 hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors"
                 >
-                  Use
+                  <Plus className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                  Add Step
                 </button>
               </div>
-            </div>
-          </div>
 
-          <div className="grid gap-3 md:grid-cols-2">
-            {LEAD_MODE_OPTIONS.map((option) => (
-              <label key={option.value} className={`rounded-lg border px-4 py-3 transition ${leadMode === option.value ? 'border-blue-500/50 bg-blue-500/10 ring-1 ring-blue-500/30' : 'border-white/10 bg-zinc-950/40 hover:border-white/15'}`}>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    name="lead_mode"
-                    checked={leadMode === option.value}
-                    onChange={() => setLeadMode(option.value)}
-                  />
-                  <span className="font-medium">{option.label}</span>
-                </div>
-                <p className="mt-1 text-sm text-zinc-500">{option.description}</p>
-              </label>
-            ))}
-          </div>
-
-          {leadMode === 'apollo' ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Country</span>
-                <div ref={countryRef} className="relative">
-                  <input
-                    value={apolloLead.market_name}
-                    onChange={(event) => {
-                      setApolloLead((current) => ({ ...current, market_name: event.target.value }))
-                      setCountryOpen(true)
-                      setCountryHighlight(0)
-                    }}
-                    onFocus={() => {
-                      setCountryOpen(true)
-                      setCountryHighlight(0)
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Escape') {
-                        setCountryOpen(false)
-                        return
-                      }
-
-                      if (!countryOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
-                        setCountryOpen(true)
-                        return
-                      }
-
-                      if (event.key === 'ArrowDown') {
-                        event.preventDefault()
-                        setCountryHighlight((current) => Math.min(current + 1, Math.max(filteredCountries.length - 1, 0)))
-                      }
-
-                      if (event.key === 'ArrowUp') {
-                        event.preventDefault()
-                        setCountryHighlight((current) => Math.max(current - 1, 0))
-                      }
-
-                      if (event.key === 'Enter') {
-                        const selected = filteredCountries[countryHighlight] || filteredCountries[0]
-                        if (selected) {
-                          event.preventDefault()
-                          setApolloLead((current) => ({ ...current, market_name: selected }))
-                          setCountryOpen(false)
-                        }
-                      }
-                    }}
-                    className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                    placeholder="United States"
-                    aria-autocomplete="list"
-                    aria-expanded={countryOpen}
-                    aria-controls="country-listbox"
-                    role="combobox"
-                  />
-                  {countryOpen && filteredCountries.length > 0 ? (
-                    <ul id="country-listbox" role="listbox" className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-white/10 bg-zinc-950 py-1 shadow-2xl backdrop-blur-xl">
-                      {filteredCountries.slice(0, 100).map((country, index) => (
-                        <li
-                          key={country}
-                          role="option"
-                          aria-selected={index === countryHighlight}
-                          onMouseEnter={() => setCountryHighlight(index)}
-                          onMouseDown={(event) => event.preventDefault()}
-                          onClick={() => {
-                            setApolloLead((current) => ({ ...current, market_name: country }))
-                            setCountryOpen(false)
-                          }}
-                          className={`cursor-pointer px-3 py-2 text-sm ${index === countryHighlight ? 'bg-blue-500/15 text-blue-200' : 'text-zinc-300 hover:bg-white/5'}`}
-                        >
-                          {country}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              </label>
-              <label className="space-y-2">
-                <span className="text-sm font-medium">Product name</span>
-                <input
-                  value={apolloLead.product_name}
-                  onChange={(event) => setApolloLead((current) => ({ ...current, product_name: event.target.value }))}
-                  className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                  placeholder="e.g. CRM automation"
-                />
-              </label>
-            </div>
-          ) : null}
-
-          {leadMode === 'import' ? (
-            <div className="space-y-3">
-              <label className="space-y-2 block">
-                <span className="text-sm font-medium">Upload CSV or Spreadsheet</span>
-                <input
-                  type="file"
-                  accept=".csv,.txt,.xlsx,.xls"
-                  onChange={handleLeadFileChange}
-                  className="w-full rounded-md border border-white/10 bg-zinc-950/50 px-3 py-2 text-zinc-100 placeholder:text-zinc-500 outline-none focus:border-blue-500/40 focus:ring-1 focus:ring-blue-500/30"
-                />
-              </label>
-              <div className="rounded-md border border-white/10 bg-zinc-950/40 px-4 py-3 text-sm text-zinc-400">
-                {leadFileName ? `Loaded file: ${leadFileName}` : 'No lead file loaded yet'}
-                <span className="ml-2">{leadRows.length} rows ready</span>
-              </div>
-            </div>
-          ) : null}
-
-        </div>
-
-        <div className="space-y-3 rounded-lg border border-white/10 bg-zinc-950/40 p-4">
-          <h2 className="text-lg font-semibold text-zinc-100">Launch Preview</h2>
-          <div className="overflow-x-auto rounded-md border border-white/10 bg-zinc-950/30">
-            <table className="min-w-full text-left text-sm">
-              <thead className="border-b border-white/10 bg-white/[0.03] text-xs uppercase tracking-wide text-zinc-500">
-                <tr>
-                  <th className="px-4 py-3">Step</th>
-                  <th className="px-4 py-3">Day</th>
-                  <th className="px-4 py-3">Subject</th>
-                  <th className="px-4 py-3">Body</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/[0.06]">
+              <div className="space-y-4">
                 {steps.map((step, index) => {
                   const stepNumber = index + 1
+                  const minimumDelay = index === 0 ? 0 : (steps[index - 1]?.delay_days ?? 0) + 1
 
                   return (
-                    <tr key={`preview-${stepNumber}`} className="hover:bg-white/[0.02]">
-                      <td className="px-4 py-3 font-medium text-zinc-100">Step {stepNumber}</td>
-                      <td className="px-4 py-3 text-zinc-400">{index === 0 ? 0 : step.delay_days}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-400">{getSubjectVariable(stepNumber)}</td>
-                      <td className="px-4 py-3 font-mono text-xs text-zinc-400">{getBodyVariable(stepNumber)}</td>
-                    </tr>
+                    <div key={stepNumber} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm relative group">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-l-xl" />
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs text-indigo-650 font-bold">{stepNumber}</span>
+                          Step {stepNumber}
+                        </h3>
+                        {index > 0 ? (
+                          <button
+                            type="button"
+                            onClick={() => removeStep(index)}
+                            className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-650 hover:bg-red-50 transition"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                            Remove
+                          </button>
+                        ) : null}
+                      </div>
+
+                      <div className="grid gap-5 lg:grid-cols-[1fr_1fr_180px]">
+                        <label className="space-y-2">
+                          <LockedLabel>Subject</LockedLabel>
+                          <input
+                            value={getSubjectVariable(stepNumber)}
+                            disabled
+                            readOnly
+                            className="w-full rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-slate-400 font-medium"
+                          />
+                        </label>
+
+                        <label className="space-y-2">
+                          <LockedLabel>Body</LockedLabel>
+                          <input
+                            value={getBodyVariable(stepNumber)}
+                            disabled
+                            readOnly
+                            className="w-full rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-slate-400 font-medium"
+                          />
+                        </label>
+
+                        <label className="space-y-2">
+                          <span className="text-sm font-semibold text-slate-700">Day Delay</span>
+                          <input
+                            type="number"
+                            min={minimumDelay}
+                            value={index === 0 ? 0 : step.delay_days}
+                            disabled={index === 0}
+                            onChange={(event) => updateDelay(index, event.target.value)}
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400"
+                          />
+                        </label>
+                      </div>
+                    </div>
                   )
                 })}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              {sequenceError ? (
+                <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-250 font-semibold shadow-sm">
+                  {sequenceError}
+                </div>
+              ) : null}
+              
+              <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-inner">
+                <h3 className="text-sm font-bold text-slate-800 mb-3">Launch Preview</h3>
+                <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
+                  <table className="min-w-full text-left text-sm">
+                    <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400 font-bold bg-slate-50/70">
+                      <tr>
+                        <th className="px-4 py-3">Step</th>
+                        <th className="px-4 py-3">Day</th>
+                        <th className="px-4 py-3">Subject</th>
+                        <th className="px-4 py-3">Body</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {steps.map((step, index) => {
+                        const stepNumber = index + 1
+                        return (
+                          <tr key={`preview-${stepNumber}`} className="hover:bg-slate-50/50 transition">
+                            <td className="px-4 py-2.5 font-semibold text-slate-700">Step {stepNumber}</td>
+                            <td className="px-4 py-2.5 text-indigo-650 font-bold font-mono">{index === 0 ? 0 : step.delay_days}</td>
+                            <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{getSubjectVariable(stepNumber)}</td>
+                            <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{getBodyVariable(stepNumber)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'Leads' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Leads & Account</h2>
+                <p className="text-sm text-slate-400 font-medium">Configure how leads are added to this campaign and what account sends them.</p>
+              </div>
+
+              <div className="space-y-3">
+                <span className="text-sm font-semibold text-slate-700">Sending Email Account</span>
+                <div className="grid gap-4 xl:grid-cols-[minmax(280px,360px)_1fr]">
+                  <div ref={emailPickerRef} className="relative w-full">
+                    <button
+                      type="button"
+                      onClick={() => setEmailMenuOpen((current) => !current)}
+                      className="flex h-11 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-4 text-left text-sm text-slate-800 shadow-sm transition hover:border-slate-350"
+                    >
+                      <span className="truncate">
+                        {selectedEmail
+                          ? selectedEmailAccount
+                            ? `${selectedEmailAccount.account_name || selectedEmailAccount.email_address} (${selectedEmailAccount.email_address})`
+                            : selectedEmail
+                          : 'No sender selected'}
+                      </span>
+                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                    </button>
+
+                    {emailMenuOpen && (
+                      <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-xl">
+                        <button
+                          type="button"
+                          className={`flex w-full items-center px-4 py-2 text-left text-sm hover:bg-slate-50 ${!selectedEmail ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}
+                          onClick={() => {
+                            setSelectedEmail('')
+                            setNewEmailAddress('')
+                            setNewEmailName('')
+                            setEmailMenuOpen(false)
+                          }}
+                        >
+                          No sender selected
+                        </button>
+
+                        {emailAccounts.length ? (
+                          emailAccounts.map((account) => (
+                            <div key={account.id} className="flex items-center gap-1 px-1">
+                              <button
+                                type="button"
+                                className={`min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}
+                                onClick={() => {
+                                  setSelectedEmail(account.email_address)
+                                  setNewEmailAddress('')
+                                  setNewEmailName('')
+                                  setEmailMenuOpen(false)
+                                }}
+                              >
+                                <span className="block truncate font-semibold">{account.account_name || account.email_address}</span>
+                                <span className="block truncate text-xs font-normal text-slate-400">{account.email_address}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  handleDeleteEmailAccount(account)
+                                }}
+                                disabled={deletingEmailId === account.id}
+                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-650 disabled:opacity-50"
+                                aria-label={`Delete ${account.email_address}`}
+                              >
+                                <Trash2 className="h-4 w-4" aria-hidden="true" />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="px-4 py-2 text-sm text-slate-400 font-medium">No saved email accounts</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid w-full gap-3 sm:grid-cols-[minmax(260px,1fr)_minmax(180px,240px)_auto]">
+                    <input
+                      type="email"
+                      value={newEmailAddress}
+                      onChange={(event) => setNewEmailAddress(event.target.value)}
+                      placeholder="Or enter new email: new@email.com"
+                      className="h-11 min-w-0 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                    <input
+                      type="text"
+                      value={newEmailName}
+                      onChange={(event) => setNewEmailName(event.target.value)}
+                      placeholder="Account Name"
+                      className="h-11 min-w-0 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddEmailAccount}
+                      disabled={addingEmail || !newEmailAddress.trim()}
+                      className="h-11 rounded-md bg-white border border-slate-200 hover:bg-slate-50 px-5 text-sm font-semibold text-slate-700 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      Use
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-200">
+                <h3 className="text-sm font-bold text-slate-700 mb-4">Lead Source</h3>
+                <div className="grid gap-4 md:grid-cols-2 mb-6">
+                  {LEAD_MODE_OPTIONS.map((option) => (
+                    <label key={option.value} className={`relative flex cursor-pointer rounded-xl border p-4 transition-all ${leadMode === option.value ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500/20 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-350 shadow-sm'}`}>
+                      <input
+                        type="radio"
+                        name="lead_mode"
+                        className="sr-only"
+                        checked={leadMode === option.value}
+                        onChange={() => setLeadMode(option.value)}
+                      />
+                      <div className="flex w-full items-start gap-4">
+                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${leadMode === option.value ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 bg-transparent'}`}>
+                          {leadMode === option.value && <div className="h-2 w-2 rounded-full bg-white" />}
+                        </div>
+                        <div>
+                          <div className="font-bold text-slate-800">{option.label}</div>
+                          <div className="mt-1 text-sm text-slate-500 font-medium">{option.description}</div>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {leadMode === 'apollo' && (
+                  <div className="grid gap-6 md:grid-cols-2 animate-in fade-in duration-300 p-5 rounded-xl border border-slate-200 bg-slate-50/50 shadow-sm">
+                    <label className="space-y-2">
+                      <span className="text-sm font-semibold text-slate-700">Target Country</span>
+                      <div ref={countryRef} className="relative">
+                        <input
+                          value={apolloLead.market_name}
+                          onChange={(event) => {
+                            setApolloLead((current) => ({ ...current, market_name: event.target.value }))
+                            setCountryOpen(true)
+                            setCountryHighlight(0)
+                          }}
+                          onFocus={() => {
+                            setCountryOpen(true)
+                            setCountryHighlight(0)
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Escape') {
+                              setCountryOpen(false)
+                              return
+                            }
+                            if (!countryOpen && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+                              setCountryOpen(true)
+                              return
+                            }
+                            if (event.key === 'ArrowDown') {
+                              event.preventDefault()
+                              setCountryHighlight((current) => Math.min(current + 1, Math.max(filteredCountries.length - 1, 0)))
+                            }
+                            if (event.key === 'ArrowUp') {
+                              event.preventDefault()
+                              setCountryHighlight((current) => Math.max(current - 1, 0))
+                            }
+                            if (event.key === 'Enter') {
+                              const selected = filteredCountries[countryHighlight] || filteredCountries[0]
+                              if (selected) {
+                                event.preventDefault()
+                                setApolloLead((current) => ({ ...current, market_name: selected }))
+                                setCountryOpen(false)
+                              }
+                            }
+                          }}
+                          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                          placeholder="e.g. United States"
+                        />
+                        {countryOpen && filteredCountries.length > 0 && (
+                          <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-xl">
+                            {filteredCountries.slice(0, 100).map((country, index) => (
+                              <li
+                                key={country}
+                                onMouseEnter={() => setCountryHighlight(index)}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  setApolloLead((current) => ({ ...current, market_name: country }))
+                                  setCountryOpen(false)
+                                }}
+                                className={`cursor-pointer px-3 py-2 text-sm font-medium ${index === countryHighlight ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-650 hover:bg-slate-50'}`}
+                              >
+                                {country}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </label>
+                    <label className="space-y-2">
+                      <span className="text-sm font-semibold text-slate-700">Product / Offering Name</span>
+                      <input
+                        value={apolloLead.product_name}
+                        onChange={(event) => setApolloLead((current) => ({ ...current, product_name: event.target.value }))}
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                        placeholder="e.g. AI CRM Automation"
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {leadMode === 'import' && (
+                  <div className="space-y-4 animate-in fade-in duration-300 p-5 rounded-xl border border-slate-200 bg-slate-50/50 shadow-sm">
+                    <label className="space-y-2 block">
+                      <span className="text-sm font-semibold text-slate-700">Upload CSV or Spreadsheet</span>
+                      <input
+                        type="file"
+                        accept=".csv,.txt,.xlsx,.xls"
+                        onChange={handleLeadFileChange}
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 shadow-sm font-medium"
+                      />
+                    </label>
+                    {leadFileName && (
+                      <div className="flex items-center gap-3 rounded-md border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 font-bold shadow-sm">
+                        <span className="font-semibold">{leadFileName}</span>
+                        <span className="text-emerald-600/80">• {leadRows.length} rows loaded</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
-        {error ? <p className="text-sm text-red-400">{error}</p> : null}
+        {error && (
+          <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-750 border border-red-200 flex items-center gap-2 font-semibold shadow-sm animate-bounce">
+            <span className="font-extrabold text-red-800">Error:</span> {error}
+          </div>
+        )}
 
-        <div className="flex items-center gap-3">
-          <button
-            type="submit"
-            disabled={submitting || Boolean(sequenceError)}
-            className="rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-5 py-2.5 font-semibold text-white shadow-lg shadow-blue-500/20 disabled:opacity-60"
-          >
-            {submitting ? 'Saving...' : submitLabel}
-          </button>
+        <div className="mt-8 flex items-center justify-between border-t border-slate-200 pt-6">
+          <div className="flex items-center gap-2">
+            {activeTab !== 'Basics' && (
+              <button
+                type="button"
+                onClick={() => setActiveTab(TABS[Math.max(0, TABS.indexOf(activeTab) - 1)])}
+                className="rounded-lg bg-white border border-slate-200 px-5 py-2.5 font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
+              >
+                Previous
+              </button>
+            )}
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {activeTab !== 'Leads' ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab(TABS[Math.min(TABS.length - 1, TABS.indexOf(activeTab) + 1)])}
+                className="rounded-lg bg-white border border-slate-200 px-6 py-2.5 font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
+              >
+                Next Step
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={submitting || Boolean(sequenceError)}
+                className="rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-8 py-2.5 font-extrabold text-white shadow-md shadow-indigo-600/10 transition hover:opacity-95 hover:shadow-indigo-600/20 disabled:opacity-60"
+              >
+                {submitting ? 'Launching...' : submitLabel}
+              </button>
+            )}
+          </div>
         </div>
       </form>
     </div>

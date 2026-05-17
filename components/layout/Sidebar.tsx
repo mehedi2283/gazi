@@ -68,8 +68,8 @@ export default function Sidebar() {
               href={item.href}
               className={`group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                 active
-                  ? 'text-white'
-                  : 'text-zinc-400 hover:bg-white/[0.04] hover:text-zinc-100'
+                  ? 'text-indigo-600 font-semibold'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
               }`}
               whileHover={{ x: 3 }}
               whileTap={{ scale: 0.98 }}
@@ -78,15 +78,15 @@ export default function Sidebar() {
               {active ? (
                 <motion.span
                   layoutId="sidebar-active"
-                  className="absolute inset-0 rounded-lg bg-gradient-to-r from-blue-500/15 via-violet-500/10 to-transparent ring-1 ring-white/10"
+                  className="absolute inset-0 rounded-lg bg-gradient-to-r from-indigo-500/8 via-sky-500/4 to-transparent ring-1 ring-indigo-500/10"
                   transition={{ type: 'spring', stiffness: 380, damping: 32 }}
                 />
               ) : null}
               <span
                 className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-md ${
                   active
-                    ? 'bg-gradient-to-br from-blue-500 to-violet-600 text-white shadow-md shadow-blue-500/25'
-                    : 'bg-zinc-800/80 text-zinc-400 group-hover:text-zinc-200'
+                    ? 'bg-gradient-to-br from-indigo-500 to-sky-500 text-white shadow-md shadow-indigo-500/20'
+                    : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200/50 group-hover:text-slate-650'
                 }`}
               >
                 <Icon className="h-4 w-4" aria-hidden />
@@ -97,15 +97,15 @@ export default function Sidebar() {
         })}
       </nav>
 
-      <div className="mt-auto border-t border-white/[0.06] pt-4">
+      <div className="mt-auto border-t border-slate-200/50 pt-4">
         <motion.button
           type="button"
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-zinc-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-500 transition-colors hover:bg-red-50 hover:text-red-600"
           whileHover={{ x: 2 }}
           whileTap={{ scale: 0.99 }}
         >
-          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-zinc-800/80 text-zinc-500">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-slate-100 text-slate-400 group-hover:text-red-500">
             <LogOut className="h-4 w-4" aria-hidden />
           </span>
           Logout

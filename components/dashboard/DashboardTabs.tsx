@@ -18,7 +18,7 @@ export default function DashboardTabs({ children }: DashboardTabsProps) {
 
   return (
     <div>
-      <div className="relative mb-8 flex gap-1 border-b border-white/[0.08]">
+      <div className="relative mb-8 flex gap-1 border-b border-slate-200">
         {tabs.map((tab) => {
           const active = activeTab === tab.id
           return (
@@ -26,14 +26,14 @@ export default function DashboardTabs({ children }: DashboardTabsProps) {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`relative px-4 py-3 text-sm font-medium transition-colors ${
-                active ? 'text-zinc-50' : 'text-zinc-500 hover:text-zinc-300'
+              className={`relative px-4 py-3 text-sm font-semibold transition-colors ${
+                active ? 'text-indigo-600' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
               {active ? (
                 <motion.span
                   layoutId="dashboard-tab-indicator"
-                  className="absolute inset-x-1 bottom-0 h-0.5 rounded-xl bg-gradient-to-r from-blue-500 to-violet-500"
+                  className="absolute inset-x-1 bottom-0 h-0.5 rounded-xl bg-gradient-to-r from-indigo-500 to-sky-500"
                   transition={{ type: 'spring', stiffness: 400, damping: 34 }}
                 />
               ) : null}

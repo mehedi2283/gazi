@@ -71,10 +71,10 @@ export default function Header() {
   const { title, subtitle } = useMemo(() => titleForPath(pathname), [pathname])
 
   return (
-    <header className="sticky top-0 z-10 border-b border-white/[0.06] bg-canvas/75 px-5 py-4 backdrop-blur-xl md:px-8">
+    <header className="sticky top-0 z-10 border-b border-slate-200/50 bg-white/70 px-5 py-4 backdrop-blur-xl md:px-8">
       <div className="flex flex-col gap-0.5">
-        <h1 className="text-xl font-semibold tracking-tight text-zinc-50 md:text-2xl">{title}</h1>
-        {subtitle ? <p className="max-w-2xl text-sm text-zinc-500">{subtitle}</p> : null}
+        <h1 className="text-xl font-semibold tracking-tight text-slate-800 md:text-2xl">{title}</h1>
+        {subtitle ? <p className="max-w-2xl text-sm text-slate-500">{subtitle}</p> : null}
       </div>
     </header>
   )

@@ -1,1 +1,2 @@
-export { default } from '../../ai-personalization/page'
+import AIPersonalizationPage from '../../ai-personalization/page'
+export default AIPersonalizationPage

@@ -4,13 +4,10 @@ import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
 import { supabase } from '@/lib/supabase/client'
 import {
-  Cell,
   CartesianGrid,
   Legend,
   Line,
   LineChart,
-  Pie,
-  PieChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -83,6 +80,119 @@ function formatTooltipValue(value: unknown, name: unknown) {
   return [numericValue.toLocaleString(), String(name || '')]
 }
 
+// ── Custom Concentric Ring Chart ─────────────────────────────────────────────
+interface RingData {
+  name: string
+  value: number
+  fill: string
+}
+
+function ConcentricRingChart({
+  data,
+  maxValue,
+}: {
+  data: RingData[]
+  maxValue: number
+}) {
+  const [hovered, setHovered] = useState<number | null>(null)
+  const size = 260
+  const cx = size / 2
+  const cy = size / 2
+  const strokeWidth = 18
+  const gap = 8
+
+  // Rings go from inside (index 0 = Bounced) to outside (index 3 = Opens)
+  const rings = data.map((item, i) => {
+    const radius = 36 + i * (strokeWidth + gap)
+    const circumference = 2 * Math.PI * radius
+    const pct = maxValue > 0 ? Math.min(item.value / maxValue, 1) : 0
+    const dashOffset = circumference * (1 - pct)
+    return { ...item, radius, circumference, dashOffset, index: i }
+  })
+
+  return (
+    <div className="relative flex items-center justify-center">
+      <svg
+        width={size}
+        height={size}
+        viewBox={`0 0 ${size} ${size}`}
+        onMouseLeave={() => setHovered(null)}
+      >
+        {rings.map((ring) => {
+          const isHovered = hovered === ring.index
+          const isAnyHovered = hovered !== null
+          const isOther = isAnyHovered && !isHovered
+
+          return (
+            <g key={ring.name}>
+              {/* Background track */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={ring.radius}
+                fill="none"
+                stroke="rgba(15,23,42,0.05)"
+                strokeWidth={strokeWidth}
+                style={{
+                  transition: 'opacity 350ms ease, stroke-width 350ms ease',
+                  opacity: isOther ? 0.3 : 1,
+                  strokeWidth: isHovered ? strokeWidth + 6 : strokeWidth,
+                }}
+              />
+              {/* Value arc */}
+              <circle
+                cx={cx}
+                cy={cy}
+                r={ring.radius}
+                fill="none"
+                stroke={ring.fill}
+                strokeWidth={isHovered ? strokeWidth + 6 : strokeWidth}
+                strokeDasharray={ring.circumference}
+                strokeDashoffset={ring.dashOffset}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${cx} ${cy})`}
+                onMouseEnter={() => setHovered(ring.index)}
+                style={{
+                  cursor: 'pointer',
+                  transition: 'stroke-dashoffset 600ms ease, opacity 350ms ease, stroke-width 350ms ease, filter 350ms ease',
+                  opacity: isOther ? 0.25 : 1,
+                  filter: isHovered
+                    ? `drop-shadow(0 0 10px ${ring.fill}aa) drop-shadow(0 0 20px ${ring.fill}55)`
+                    : 'none',
+                }}
+              />
+            </g>
+          )
+        })}
+        {/* Center label */}
+        <text x={cx} y={cy - 4} textAnchor="middle" fill="#1e293b" fontSize="16" fontWeight="700">
+          {maxValue}
+        </text>
+        <text x={cx} y={cy + 10} textAnchor="middle" fill="#64748b" fontSize="9" fontWeight="500">
+          Total Leads
+        </text>
+      </svg>
+
+      {/* Floating tooltip */}
+      {hovered !== null && data[hovered] && (
+        <div
+          className="pointer-events-none absolute -right-2 top-1/2 -translate-y-1/2 rounded-lg border border-slate-200/80 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-md"
+          style={{ minWidth: 100 }}
+        >
+          <div className="flex items-center gap-2">
+            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: data[hovered].fill }} />
+            <span className="text-sm font-semibold text-slate-800">{data[hovered].name}</span>
+          </div>
+          <div className="mt-1 text-lg font-bold text-slate-900">{data[hovered].value.toLocaleString()}</div>
+          <div className="text-[10px] text-slate-400">
+            {maxValue > 0 ? Math.round((data[hovered].value / maxValue) * 100) : 0}% of leads
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function groupDailyRows(rows: DailyRow[]): AggregatedDailyRow[] {
   const grouped = rows.reduce<Record<string, AggregatedDailyRow>>((acc, row) => {
     if (!acc[row.date]) {
@@ -126,14 +236,14 @@ function getStatusLabel(status: number | null) {
 }
 
 function getStatusBadgeClasses(status: number | null) {
-  if (status === 1) return 'border border-emerald-500/30 bg-emerald-500/10 text-emerald-300'
-  if (status === 2) return 'border border-amber-500/30 bg-amber-500/10 text-amber-200'
-  if (status === 3) return 'border border-zinc-500/30 bg-zinc-800/80 text-zinc-300'
-  return 'border border-blue-500/30 bg-blue-500/10 text-blue-200'
+  if (status === 1) return 'border border-emerald-500/20 bg-emerald-50 text-emerald-700'
+  if (status === 2) return 'border border-amber-500/20 bg-amber-50 text-amber-700'
+  if (status === 3) return 'border border-slate-300 bg-slate-100 text-slate-700'
+  return 'border border-blue-500/20 bg-blue-50 text-blue-700'
 }
 
 function LoadingBlock({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded-md bg-zinc-800/80 ${className || ''}`} />
+  return <div className={`animate-pulse rounded-md bg-slate-200/60 ${className || ''}`} />
 }
 
 export default function InstantlyDashboard() {
@@ -141,12 +251,7 @@ export default function InstantlyDashboard() {
   const [selectedCampaign, setSelectedCampaign] = useState<string>('all')
   const [campaigns, setCampaigns] = useState<CampaignRow[]>([])
   const [dailyRows, setDailyRows] = useState<DailyRow[]>([])
-  const [kpis, setKpis] = useState<KPIs>({
-    emailsSent: 0,
-    openRate: 0,
-    replyRate: 0,
-    bounceRate: 0,
-  })
+
   const [loading, setLoading] = useState(true)
   const [kpiLoading, setKpiLoading] = useState(true)
   const [isSyncing, setIsSyncing] = useState(false)
@@ -201,25 +306,6 @@ export default function InstantlyDashboard() {
       if (overviewData[0]?.synced_at) {
         setLastSynced(new Date(overviewData[0].synced_at).toLocaleString())
       }
-
-      const totals = dailyData.reduce(
-        (acc, row) => ({
-          sent: acc.sent + (row.sent || 0),
-          unique_opened: acc.unique_opened + (row.unique_opened || 0),
-          unique_replies: acc.unique_replies + (row.unique_replies || 0),
-          bounced: acc.bounced + (row.bounced || 0),
-        }),
-        { sent: 0, unique_opened: 0, unique_replies: 0, bounced: 0 }
-      )
-
-      const emailsSent = totals.sent
-
-      setKpis({
-        emailsSent,
-        openRate: emailsSent > 0 ? (totals.unique_opened / emailsSent) * 100 : 0,
-        replyRate: emailsSent > 0 ? (totals.unique_replies / emailsSent) * 100 : 0,
-        bounceRate: emailsSent > 0 ? (totals.bounced / emailsSent) * 100 : 0,
-      })
     } catch (error) {
       console.error('Error loading Instantly dashboard data:', error)
     } finally {
@@ -259,20 +345,24 @@ export default function InstantlyDashboard() {
   const donutData = useMemo(
     () => [
       {
-        name: 'Opens',
-        value: visibleCampaigns.reduce((sum, campaign) => sum + (campaign.open_count_unique || 0), 0),
-      },
-      {
-        name: 'Replies',
-        value: visibleCampaigns.reduce((sum, campaign) => sum + (campaign.reply_count_unique || 0), 0),
+        name: 'Bounced',
+        value: visibleCampaigns.reduce((sum, campaign) => sum + (campaign.bounced_count || 0), 0),
+        fill: '#f43f5e', // rose-500
       },
       {
         name: 'Clicks',
         value: visibleCampaigns.reduce((sum, campaign) => sum + (campaign.link_click_count_unique || 0), 0),
+        fill: '#06b6d4', // cyan-500
       },
       {
-        name: 'Bounced',
-        value: visibleCampaigns.reduce((sum, campaign) => sum + (campaign.bounced_count || 0), 0),
+        name: 'Replies',
+        value: visibleCampaigns.reduce((sum, campaign) => sum + (campaign.reply_count_unique || 0), 0),
+        fill: '#a855f7', // purple-500
+      },
+      {
+        name: 'Opens',
+        value: visibleCampaigns.reduce((sum, campaign) => sum + (campaign.open_count_unique || 0), 0),
+        fill: '#3b82f6', // blue-500
       },
     ],
     [visibleCampaigns]
@@ -280,19 +370,33 @@ export default function InstantlyDashboard() {
 
   const totalCampaignLeads = visibleCampaigns.reduce((sum, campaign) => sum + (campaign.leads_count || 0), 0)
 
+  const kpis = useMemo(() => {
+    const sent = visibleCampaigns.reduce((sum, c) => sum + (c.emails_sent_count || 0), 0)
+    const unique_opened = visibleCampaigns.reduce((sum, c) => sum + (c.open_count_unique || 0), 0)
+    const unique_replies = visibleCampaigns.reduce((sum, c) => sum + (c.reply_count_unique || 0), 0)
+    const bounced = visibleCampaigns.reduce((sum, c) => sum + (c.bounced_count || 0), 0)
+    
+    return {
+      emailsSent: sent,
+      openRate: sent > 0 ? (unique_opened / sent) * 100 : 0,
+      replyRate: sent > 0 ? (unique_replies / sent) * 100 : 0,
+      bounceRate: sent > 0 ? (bounced / sent) * 100 : 0,
+    }
+  }, [visibleCampaigns])
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight text-zinc-50">Instantly analytics</h2>
-          <p className="mt-1 text-sm text-zinc-500">Data is read from Supabase only.</p>
+          <h2 className="text-xl font-bold tracking-tight text-slate-800">Instantly analytics</h2>
+          <p className="mt-1 text-sm text-slate-400">Data is read from Supabase only.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-4">
-          {lastSynced ? <span className="text-sm text-zinc-500">Last synced: {lastSynced}</span> : null}
+          {lastSynced ? <span className="text-sm text-slate-400">Last synced: {lastSynced}</span> : null}
           <button
             onClick={handleSync}
             disabled={isSyncing}
-            className="rounded-lg bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/20 transition hover:opacity-95 disabled:opacity-50"
+            className="rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-indigo-500/20 transition hover:opacity-95 disabled:opacity-50"
           >
             {isSyncing ? 'Syncing...' : 'Sync now'}
           </button>
@@ -300,16 +404,16 @@ export default function InstantlyDashboard() {
       </div>
 
       <div className="flex flex-wrap gap-4">
-        <div className="flex gap-1 rounded-lg border border-white/[0.08] bg-white/[0.03] p-1 backdrop-blur-xl">
+        <div className="flex gap-1 rounded-lg border border-slate-200 bg-white/70 p-1 backdrop-blur-xl shadow-sm">
           {[7, 30, 90].map((days) => (
             <button
               key={days}
               type="button"
               onClick={() => setDateRange(days as 7 | 30 | 90)}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+              className={`rounded-md px-3 py-1.5 text-sm font-semibold transition ${
                 dateRange === days
-                  ? 'bg-gradient-to-r from-blue-600 to-violet-600 text-white shadow-md'
-                  : 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-100'
+                  ? 'bg-gradient-to-br from-indigo-600 to-sky-600 text-white shadow-sm'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
               }`}
             >
               {days}d
@@ -320,7 +424,7 @@ export default function InstantlyDashboard() {
         <select
           value={selectedCampaign}
           onChange={(e) => setSelectedCampaign(e.target.value)}
-          className="rounded-lg border border-white/10 bg-zinc-950/60 px-4 py-2 text-sm font-medium text-zinc-100 outline-none ring-blue-500/30 transition focus:ring-2"
+          className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 outline-none ring-indigo-500/25 transition focus:ring-2 shadow-sm"
         >
           <option value="all">All campaigns</option>
           {campaigns.map((campaign) => (
@@ -332,11 +436,11 @@ export default function InstantlyDashboard() {
       </div>
 
       {selectedCampaign !== 'all' ? (
-        <div className="inline-flex items-center gap-2 rounded-lg border border-blue-500/25 bg-blue-500/10 px-3 py-1.5 text-sm text-blue-200">
+        <div className="inline-flex items-center gap-2 rounded-lg border border-indigo-500/20 bg-indigo-50/50 px-3 py-1.5 text-sm font-semibold text-indigo-700">
           <span>
             {campaigns.find((c) => c.campaign_id === selectedCampaign)?.campaign_name || selectedCampaign}
           </span>
-          <button type="button" onClick={() => setSelectedCampaign('all')} className="ml-1 text-blue-300 hover:text-white">
+          <button type="button" onClick={() => setSelectedCampaign('all')} className="ml-1 text-indigo-400 hover:text-indigo-650">
             ×
           </button>
         </div>
@@ -344,51 +448,58 @@ export default function InstantlyDashboard() {
 
       <div className="space-y-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
-            <div className="mb-2 text-sm font-medium text-zinc-500">Emails sent</div>
+          <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-slate-400">Emails sent</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-24" />
             ) : (
-              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.emailsSent.toLocaleString()}</div>
+              <div className="text-3xl font-extrabold tracking-tight text-slate-850">{kpis.emailsSent.toLocaleString()}</div>
             )}
-            <div className="mt-2 text-xs text-zinc-500">total sent</div>
+            <div className="mt-2 text-xs text-slate-400">total sent</div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
-            <div className="mb-2 text-sm font-medium text-zinc-500">Open rate</div>
+          <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-slate-400">Open rate</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-20" />
             ) : (
-              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.openRate.toFixed(1)}%</div>
+              <div className="text-3xl font-extrabold tracking-tight text-slate-850">{kpis.openRate.toFixed(1)}%</div>
             )}
-            <div className="mt-2 text-xs text-zinc-500">unique opens</div>
+            <div className="mt-2 text-xs text-slate-400">unique opens</div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
-            <div className="mb-2 text-sm font-medium text-zinc-500">Reply rate</div>
+          <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-slate-400">Reply rate</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-20" />
             ) : (
-              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.replyRate.toFixed(1)}%</div>
+              <div className="text-3xl font-extrabold tracking-tight text-slate-850">{kpis.replyRate.toFixed(1)}%</div>
             )}
-            <div className="mt-2 text-xs text-zinc-500">unique replies</div>
+            <div className="mt-2 text-xs text-slate-400">unique replies</div>
           </div>
 
-          <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
-            <div className="mb-2 text-sm font-medium text-zinc-500">Bounce rate</div>
+          <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-2 text-sm font-medium text-slate-400">Bounce rate</div>
             {kpiLoading ? (
               <LoadingBlock className="h-8 w-20" />
             ) : (
-              <div className="text-3xl font-bold tracking-tight text-zinc-50">{kpis.bounceRate.toFixed(1)}%</div>
+              <div className="text-3xl font-extrabold tracking-tight text-slate-850">{kpis.bounceRate.toFixed(1)}%</div>
             )}
-            <div className="mt-2 text-xs text-zinc-500">of sent</div>
+            <div className="mt-2 text-xs text-slate-400">of sent</div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="min-h-[360px] rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
-            <div className="mb-4 text-sm font-semibold text-zinc-200">Daily trend</div>
-            {loading ? (
+          <div className="min-h-[360px] rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="text-sm font-bold text-slate-700">Daily trend</div>
+            </div>
+            {selectedCampaign !== 'all' ? (
+              <div className="flex h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-sm text-slate-500">
+                <div>Daily trend data is only available account-wide.</div>
+                <div className="mt-2 text-xs text-slate-400">Select "All campaigns" to view this chart.</div>
+              </div>
+            ) : loading ? (
               <LoadingBlock className="h-[280px] w-full" />
             ) : chartData.length > 0 ? (
               <div className="h-[280px] w-full">
@@ -408,7 +519,7 @@ export default function InstantlyDashboard() {
                       labelFormatter={(value) => `Date: ${formatDateLabel(String(value))}`}
                       formatter={formatTooltipValue}
                     />
-                    <Legend wrapperStyle={{ color: '#a1a1aa', fontSize: 12 }} />
+                    <Legend wrapperStyle={{ color: '#64748b', fontSize: 12 }} />
                     <Line type="monotone" dataKey="sent" name="Sent" stroke="#3b82f6" strokeWidth={2} dot={false} />
                     <Line
                       type="monotone"
@@ -430,62 +541,46 @@ export default function InstantlyDashboard() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed border-white/10 bg-zinc-950/40 text-sm text-zinc-500">
+              <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-sm text-slate-500">
                 No daily data available for this range.
               </div>
             )}
           </div>
 
-          <div className="min-h-[360px] rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
-            <div className="mb-4 text-sm font-semibold text-zinc-200">Engagement breakdown</div>
+          <div className="min-h-[360px] rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+            <div className="mb-4 text-sm font-bold text-slate-700">Engagement breakdown</div>
             {loading ? (
               <LoadingBlock className="h-[280px] w-full" />
             ) : donutData.some((entry) => entry.value > 0) ? (
               <div className="flex h-[280px] w-full items-center justify-center">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={donutData}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={72}
-                      outerRadius={112}
-                      paddingAngle={2}
-                    >
-                      {donutData.map((entry, index) => (
-                        <Cell key={entry.name} fill={DONUT_COLORS[index % DONUT_COLORS.length]} stroke="rgba(10,10,10,0.4)" strokeWidth={1} />
-                      ))}
-                    </Pie>
-                    <Tooltip {...chartTooltipProps} formatter={formatTooltipValue} />
-                  </PieChart>
-                </ResponsiveContainer>
+                <ConcentricRingChart data={donutData} maxValue={Math.max(1, totalCampaignLeads)} />
               </div>
             ) : (
-              <div className="flex h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-white/10 bg-zinc-950/40 text-sm text-zinc-500">
+              <div className="flex h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-sm text-slate-500">
                 <div>No campaign engagement data available.</div>
-                <div className="mt-2 text-xs text-zinc-600">Sync Instantly data to populate this chart.</div>
+                <div className="mt-2 text-xs text-slate-400">Sync Instantly data to populate this chart.</div>
               </div>
             )}
-            <div className="mt-4 flex flex-wrap gap-3 text-xs text-zinc-400">
-              {donutData.map((entry, index) => (
+            <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
+              {donutData.map((entry) => (
                 <span key={entry.name} className="inline-flex items-center gap-2">
                   <span
                     className="h-2.5 w-2.5 rounded-sm"
-                    style={{ backgroundColor: DONUT_COLORS[index % DONUT_COLORS.length] }}
+                    style={{ backgroundColor: entry.fill }}
                   />
                   {entry.name} {entry.value.toLocaleString()}
                 </span>
               ))}
-              <span className="inline-flex items-center gap-2 font-medium text-zinc-300">
-                <span className="h-2.5 w-2.5 rounded-sm bg-zinc-600" />
+              <span className="inline-flex items-center gap-2 font-semibold text-slate-650">
+                <span className="h-2.5 w-2.5 rounded-sm bg-slate-300" />
                 Leads {totalCampaignLeads.toLocaleString()}
               </span>
             </div>
           </div>
         </div>
 
-        <div className="rounded-xl border border-white/[0.08] bg-white/[0.03] p-6 shadow-glass backdrop-blur-xl">
-          <div className="mb-4 text-sm font-semibold text-zinc-200">Campaign performance</div>
+        <div className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+          <div className="mb-4 text-sm font-bold text-slate-700">Campaign performance</div>
           {loading ? (
             <div className="space-y-3">
               <LoadingBlock className="h-10 w-full" />
@@ -497,8 +592,8 @@ export default function InstantlyDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/[0.08] text-left text-xs font-medium uppercase tracking-wider text-zinc-500">
-                    <th className="py-3 pr-4">Campaign</th>
+                  <tr className="border-b border-slate-100 bg-slate-50/70 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    <th className="py-3 pr-4 pl-2">Campaign</th>
                     <th className="py-3 pr-4">Status</th>
                     <th className="py-3 pr-4">Leads</th>
                     <th className="py-3 pr-4">Sent</th>
@@ -518,9 +613,9 @@ export default function InstantlyDashboard() {
                     return (
                       <tr
                         key={campaign.campaign_id}
-                        className="border-b border-white/[0.04] transition-colors last:border-b-0 hover:bg-white/[0.03]"
+                        className="border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50/50"
                       >
-                        <td className="max-w-[280px] truncate py-3 pr-4 font-medium text-zinc-100">
+                        <td className="max-w-[280px] truncate py-3 pr-4 pl-2 font-semibold text-slate-800">
                           {campaign.campaign_name || campaign.campaign_id}
                         </td>
                         <td className="py-3 pr-4">
@@ -530,13 +625,13 @@ export default function InstantlyDashboard() {
                             {getStatusLabel(campaign.campaign_status)}
                           </span>
                         </td>
-                        <td className="py-3 pr-4 text-zinc-300">{(campaign.leads_count || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4 text-zinc-300">{sent.toLocaleString()}</td>
-                        <td className="py-3 pr-4 text-zinc-300">{openCount.toLocaleString()}</td>
-                        <td className="py-3 pr-4 text-zinc-300">{(campaign.reply_count_unique || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4 text-zinc-300">{(campaign.link_click_count_unique || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4 text-zinc-300">{(campaign.bounced_count || 0).toLocaleString()}</td>
-                        <td className="py-3 pr-4 text-zinc-300">{sent > 0 ? `${openPercent.toFixed(1)}%` : '0.0%'}</td>
+                        <td className="py-3 pr-4 text-slate-600">{(campaign.leads_count || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-slate-600">{sent.toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-slate-600">{openCount.toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-slate-600">{(campaign.reply_count_unique || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-slate-600">{(campaign.link_click_count_unique || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-slate-600">{(campaign.bounced_count || 0).toLocaleString()}</td>
+                        <td className="py-3 pr-4 text-slate-600">{sent > 0 ? `${openPercent.toFixed(1)}%` : '0.0%'}</td>
                       </tr>
                     )
                   })}
@@ -544,7 +639,7 @@ export default function InstantlyDashboard() {
               </table>
             </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-white/10 bg-zinc-950/40 px-6 py-10 text-center text-sm text-zinc-500">
+            <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 px-6 py-10 text-center text-sm text-slate-500">
               No campaigns found for the current view.
             </div>
           )}
