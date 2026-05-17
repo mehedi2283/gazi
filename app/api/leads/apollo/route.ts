@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
+import { isAuthResponse, requireApiAuth } from '../../../../lib/api/auth'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const body = await req.json()
 
     const payload = {
@@ -13,7 +17,7 @@ export async function POST(req: Request) {
       contacts_wanted: body.contacts_wanted ?? null,
       campaign_id: body.campaign_id || null,
       campaign_name: body.campaign_name || null,
-      organization_id: body.organization_id || null
+      organization_id: body.organization_id || auth.organizationId || null
     }
 
     return NextResponse.json({ data: payload, error: null })

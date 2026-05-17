@@ -3,6 +3,7 @@ import { createCampaign, listAllCampaigns, updateCampaign } from '../../../lib/i
 import supabase from '../../../lib/supabase/server'
 import { sendImportedLeadsToWebhook, sendLeadsToWebhook } from '../../../lib/webhook/leads'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../../lib/timezones'
+import { isAuthResponse, requireApiAuth } from '../../../lib/api/auth'
 
 type LocalCampaign = {
   id: string
@@ -333,17 +334,56 @@ async function ensureSequenceVariableColumns() {
   return error ? formatSchemaError(error) : null
 }
 
-export async function GET() {
+function parsePositiveInt(value: string | null, fallback: number, max: number) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback
+  return Math.min(Math.floor(parsed), max)
+}
+
+function applyCampaignScope(query: any, auth: { userId: string; organizationId: string | null }) {
+  if (auth.organizationId) {
+    return query.eq('organization_id', auth.organizationId)
+  }
+
+  return query.eq('created_by', auth.userId)
+}
+
+export async function GET(req: Request) {
   try {
-    const { data, error } = await supabase.from('campaigns').select('*, leads:leads(count)').order('created_at', { ascending: false })
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
+    const { searchParams } = new URL(req.url)
+    const page = parsePositiveInt(searchParams.get('page'), 1, 100000)
+    const perPage = parsePositiveInt(searchParams.get('per_page'), 25, 100)
+    const shouldSyncInstantly = searchParams.get('sync') === '1'
+    const search = (searchParams.get('q') || '').trim()
+    const from = (page - 1) * perPage
+    const to = from + perPage - 1
+
+    let query = applyCampaignScope(
+      supabase
+        .from('campaigns')
+        .select('*, leads:leads(count)', { count: 'exact' })
+        .order('created_at', { ascending: false }),
+      auth
+    )
+
+    if (search) {
+      const escaped = search.replace(/[%_]/g, '\\$&')
+      query = query.or(`name.ilike.%${escaped}%,status.ilike.%${escaped}%,instantly_campaign_id.ilike.%${escaped}%`)
+    }
+
+    const { data, error, count } = await query.range(from, to)
+
     if (error) return NextResponse.json({ data: null, error: formatSchemaError(error) })
 
-    let localCampaigns = (data || []).map((c) => ({
+    let localCampaigns = (data || []).map((c: any) => ({
       ...c,
       total_leads: c.leads?.[0]?.count ?? c.total_leads ?? 0
     })) as LocalCampaign[]
 
-    if (process.env.INSTANTLY_API_KEY) {
+    if (shouldSyncInstantly && process.env.INSTANTLY_API_KEY) {
       const instantlyCampaigns = await listAllCampaigns()
       const localByInstantlyId = new Map(
         localCampaigns
@@ -399,7 +439,11 @@ export async function GET() {
         )
       }
 
-      return NextResponse.json({ data: sortCampaignsByCreatedAt([...mergedInstantlyCampaigns, ...localOnlyCampaigns]), error: null })
+      return NextResponse.json({
+        data: sortCampaignsByCreatedAt([...mergedInstantlyCampaigns, ...localOnlyCampaigns]),
+        error: null,
+        meta: { page, perPage, total: count ?? localCampaigns.length }
+      })
     }
 
     return NextResponse.json({
@@ -407,7 +451,8 @@ export async function GET() {
         ...campaign,
         status: normalizeCampaignStatus(campaign.status)
       }))),
-      error: null
+      error: null,
+      meta: { page, perPage, total: count ?? localCampaigns.length }
     })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
@@ -416,14 +461,17 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const body = await req.json()
 
     if (!body?.name) {
       return NextResponse.json({ data: null, error: 'Campaign name is required' }, { status: 400 })
     }
 
-    const organizationId = body.organization_id || body.organizationId || null
-    const createdBy = body.created_by || body.createdBy || req.headers.get('x-user-id') || null
+    const organizationId = body.organization_id || body.organizationId || auth.organizationId || null
+    const createdBy = auth.userId
     const sendingEmail = normalizeEmail(body.sending_email)
     const schedule = body.campaign_schedule?.schedules?.[0] || {}
     const sequenceSteps = normalizeSequenceSteps(body.sequences)

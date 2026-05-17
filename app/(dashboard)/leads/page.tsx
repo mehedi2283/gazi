@@ -37,8 +37,10 @@ function SourceBadge({ source }: { source: string }) {
 }
 
 export default function LeadsPage() {
-  const { data: campaigns, isLoading: campaignsLoading } = useCampaigns()
-  const { data: leads, isLoading: leadsLoading, error: leadsError } = useLeads()
+  const [page, setPage] = useState(1)
+  const perPage = 10
+  const { data: campaigns, isLoading: campaignsLoading } = useCampaigns(1, 100)
+  const { data: leads, meta, isLoading: leadsLoading, error: leadsError } = useLeads(undefined, page, perPage)
 
   const campaignNameById = useMemo(() => {
     return new Map<string, string>((campaigns || []).map((campaign: any) => [String(campaign.id), String(campaign.name)]))
@@ -46,15 +48,9 @@ export default function LeadsPage() {
 
   const loading = campaignsLoading || leadsLoading
 
-  const [page, setPage] = useState(1)
-  const perPage = 10
-  const totalLeads = leads?.length || 0
+  const totalLeads = meta?.total ?? leads?.length ?? 0
   const totalPages = Math.max(1, Math.ceil(totalLeads / perPage))
-  const paginatedLeads = useMemo(() => {
-    if (!leads) return []
-    const start = (page - 1) * perPage
-    return leads.slice(start, start + perPage)
-  }, [leads, page])
+  const paginatedLeads = leads || []
 
   return (
     <div className="space-y-6">

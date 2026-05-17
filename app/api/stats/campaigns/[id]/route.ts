@@ -1,15 +1,24 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../../lib/supabase/server'
+import { isAuthResponse, requireApiAuth } from '../../../../../lib/api/auth'
 
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
-    const [campaignRes, leadsRes, statsRes] = await Promise.all([
-      supabase.from('campaigns').select('*').eq('id', params.id).single(),
-      supabase.from('leads').select('id, status, lead_score, email_open_count, email_reply_count, email_click_count, created_at').eq('campaign_id', params.id),
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
+    let campaignQuery = supabase.from('campaigns').select('*').eq('id', params.id)
+    campaignQuery = auth.organizationId ? campaignQuery.eq('organization_id', auth.organizationId) : campaignQuery.eq('created_by', auth.userId)
+
+    const campaignRes = await campaignQuery.single()
+
+    if (campaignRes.error) return NextResponse.json({ data: null, error: campaignRes.error.message })
+
+    const [leadsRes, statsRes] = await Promise.all([
+      supabase.from('leads').select('id, status, lead_score, email_open_count, email_reply_count, email_click_count, created_at').contains('campaign_ids', [params.id]).limit(5000),
       supabase.from('campaign_stats').select('*').eq('campaign_id', params.id).order('date', { ascending: true })
     ])
 
-    if (campaignRes.error) return NextResponse.json({ data: null, error: campaignRes.error.message })
     if (leadsRes.error) return NextResponse.json({ data: null, error: leadsRes.error.message })
     if (statsRes.error) return NextResponse.json({ data: null, error: statsRes.error.message })
 

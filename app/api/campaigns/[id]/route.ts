@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { deleteCampaign as deleteInstantlyCampaign, updateCampaign } from '../../../../lib/instantly/client'
 import supabase from '../../../../lib/supabase/server'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../../../lib/timezones'
+import { isAuthResponse, requireApiAuth } from '../../../../lib/api/auth'
 
 type NormalizedSequence = {
   step_number: number
@@ -108,9 +109,23 @@ function normalizeCampaignRow(campaign: any) {
   }
 }
 
+function applyCampaignScope(query: any, auth: { userId: string; organizationId: string | null }) {
+  if (auth.organizationId) {
+    return query.eq('organization_id', auth.organizationId)
+  }
+
+  return query.eq('created_by', auth.userId)
+}
+
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
-    const { data, error } = await supabase.from('campaigns').select('*').eq('id', params.id).single()
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
+    const { data, error } = await applyCampaignScope(
+      supabase.from('campaigns').select('*').eq('id', params.id),
+      auth
+    ).single()
     if (error) return NextResponse.json({ data: null, error: error.message })
 
     const { data: sequences, error: sequenceError } = await supabase
@@ -129,12 +144,16 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const body = await req.json()
 
     const { data: existingCampaign, error: existingError } = await supabase
       .from('campaigns')
       .select('*')
       .eq('id', params.id)
+      .match(auth.organizationId ? { organization_id: auth.organizationId } : { created_by: auth.userId })
       .single()
 
     if (existingError) return NextResponse.json({ data: null, error: existingError.message })
@@ -164,7 +183,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     }))
 
     const campaignUpdate = {
-      organization_id: body.organization_id || body.organizationId || existingCampaign?.organization_id || null,
+      organization_id: body.organization_id || body.organizationId || existingCampaign?.organization_id || auth.organizationId || null,
       name: body.name || existingCampaign?.name,
       daily_limit: Number(body.daily_limit ?? existingCampaign?.daily_limit ?? 50),
       email_gap: Number(body.email_gap ?? existingCampaign?.email_gap ?? 10),
@@ -210,7 +229,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       if (insertError) return NextResponse.json({ data: null, error: insertError.message })
     }
 
-    const { data, error } = await supabase.from('campaigns').update(campaignUpdate).eq('id', params.id).select()
+    const { data, error } = await applyCampaignScope(
+      supabase.from('campaigns').update(campaignUpdate).eq('id', params.id),
+      auth
+    ).select()
     if (error) return NextResponse.json({ data: null, error: error.message })
     return NextResponse.json({ data: { ...normalizeCampaignRow(data?.[0]), sequences: normalizedSequences }, error: null })
   } catch (err: any) {
@@ -220,11 +242,16 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
 export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   try {
-    const { data: existingCampaign, error: existingError } = await supabase
-      .from('campaigns')
-      .select('id, instantly_campaign_id')
-      .eq('id', params.id)
-      .single()
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
+    const { data: existingCampaign, error: existingError } = await applyCampaignScope(
+      supabase
+        .from('campaigns')
+        .select('id, instantly_campaign_id')
+        .eq('id', params.id),
+      auth
+    ).single()
 
     if (existingError) return NextResponse.json({ data: null, error: existingError.message })
 
@@ -269,7 +296,10 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     const { error: sequencesDeleteError } = await supabase.from('sequences').delete().eq('campaign_id', params.id)
     if (sequencesDeleteError) return NextResponse.json({ data: null, error: sequencesDeleteError.message })
 
-    const { data, error } = await supabase.from('campaigns').delete().eq('id', params.id).select()
+    const { data, error } = await applyCampaignScope(
+      supabase.from('campaigns').delete().eq('id', params.id),
+      auth
+    ).select()
     if (error) return NextResponse.json({ data: null, error: error.message })
     return NextResponse.json({ data: data?.[0], error: null })
   } catch (err: any) {

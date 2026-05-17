@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
@@ -38,9 +38,11 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
 }
 
 export default function CampaignsPage() {
-  const { data, isLoading, error } = useCampaigns()
-  const qc = useQueryClient()
   const [searchQuery, setSearchQuery] = useState('')
+  const [page, setPage] = useState(1)
+  const perPage = 10
+  const { data, meta, isLoading, error } = useCampaigns(page, perPage, searchQuery)
+  const qc = useQueryClient()
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
   const [deleteModalFor, setDeleteModalFor] = useState<any | null>(null)
@@ -58,25 +60,10 @@ export default function CampaignsPage() {
 
 
 
-  const filteredCampaigns = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase()
-    if (!query) return data || []
-
-    return (data || []).filter((campaign: any) => {
-      return [campaign.name, campaign.status, campaign.instantly_campaign_id, campaign.organization_id]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(query))
-    })
-  }, [data, searchQuery])
-
-  const [page, setPage] = useState(1)
-  const perPage = 10
-  const totalCampaigns = filteredCampaigns.length
+  const filteredCampaigns = data || []
+  const totalCampaigns = meta?.total ?? filteredCampaigns.length
   const totalPages = Math.max(1, Math.ceil(totalCampaigns / perPage))
-  const paginatedCampaigns = useMemo(() => {
-    const start = (page - 1) * perPage
-    return filteredCampaigns.slice(start, start + perPage)
-  }, [filteredCampaigns, page])
+  const paginatedCampaigns = filteredCampaigns
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -114,7 +101,7 @@ export default function CampaignsPage() {
               className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
               onClick={async () => {
                 try {
-                  const leadsResponse = await fetch(`/api/leads?campaign_id=${deleteModalFor.id}`)
+                  const leadsResponse = await fetch(`/api/leads?campaign_id=${deleteModalFor.id}&export=1`)
                   const leadsJson = await leadsResponse.json()
 
                   if (!leadsResponse.ok || leadsJson.error) {

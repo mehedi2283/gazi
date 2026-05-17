@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 import { searchPeople } from '../../../../lib/apollo/client'
 import { upsertLeadsWithCampaigns } from '../../../../lib/supabase/leads'
+import { isAuthResponse, requireApiAuth } from '../../../../lib/api/auth'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const body = await req.json()
     const filters = body.filters || {}
     const sender_info = body.sender_info || null
@@ -27,6 +31,7 @@ export async function POST(req: Request) {
       employees: p.organization?.employee_count || null,
       sender_info,
       campaign_id: body.campaign_id || null,
+      organization_id: auth.organizationId || null,
       source: 'apollo'
     }))
 

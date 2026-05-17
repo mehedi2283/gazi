@@ -1,15 +1,19 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 import { upsertLeadsWithCampaigns } from '../../../../lib/supabase/leads'
+import { isAuthResponse, requireApiAuth } from '../../../../lib/api/auth'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const body = await req.json()
     const { leads, campaign_id, organization_id, sender_info } = body
 
     // validate minimal shape
     const sanitized = (leads || []).map((l: any) => ({
-      organization_id: l.organization_id || organization_id || null,
+      organization_id: l.organization_id || organization_id || auth.organizationId || null,
       campaign_id: l.campaign_id || campaign_id || null,
       email: l.email,
       first_name: l.first_name,

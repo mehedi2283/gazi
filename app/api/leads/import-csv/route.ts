@@ -2,9 +2,13 @@ import { NextResponse } from 'next/server'
 import supabase from '../../../../lib/supabase/server'
 import Papa from 'papaparse'
 import { upsertLeadsWithCampaigns } from '../../../../lib/supabase/leads'
+import { isAuthResponse, requireApiAuth } from '../../../../lib/api/auth'
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const body = await req.json()
     const { csv, campaign_id, organization_id, sender_info } = body
     if (!csv) return NextResponse.json({ data: null, error: 'Missing csv payload' })
@@ -39,7 +43,7 @@ export async function POST(req: Request) {
     const mapped = rows.map((r: any) => {
       const nr = normalizeKeys(r)
       return {
-        organization_id: organization_id || null,
+        organization_id: organization_id || auth.organizationId || null,
         campaign_id: campaign_id || null,
         sender_info: sender_info || null,
         email: findByKeys(nr, ['Email'], 'Email'),

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import supabase from '../../../lib/supabase/server'
+import { isAuthResponse, requireApiAuth } from '../../../lib/api/auth'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -21,8 +22,11 @@ function formatEmailAccountError(error: any) {
   return error
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const { data, error } = await supabase
       .from('email_accounts')
       .select('id, email_address, account_name, provider')
@@ -40,6 +44,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const body = await req.json()
     const emailAddress = normalizeEmail(body?.email_address)
 
@@ -75,6 +82,9 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
     const { searchParams } = new URL(req.url)
     const id = searchParams.get('id')
     const emailAddress = normalizeEmail(searchParams.get('email_address'))

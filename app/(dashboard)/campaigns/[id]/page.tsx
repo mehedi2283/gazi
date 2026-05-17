@@ -10,7 +10,9 @@ import useLeads from '../../../../hooks/useLeads'
 import { TableRowSkeleton } from '../../../../components/ui/Skeleton'
 
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
-  const { data: leads, isLoading, error: leadsQueryError } = useLeads(params.id)
+  const [page, setPage] = useState(1)
+  const perPage = 10
+  const { data: leads, meta, isLoading, error: leadsQueryError } = useLeads(params.id, page, perPage)
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
   const [campaign, setCampaign] = useState<{ name: string } | null>(null)
   const [campaignLoadState, setCampaignLoadState] = useState<'loading' | 'ok' | 'error'>('loading')
@@ -87,13 +89,24 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     }, {})
   }
 
-  function handleExport() {
+  async function handleExport() {
     if (!campaignLeads.length) {
       toast.error('No leads to export yet')
       return
     }
 
-    const rows = campaignLeads.map((lead) => flattenLead(lead))
+    let rows = campaignLeads.map((lead) => flattenLead(lead))
+
+    try {
+      const response = await fetch(`/api/leads?campaign_id=${params.id}&export=1`)
+      const result = await response.json()
+      if (response.ok && Array.isArray(result?.data)) {
+        rows = result.data.map((lead: Record<string, any>) => flattenLead(lead))
+      }
+    } catch {
+      rows = campaignLeads.map((lead) => flattenLead(lead))
+    }
+
     const csv = Papa.unparse(rows)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -195,7 +208,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
             <div className="flex items-center gap-2 rounded-full bg-indigo-500/10 px-3 py-1 ring-1 ring-indigo-500/20">
               <div className="h-1.5 w-1.5 rounded-full bg-indigo-600 animate-pulse" />
               <span className="text-xs font-bold text-indigo-600">
-                {campaignLeads.length} Total
+                {meta?.total ?? campaignLeads.length} Total
               </span>
             </div>
           </div>
@@ -210,6 +223,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
             <p className="text-sm text-red-500 font-semibold">Unable to load campaign leads.</p>
           </div>
         ) : campaignLeads.length ? (
+          <>
           <div className="overflow-x-auto">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/50">
@@ -301,6 +315,33 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
               </tbody>
             </table>
           </div>
+          <div className="flex items-center justify-between border-t border-slate-100 px-6 py-3">
+            <span className="text-xs text-slate-400">
+              Showing {Math.min((page - 1) * perPage + 1, meta?.total ?? campaignLeads.length)}-{Math.min(page * perPage, meta?.total ?? campaignLeads.length)} of {meta?.total ?? campaignLeads.length}
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-30"
+              >
+                Previous
+              </button>
+              <span className="min-w-[60px] text-center text-xs font-medium text-slate-500">
+                Page {page} of {Math.max(1, Math.ceil((meta?.total ?? campaignLeads.length) / perPage))}
+              </span>
+              <button
+                type="button"
+                disabled={page >= Math.max(1, Math.ceil((meta?.total ?? campaignLeads.length) / perPage))}
+                onClick={() => setPage((p) => Math.min(Math.max(1, Math.ceil((meta?.total ?? campaignLeads.length) / perPage)), p + 1))}
+                className="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-30"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+          </>
         ) : (
           <div className="p-20 text-center">
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-50 border border-slate-200">

@@ -51,11 +51,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ data: null, error: error?.message || 'Unable to create account' }, { status: 400 })
     }
 
+    const { data: organization, error: organizationError } = await supabase
+      .from('organizations')
+      .insert({ name: `${fullName}'s organization` })
+      .select('id')
+      .single()
+
+    if (organizationError || !organization?.id) {
+      return NextResponse.json({ data: null, error: organizationError?.message || 'Account created, but organization could not be saved' }, { status: 500 })
+    }
+
     const { error: profileError } = await supabase
       .from('profiles')
       .upsert(
         {
           id: data.user.id,
+          organization_id: organization.id,
           full_name: fullName,
           role: 'member'
         },
