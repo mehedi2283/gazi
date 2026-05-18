@@ -519,6 +519,7 @@ export async function POST(req: Request) {
       to_time: toTime,
       target_lead_count: Number(body.target_lead_count ?? 0),
       report_email: body.report_email || null,
+      booking_calendar_link: body?.sender_info?.booking_calendar_link || body.booking_calendar_link || null,
       attachment_url: body.attachment_url || body?.sender_info?.attachment_url || null,
       signature: body.signature || body?.sender_info?.signature || null,
       signature_url: body.signature_url || body?.sender_info?.signature_url || null,
@@ -653,10 +654,11 @@ export async function POST(req: Request) {
       const { data: updatedRows, error: updateError } = await supabase
         .from('campaigns')
         .update({
-          instantly_campaign_id: instantlyCampaignId,
-          sending_days: sendingDays,
-          status: instantlyStatus,
-          updated_at: new Date().toISOString()
+            instantly_campaign_id: instantlyCampaignId,
+            sending_days: sendingDays,
+            status: instantlyStatus,
+            booking_calendar_link: body?.sender_info?.booking_calendar_link || body.booking_calendar_link || null,
+            updated_at: new Date().toISOString()
         })
         .eq('id', campaign.id)
         .select()

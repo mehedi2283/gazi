@@ -10,7 +10,7 @@ const inter = Inter({
 })
 
 export const metadata = {
-  title: 'LeadGen AI'
+  title: 'GaziAI Buyer Discovery'
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -18,6 +18,7 @@ function SourceBadge({ source }: { source: string }) {
   let bg = 'bg-blue-50'
   let border = 'border-blue-200'
   let text = 'text-blue-700'
+  let label = source || 'manual'
 
   if (s === 'import') {
     bg = 'bg-emerald-50'
@@ -27,11 +28,12 @@ function SourceBadge({ source }: { source: string }) {
     bg = 'bg-indigo-50'
     border = 'border-indigo-200'
     text = 'text-indigo-700'
+    label = 'External'
   }
 
   return (
     <span className={`inline-flex rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${bg} ${border} ${text}`}>
-      {source || 'manual'}
+      {label}
     </span>
   )
 }

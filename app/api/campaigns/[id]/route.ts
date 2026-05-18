@@ -198,6 +198,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       attachment_url: body.attachment_url ?? existingCampaign?.attachment_url ?? null,
       signature: body.signature ?? existingCampaign?.signature ?? null,
       signature_url: body.signature_url ?? body?.sender_info?.signature_url ?? existingCampaign?.signature_url ?? null,
+      booking_calendar_link: body.booking_calendar_link ?? body?.sender_info?.booking_calendar_link ?? existingCampaign?.booking_calendar_link ?? null,
       updated_at: new Date().toISOString()
     }
 

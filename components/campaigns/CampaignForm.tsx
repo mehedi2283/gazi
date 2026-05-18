@@ -81,7 +81,7 @@ type CampaignFormProps = {
 }
 
 const LEAD_MODE_OPTIONS: Array<{ value: LeadCreationMode; label: string; description: string }> = [
-  { value: 'apollo', label: 'Apollo', description: 'Send country and product data to the webhook' },
+  { value: 'apollo', label: 'External', description: 'Send country and product data to GaziAI Buyer Discovery' },
   { value: 'import', label: 'Import', description: 'Upload a CSV or spreadsheet of leads' }
 ]
 
@@ -571,7 +571,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     }
 
     if (leadMode === 'apollo' && (!apolloLead.market_name.trim() || !apolloLead.product_name.trim())) {
-      setError('Country and product name are required for Apollo lead creation')
+      setError('Country and product name are required for External lead creation')
       setSubmitting(false)
       return
     }
@@ -689,7 +689,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <div className="grid gap-6 md:grid-cols-2">
                 <label className="space-y-2 md:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">Campaign Name</span>
-                  <input name="name" value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" placeholder="Apollo Outreach Campaign 1" />
+                  <input name="name" value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" placeholder="GaziAI Buyer Discovery 1" />
                 </label>
                 
                 <label className="space-y-2">

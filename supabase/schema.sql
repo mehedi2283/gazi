@@ -48,6 +48,7 @@ create table if not exists campaigns (
   from_time text default '09:00',
   to_time text default '17:00',
   sending_days jsonb default '{"monday":true,"tuesday":true,"wednesday":true,"thursday":true,"friday":true,"saturday":false,"sunday":false}'::jsonb,
+  booking_calendar_link text,
   report_email text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()

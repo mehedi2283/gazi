@@ -47,12 +47,14 @@ export default function Sidebar() {
 
   return (
     <div className="relative z-10 flex h-full flex-col">
-      <div className="mb-8 flex items-center gap-2 px-1">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/20">
-          <Zap className="h-5 w-5 text-white" aria-hidden />
+      <div className="mb-8 flex flex-col items-center gap-1 px-1 text-center">
+        <div className="w-full">
+          <div className="h-16 w-full flex items-center justify-center overflow-hidden px-2">
+            <img src="/Final_Logo_GazI.svg" alt="Gazi logo" className="w-full h-full object-contain" />
+          </div>
         </div>
         <div>
-          <div className="text-lg font-semibold tracking-tight text-gradient-accent">LeadGen AI</div>
+          <div className="text-lg font-semibold tracking-tight text-gradient-accent">GaziAI Buyer Discovery</div>
           <p className="text-[11px] font-medium uppercase tracking-widest text-zinc-500">Outbound</p>
         </div>
       </div>
