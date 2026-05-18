@@ -13,14 +13,14 @@ export default function Modal({ open, title, children, onClose }: {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden
       />
 
-      <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl border border-white/[0.1] bg-zinc-950/90 p-6 shadow-glass backdrop-blur-2xl">
-        {title ? <h3 className="mb-4 text-lg font-semibold text-zinc-50">{title}</h3> : null}
-        <div className="text-zinc-300">{children}</div>
+      <div className="relative z-10 max-h-[90vh] w-full max-w-5xl overflow-auto rounded-xl border border-slate-100 bg-white p-6 shadow-glass">
+        {title ? <h3 className="mb-4 text-lg font-semibold text-slate-800">{title}</h3> : null}
+        <div>{children}</div>
       </div>
     </div>
   )

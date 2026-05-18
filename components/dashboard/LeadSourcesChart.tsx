@@ -3,6 +3,7 @@ import React from 'react'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { GlassCard } from '../ui/GlassCard'
 import { chartTooltipProps } from '@/lib/chart-theme'
+import ChartTooltip from '../ui/ChartTooltip'
 
 const SOURCE_COLORS: Record<string, string> = {
   import: '#10b981', // Emerald
@@ -18,6 +19,8 @@ const SOURCE_LABELS: Record<string, string> = {
 const DEFAULT_COLORS = ['#6366f1', '#8b5cf6', '#a855f7', '#0ea5e9', '#10b981']
 
 export default function LeadSourcesChart({ data }: { data: Record<string, number> }) {
+  const getSourceLabel = (value: string) => SOURCE_LABELS[value.toLowerCase()] || value
+
   const rows = Object.entries(data || {}).map(([name, value]) => ({ key: name, name: getSourceLabel(name), value }))
   if (!rows.length) {
     return (
@@ -32,7 +35,6 @@ export default function LeadSourcesChart({ data }: { data: Record<string, number
     return SOURCE_COLORS[k] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]
   }
 
-  const getSourceLabel = (value: string) => SOURCE_LABELS[value.toLowerCase()] || value
 
   return (
     <GlassCard hover={false} className="min-h-[320px] p-5">
@@ -48,8 +50,13 @@ export default function LeadSourcesChart({ data }: { data: Record<string, number
                 <Cell key={`cell-${index}`} fill={getCellColor(entry.key, index)} stroke="#ffffff" strokeWidth={2} />
               ))}
             </Pie>
-            <Tooltip {...chartTooltipProps} />
-            <Legend formatter={(value) => <span className="text-slate-600 font-medium text-xs capitalize">{getSourceLabel(String(value))}</span>} />
+            <Tooltip content={<ChartTooltip />} />
+            <Legend formatter={(value: any, entry: any) => (
+              <span className="text-slate-600 font-medium text-xs capitalize" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 10, height: 10, background: entry?.color || '#cbd5e1', borderRadius: 4, display: 'inline-block' }} />
+                <span>{getSourceLabel(String(value))}</span>
+              </span>
+            )} />
           </PieChart>
         </ResponsiveContainer>
       </div>

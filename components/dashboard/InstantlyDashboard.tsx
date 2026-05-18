@@ -14,6 +14,7 @@ import {
   YAxis,
 } from 'recharts'
 import { chartAxisTick, chartGridStroke, chartTooltipProps } from '@/lib/chart-theme'
+import ChartTooltip from '../ui/ChartTooltip'
 
 interface KPIs {
   emailsSent: number
@@ -180,7 +181,6 @@ function ConcentricRingChart({
           style={{ minWidth: 100 }}
         >
           <div className="flex items-center gap-2">
-            <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: data[hovered].fill }} />
             <span className="text-sm font-semibold text-slate-800">{data[hovered].name}</span>
           </div>
           <div className="mt-1 text-lg font-bold text-slate-900">{data[hovered].value.toLocaleString()}</div>
@@ -515,7 +515,7 @@ export default function InstantlyDashboard() {
                     />
                     <YAxis tick={chartAxisTick} axisLine={false} tickLine={false} width={40} />
                     <Tooltip
-                      {...chartTooltipProps}
+                      content={<ChartTooltip />}
                       labelFormatter={(value) => `Date: ${formatDateLabel(String(value))}`}
                       formatter={formatTooltipValue}
                     />

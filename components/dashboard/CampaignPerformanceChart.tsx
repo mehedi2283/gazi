@@ -3,6 +3,7 @@ import React from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { GlassCard } from '../ui/GlassCard'
 import { chartAxisTick, chartGridStroke, chartTooltipProps } from '@/lib/chart-theme'
+import ChartTooltip from '../ui/ChartTooltip'
 
 type Point = {
   date: string
@@ -34,8 +35,13 @@ export default function CampaignPerformanceChart({ data }: { data: Point[] }) {
             <CartesianGrid strokeDasharray="3 3" stroke={chartGridStroke} vertical={false} />
             <XAxis dataKey="date" tick={chartAxisTick} axisLine={false} tickLine={false} />
             <YAxis tick={chartAxisTick} axisLine={false} tickLine={false} width={36} />
-            <Tooltip {...chartTooltipProps} />
-            <Legend formatter={(value) => <span className="text-slate-600 font-medium text-xs capitalize">{value}</span>} />
+            <Tooltip content={<ChartTooltip />} />
+            <Legend formatter={(value: any, entry: any) => (
+              <span className="text-slate-600 font-medium text-xs capitalize" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 10, height: 10, background: entry?.color || '#cbd5e1', borderRadius: 4, display: 'inline-block' }} />
+                <span>{value}</span>
+              </span>
+            )} />
             <Line type="monotone" dataKey="emailsSent" name="Sent" stroke="#6366f1" strokeWidth={2} dot={false} />
             <Line type="monotone" dataKey="replies" name="Replies" stroke="#ec4899" strokeWidth={2} dot={false} />
           </LineChart>

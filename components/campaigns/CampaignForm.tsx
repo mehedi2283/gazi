@@ -110,6 +110,33 @@ function getBodyVariable(stepNumber: number) {
   return `{{personalization_${stepNumber}}}`
 }
 
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, index) => {
+  const hours24 = Math.floor(index / 2)
+  const minutes = index % 2 === 0 ? '00' : '30'
+  const period = hours24 >= 12 ? 'PM' : 'AM'
+  const hours12 = ((hours24 + 11) % 12) + 1
+
+  return {
+    value: `${String(hours24).padStart(2, '0')}:${minutes}`,
+    label: `${hours12}:${minutes} ${period}`
+  }
+})
+
+// Add 11:59 PM as a special option at the end
+const TIME_OPTIONS_WITH_2359 = [...TIME_OPTIONS, { value: '23:59', label: '11:59 PM' }]
+
+function formatTimeLabel(value: string) {
+  const match = /^([0-2]\d):([0-5]\d)$/.exec(value)
+  if (!match) return value
+
+  const hours24 = Number(match[1])
+  const minutes = match[2]
+  const period = hours24 >= 12 ? 'PM' : 'AM'
+  const hours12 = ((hours24 + 11) % 12) + 1
+
+  return `${hours12}:${minutes} ${period}`
+}
+
 function getSequenceError(steps: SequenceStep[]) {
   if (steps[0]?.delay_days !== 0) {
     return 'Step 1 day must be 0.'
@@ -163,7 +190,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [fromTime, setFromTime] = useState(initialData?.from_time || '09:00')
   const [toTime, setToTime] = useState(initialData?.to_time || '17:00')
   const [stopOnReply, setStopOnReply] = useState(initialData?.stop_on_reply ?? true)
-  const [openTracking, setOpenTracking] = useState(initialData?.open_tracking ?? false)
+  const [openTracking, setOpenTracking] = useState(initialData?.open_tracking ?? true)
   const [linkTracking, setLinkTracking] = useState(initialData?.link_tracking ?? true)
   const [leadMode, setLeadMode] = useState<LeadCreationMode>('apollo')
   const [leadRows, setLeadRows] = useState<Record<string, any>[]>([])
@@ -197,8 +224,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [uploadingSignature, setUploadingSignature] = useState(false)
   const [countryOpen, setCountryOpen] = useState(false)
   const [countryHighlight, setCountryHighlight] = useState(0)
+  const [timePickerOpen, setTimePickerOpen] = useState<null | 'from' | 'to'>(null)
   const countryRef = React.useRef<HTMLDivElement | null>(null)
   const emailPickerRef = React.useRef<HTMLDivElement | null>(null)
+  const timePickerRef = React.useRef<HTMLDivElement | null>(null)
   const [days, setDays] = useState({
     monday: initialData?.sending_days?.monday ?? initialData?.days?.monday ?? true,
     tuesday: initialData?.sending_days?.tuesday ?? initialData?.days?.tuesday ?? true,
@@ -307,7 +336,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     setFromTime(initialData?.from_time || '09:00')
     setToTime(initialData?.to_time || '17:00')
     setStopOnReply(initialData?.stop_on_reply ?? true)
-    setOpenTracking(initialData?.open_tracking ?? false)
+    setOpenTracking(initialData?.open_tracking ?? true)
     setLinkTracking(initialData?.link_tracking ?? true)
     setDays({
       monday: initialData?.sending_days?.monday ?? initialData?.days?.monday ?? true,
@@ -367,6 +396,18 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     window.addEventListener('mousedown', handleOutsideClick)
     return () => window.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  useEffect(() => {
+    function handleTimePickerOutsideClick(event: MouseEvent) {
+      if (!timePickerRef.current) return
+      if (!timePickerRef.current.contains(event.target as Node)) {
+        setTimePickerOpen(null)
+      }
+    }
+
+    window.addEventListener('mousedown', handleTimePickerOutsideClick)
+    return () => window.removeEventListener('mousedown', handleTimePickerOutsideClick)
   }, [])
 
   function addStep() {
@@ -744,15 +785,75 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                   </select>
                 </label>
                 
-                <label className="space-y-2 md:col-span-1">
-                  <span className="text-sm font-semibold text-slate-700">From Time</span>
-                  <input type="time" name="from_time" className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={fromTime} onChange={(event) => setFromTime(event.target.value)} />
-                </label>
-                
-                <label className="space-y-2 md:col-span-1">
-                  <span className="text-sm font-semibold text-slate-700">To Time</span>
-                  <input type="time" name="to_time" className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={toTime} onChange={(event) => setToTime(event.target.value)} />
-                </label>
+                <div ref={timePickerRef} className="md:col-span-2 grid gap-6 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-700">From Time</span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setTimePickerOpen((current) => (current === 'from' ? null : 'from'))}
+                        className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-slate-850 shadow-sm outline-none transition hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 font-medium"
+                      >
+                        <span>{formatTimeLabel(fromTime)}</span>
+                        <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                      </button>
+
+                      {timePickerOpen === 'from' ? (
+                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+                          <div className="max-h-64 overflow-auto py-1">
+                            {TIME_OPTIONS_WITH_2359.filter(o => o.value !== '00:00').map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => {
+                                  setFromTime(option.value)
+                                  setTimePickerOpen(null)
+                                }}
+                                className={`flex w-full items-center px-4 py-2 text-left text-sm transition hover:bg-slate-50 ${fromTime === option.value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700'}`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <span className="text-sm font-semibold text-slate-700">To Time</span>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setTimePickerOpen((current) => (current === 'to' ? null : 'to'))}
+                        className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-slate-850 shadow-sm outline-none transition hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 font-medium"
+                      >
+                        <span>{formatTimeLabel(toTime)}</span>
+                        <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                      </button>
+
+                      {timePickerOpen === 'to' ? (
+                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+                          <div className="max-h-64 overflow-auto py-1">
+                            {TIME_OPTIONS_WITH_2359.filter(o => o.value !== '00:00' && o.value !== '00:30').map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() => {
+                                  setToTime(option.value)
+                                  setTimePickerOpen(null)
+                                }}
+                                className={`flex w-full items-center px-4 py-2 text-left text-sm transition hover:bg-slate-50 ${toTime === option.value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700'}`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="space-y-4">
