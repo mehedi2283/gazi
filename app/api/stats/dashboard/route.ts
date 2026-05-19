@@ -110,8 +110,8 @@ export async function GET(req: Request) {
     const totalLeads = totalLeadsRes.count || 0
     const activeLeads = activeLeadsRes.count || 0
     const activeCampaigns = campaigns.filter((campaign: any) => campaign.status === 'active').length
-    const totalOpens = campaigns.reduce((sum: number, campaign: any) => sum + (campaign.open_count || 0), 0)
-    const totalReplies = campaigns.reduce((sum: number, campaign: any) => sum + (campaign.reply_count || 0), 0)
+    const totalOpens = stats.reduce((sum: number, stat: any) => sum + (stat.opens || 0), 0)
+    const totalReplies = stats.reduce((sum: number, stat: any) => sum + (stat.replies || 0), 0)
     const replyRate = safeRate(totalReplies, totalLeads)
     const openRate = safeRate(totalOpens, totalLeads)
 

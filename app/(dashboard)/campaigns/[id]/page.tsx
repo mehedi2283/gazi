@@ -14,6 +14,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   const perPage = 10
   const { data: leads, meta, isLoading, error: leadsQueryError } = useLeads(params.id, page, perPage)
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
+  const [threads, setThreads] = useState<Record<string, any>>({})
   const [campaign, setCampaign] = useState<{ name: string } | null>(null)
   const [campaignLoadState, setCampaignLoadState] = useState<'loading' | 'ok' | 'error'>('loading')
   const [campaignLoadError, setCampaignLoadError] = useState<string | null>(null)
@@ -153,6 +154,164 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     )
   }
 
+  function renderConversation(lead: Record<string, any>) {
+    const leadIdKey = String(lead.id || lead.email || '')
+    const thread = threads[leadIdKey]
+
+    if (!thread) {
+      return <p className="text-sm text-slate-400">Loading messages or no messages yet.</p>
+    }
+
+    const safeParseMessages = (rawMessages: any) => {
+      if (Array.isArray(rawMessages)) return rawMessages
+      if (typeof rawMessages !== 'string') return []
+
+      const tryParse = (s: string) => {
+        try { return JSON.parse(s) } catch { return null }
+      }
+
+      // 1) direct parse
+      let parsed = tryParse(rawMessages)
+      if (Array.isArray(parsed)) return parsed
+
+      // 2) strip surrounding quotes
+      if (parsed == null && rawMessages.startsWith('"') && rawMessages.endsWith('"')) {
+        parsed = tryParse(rawMessages.slice(1, -1))
+        if (Array.isArray(parsed)) return parsed
+      }
+
+      // 3) escape newlines/tabs
+      const escapeControls = (s: string) => s.replace(/\r\n|\r|\n/g, '\\n').replace(/\t/g, '\\t')
+      parsed = tryParse(escapeControls(rawMessages))
+      if (Array.isArray(parsed)) return parsed
+
+      // 4) escape all C0 control chars
+      const escapeAll = (s: string) => s.replace(/[\u0000-\u001F]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4,'0')}`)
+      parsed = tryParse(escapeAll(rawMessages))
+      if (Array.isArray(parsed)) return parsed
+
+      // 5) extract first array substring
+      const first = rawMessages.indexOf('[')
+      const last = rawMessages.lastIndexOf(']')
+      if (first !== -1 && last !== -1 && last > first) {
+        const sub = rawMessages.slice(first, last + 1)
+        parsed = tryParse(sub) || tryParse(escapeControls(sub)) || tryParse(escapeAll(sub))
+        if (Array.isArray(parsed)) return parsed
+      }
+
+      return []
+    }
+
+    const messages = safeParseMessages(thread.messages).slice().sort((a: any, b: any) => new Date(a.timestamp || a.created_at || 0).getTime() - new Date(b.timestamp || b.created_at || 0).getTime())
+
+    const sanitizeBody = (text: string | undefined) => {
+      if (!text || typeof text !== 'string') return '—'
+
+      // Preserve angle-bracketed segments (e.g., <https://...>) so URLs are not broken
+      const placeholders: string[] = []
+      const protectedText = text.replace(/<[^>]*>/g, (m) => {
+        const idx = placeholders.length
+        placeholders.push(m)
+        return `__ANG${idx}__`
+      })
+
+      // Replace sequences of > (common mail-quote markers) with newlines
+      let cleaned = protectedText.replace(/>+\s*/g, '\n')
+
+      // Collapse multiple blank lines and trim
+      cleaned = cleaned.replace(/\n{2,}/g, '\n\n').trim()
+
+      // Restore protected placeholders
+      cleaned = cleaned.replace(/__ANG(\d+)__/g, (_, n) => placeholders[Number(n)] || '')
+
+      return cleaned
+    }
+
+    return (
+      <div className="flex flex-col gap-3">
+        {messages.map((msg: any) => {
+          const isSent = (msg.type || msg.side) === 'sent' || msg.side === 'right'
+          const label = msg.type === 'reply' || msg.side === 'left' ? 'Reply' : 'Sent'
+          const body = sanitizeBody(msg.body || msg.reply_text || msg.lead_reply || '')
+
+          return (
+            <div key={msg.id || msg.reply_event_id || Math.random()} className={`flex ${isSent ? 'justify-end' : 'justify-start'}`}>
+              <div className={`${isSent ? 'bg-indigo-50 text-indigo-900' : 'bg-white border border-slate-200 text-slate-700'} max-w-[70%] rounded-lg p-3 text-sm`}> 
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-xs font-semibold text-slate-500">{msg.subject || ''}</div>
+                  <div className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isSent ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{label}</div>
+                </div>
+                <div className="whitespace-pre-wrap break-words text-sm leading-snug">{body}</div>
+                <div className="text-[11px] text-slate-400 mt-2">{msg.timestamp ? new Date(msg.timestamp).toLocaleString() : ''}</div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+  async function loadThreadForLead(lead: Record<string, any>) {
+    const leadIdKey = String(lead.id || lead.email || '')
+    if (threads[leadIdKey]) return
+    try {
+      const url = `/api/threads?lead_id=${encodeURIComponent(lead.id || '')}&campaign_id=${encodeURIComponent(params.id)}`
+      const res = await fetch(url)
+      const json = await res.json()
+      if (res.ok && json?.data) {
+        const row = json.data
+        const normalizedMessages = (() => {
+          const rawMessages = row.messages
+          if (Array.isArray(rawMessages)) return rawMessages
+          if (typeof rawMessages !== 'string') return []
+
+          const tryParse = (s: string) => {
+            try { return JSON.parse(s) } catch { return null }
+          }
+
+          let parsed = tryParse(rawMessages)
+          if (Array.isArray(parsed)) return parsed
+
+          if (parsed == null && rawMessages.startsWith('"') && rawMessages.endsWith('"')) {
+            parsed = tryParse(rawMessages.slice(1, -1))
+            if (Array.isArray(parsed)) return parsed
+          }
+
+          const escapeControls = (s: string) => s.replace(/\r\n|\r|\n/g, '\\n').replace(/\t/g, '\\t')
+          parsed = tryParse(escapeControls(rawMessages))
+          if (Array.isArray(parsed)) return parsed
+
+          const escapeAll = (s: string) => s.replace(/[\u0000-\u001F]/g, (c) => `\\u${c.charCodeAt(0).toString(16).padStart(4,'0')}`)
+          parsed = tryParse(escapeAll(rawMessages))
+          if (Array.isArray(parsed)) return parsed
+
+          const first = rawMessages.indexOf('[')
+          const last = rawMessages.lastIndexOf(']')
+          if (first !== -1 && last !== -1 && last > first) {
+            const sub = rawMessages.slice(first, last + 1)
+            parsed = tryParse(sub) || tryParse(escapeControls(sub)) || tryParse(escapeAll(sub))
+            if (Array.isArray(parsed)) return parsed
+          }
+
+          return []
+        })()
+        setThreads((prev) => ({ ...prev, [leadIdKey]: { ...row, messages: normalizedMessages } }))
+      } else {
+        setThreads((prev) => ({ ...prev, [leadIdKey]: null }))
+      }
+    } catch (err) {
+      setThreads((prev) => ({ ...prev, [leadIdKey]: null }))
+    }
+  }
+
+  function handleToggleLead(lead: Record<string, any>, leadId: string) {
+    setExpandedLeadId((current) => {
+      const next = current === leadId ? null : leadId
+      if (next) loadThreadForLead(lead)
+      return next
+    })
+  }
+
   const displayName =
     campaignLoadState === 'loading'
       ? null
@@ -260,7 +419,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                         <td className="px-6 py-5 text-right">
                           <button
                             type="button"
-                            onClick={() => setExpandedLeadId((current) => (current === leadId ? null : leadId))}
+                            onClick={() => handleToggleLead(lead, leadId)}
                             className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
                               isExpanded 
                                 ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500/20' 
@@ -286,10 +445,10 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                             >
                               <div className="my-4 rounded-xl border border-slate-200 bg-slate-50/50 p-6 shadow-sm">
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                                  <div className="space-y-4">
-                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">Lead Metadata</h4>
-                                    <div className="space-y-1">{renderLeadDetails(lead)}</div>
-                                  </div>
+                                          <div className="space-y-4">
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">Lead Metadata</h4>
+                                            <div className="space-y-1">{renderLeadDetails(lead)}</div>
+                                          </div>
                                   <div className="rounded-lg bg-white p-4 border border-slate-200 shadow-sm">
                                     <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 mb-4">Quick Context</h4>
                                     <div className="space-y-3">
@@ -301,6 +460,10 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                                         <label className="text-[10px] text-slate-400 block uppercase font-bold">Lead Ref</label>
                                         <code className="text-xs text-slate-600 font-medium">{lead.id || 'N/A'}</code>
                                       </div>
+                                    </div>
+                                    <div className="mt-4">
+                                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 mb-2">Conversation</h4>
+                                      {renderConversation(lead)}
                                     </div>
                                   </div>
                                 </div>
