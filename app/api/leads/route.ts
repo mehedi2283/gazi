@@ -53,6 +53,26 @@ export async function GET(req: Request) {
       })
     }
 
+    // Search across name, company and title
+    const search = searchParams.get('search')
+    if (search && typeof search === 'string' && search.trim().length > 0) {
+      const q = `%${search.trim().replace(/%/g, '\\%')}%`
+      // search first_name, last_name, company_name, title, email
+      query = query.or(`first_name.ilike.${q},last_name.ilike.${q},company_name.ilike.${q},title.ilike.${q},email.ilike.${q}`)
+    }
+
+    // Filter by lead_score (cold/warm/hot)
+    const leadScore = searchParams.get('lead_score')
+    if (leadScore) {
+      query = query.eq('lead_score', leadScore)
+    }
+
+    // Filter by source
+    const source = searchParams.get('source')
+    if (source) {
+      query = query.eq('source', source)
+    }
+
     if (exportAll) {
       query = query.limit(50000)
     } else {

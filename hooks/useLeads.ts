@@ -2,17 +2,26 @@
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 
-export function useLeads(campaignId?: string, page = 1, perPage = 25) {
+export function useLeads(
+  campaignId?: string,
+  page = 1,
+  perPage = 25,
+  options?: { search?: string; leadScore?: string; source?: string }
+) {
   const query = useQuery({
-    queryKey: ['leads', campaignId || 'all', page, perPage],
+    queryKey: ['leads', campaignId || 'all', page, perPage, options?.search || '', options?.leadScore || '', options?.source || ''],
     queryFn: async () => {
-      const r = await axios.get('/api/leads', {
-        params: {
-          ...(campaignId ? { campaign_id: campaignId } : {}),
-          page,
-          per_page: perPage
-        }
-      })
+      const params: Record<string, any> = {
+        ...(campaignId ? { campaign_id: campaignId } : {}),
+        page,
+        per_page: perPage
+      }
+
+      if (options?.search) params.search = options.search
+      if (options?.leadScore) params.lead_score = options.leadScore
+      if (options?.source) params.source = options.source
+
+      const r = await axios.get('/api/leads', { params })
       return {
         data: r.data.data || [],
         meta: r.data.meta || { page, perPage, total: r.data.data?.length || 0 }

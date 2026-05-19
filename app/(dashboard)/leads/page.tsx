@@ -69,8 +69,15 @@ function LeadScoreBadge({ score }: { score: string | null | undefined }) {
 export default function LeadsPage() {
   const [page, setPage] = useState(1)
   const perPage = 10
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterScore, setFilterScore] = useState('')
+  const [filterSource, setFilterSource] = useState('')
   const { data: campaigns, isLoading: campaignsLoading } = useCampaigns(1, 100)
-  const { data: leads, meta, isLoading: leadsLoading, error: leadsError } = useLeads(undefined, page, perPage)
+  const { data: leads, meta, isLoading: leadsLoading, error: leadsError } = useLeads(undefined, page, perPage, {
+    search: searchTerm,
+    leadScore: filterScore,
+    source: filterSource
+  })
 
   const campaignNameById = useMemo(() => {
     return new Map<string, string>((campaigns || []).map((campaign: any) => [String(campaign.id), String(campaign.name)]))
@@ -89,6 +96,34 @@ export default function LeadsPage() {
           <div>
             <h2 className="text-base font-semibold text-slate-800">All leads</h2>
             <p className="text-sm text-slate-400">{leads?.length || 0} leads in Supabase</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              value={searchTerm}
+              onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
+              placeholder="Search name, company, title..."
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            />
+            <select
+              value={filterScore}
+              onChange={(e) => { setFilterScore(e.target.value); setPage(1) }}
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            >
+              <option value="">All scores</option>
+              <option value="cold">Cold</option>
+              <option value="warm">Warm</option>
+              <option value="hot">Hot</option>
+            </select>
+            <select
+              value={filterSource}
+              onChange={(e) => { setFilterSource(e.target.value); setPage(1) }}
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            >
+              <option value="">All sources</option>
+              <option value="manual">Manual</option>
+              <option value="import">Import</option>
+              <option value="apollo">External</option>
+            </select>
           </div>
         </div>
 
