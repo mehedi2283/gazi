@@ -42,7 +42,7 @@ export async function GET(req: Request) {
       if (campaignError) return NextResponse.json({ data: null, error: campaignError.message }, { status: 500 })
       if (!campaign) return NextResponse.json({ data: null, error: 'Campaign not found' }, { status: 404 })
 
-      query = query.contains('campaign_ids', [campaignId])
+      query = query.or(`campaign_id.eq.${campaignId},campaign_ids.cs.{${campaignId}}`)
     } else if (auth.organizationId) {
       query = query.eq('organization_id', auth.organizationId)
     } else {

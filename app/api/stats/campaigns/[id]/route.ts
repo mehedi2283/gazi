@@ -15,7 +15,11 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     if (campaignRes.error) return NextResponse.json({ data: null, error: campaignRes.error.message })
 
     const [leadsRes, statsRes] = await Promise.all([
-      supabase.from('leads').select('id, status, lead_score, email_open_count, email_reply_count, email_click_count, created_at').contains('campaign_ids', [params.id]).limit(5000),
+      supabase
+        .from('leads')
+        .select('id, status, lead_score, email_open_count, email_reply_count, email_click_count, created_at')
+        .or(`campaign_id.eq.${params.id},campaign_ids.cs.{${params.id}}`)
+        .limit(5000),
       supabase.from('campaign_stats').select('*').eq('campaign_id', params.id).order('date', { ascending: true })
     ])
 

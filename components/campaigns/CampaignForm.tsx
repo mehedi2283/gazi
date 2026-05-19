@@ -224,9 +224,12 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [uploadingSignature, setUploadingSignature] = useState(false)
   const [countryOpen, setCountryOpen] = useState(false)
   const [countryHighlight, setCountryHighlight] = useState(0)
+  const [timezoneOpen, setTimezoneOpen] = useState(false)
+  const [timezoneSearch, setTimezoneSearch] = useState('')
   const [timePickerOpen, setTimePickerOpen] = useState<null | 'from' | 'to'>(null)
   const countryRef = React.useRef<HTMLDivElement | null>(null)
   const emailPickerRef = React.useRef<HTMLDivElement | null>(null)
+  const timezoneRef = React.useRef<HTMLDivElement | null>(null)
   const timePickerRef = React.useRef<HTMLDivElement | null>(null)
   const [days, setDays] = useState({
     monday: initialData?.sending_days?.monday ?? initialData?.days?.monday ?? true,
@@ -373,6 +376,11 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     if (!query) return COUNTRY_OPTIONS
     return COUNTRY_OPTIONS.filter((country) => country.toLowerCase().includes(query))
   }, [apolloLead.market_name])
+  const filteredTimezones = useMemo(() => {
+    const query = timezoneSearch.trim().toLowerCase()
+    if (!query) return INSTANTLY_TIMEZONES
+    return INSTANTLY_TIMEZONES.filter((tz) => tz.toLowerCase().includes(query))
+  }, [timezoneSearch])
 
   useEffect(() => {
     function handleOutsideClick(event: MouseEvent) {
@@ -396,6 +404,18 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     window.addEventListener('mousedown', handleOutsideClick)
     return () => window.removeEventListener('mousedown', handleOutsideClick)
+  }, [])
+
+  useEffect(() => {
+    function handleTimezoneOutsideClick(event: MouseEvent) {
+      if (!timezoneRef.current) return
+      if (!timezoneRef.current.contains(event.target as Node)) {
+        setTimezoneOpen(false)
+      }
+    }
+
+    window.addEventListener('mousedown', handleTimezoneOutsideClick)
+    return () => window.removeEventListener('mousedown', handleTimezoneOutsideClick)
   }, [])
 
   useEffect(() => {
@@ -778,11 +798,53 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               <div className="grid gap-6 md:grid-cols-3">
                 <label className="space-y-2 md:col-span-3">
                   <span className="text-sm font-semibold text-slate-700">Timezone</span>
-                  <select name="timezone" className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={timezone} onChange={(event) => setTimezone(event.target.value)}>
-                    {INSTANTLY_TIMEZONES.map((tz) => (
-                      <option key={tz} value={tz}>{tz}</option>
-                    ))}
-                  </select>
+                  <div ref={timezoneRef} className="relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTimezoneOpen((current) => !current)
+                        setTimezoneSearch('')
+                      }}
+                      className="flex w-full cursor-pointer items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-slate-850 shadow-sm outline-none transition hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 font-medium"
+                    >
+                      <span className="truncate cursor-pointer">{timezone}</span>
+                      <ChevronDown className="h-4 w-4 cursor-pointer text-slate-400" aria-hidden="true" />
+                    </button>
+
+                    {timezoneOpen ? (
+                      <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+                        <div className="border-b border-slate-100 px-3 py-2">
+                          <input
+                            autoFocus
+                            value={timezoneSearch}
+                            onChange={(event) => setTimezoneSearch(event.target.value)}
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                            placeholder="Search timezone..."
+                          />
+                        </div>
+                        <div className="max-h-64 overflow-auto py-1">
+                          {filteredTimezones.length ? (
+                            filteredTimezones.map((tz) => (
+                              <button
+                                key={tz}
+                                type="button"
+                                onClick={() => {
+                                  setTimezone(tz)
+                                  setTimezoneOpen(false)
+                                  setTimezoneSearch('')
+                                }}
+                                className={`flex w-full items-center px-4 py-2 text-left text-sm transition hover:bg-slate-50 ${timezone === tz ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700'}`}
+                              >
+                                {tz}
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-3 text-sm text-slate-400">No timezones found.</div>
+                          )}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
                 </label>
                 
                 <div ref={timePickerRef} className="md:col-span-2 grid gap-6 md:grid-cols-2">

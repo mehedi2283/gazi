@@ -136,7 +136,20 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
     if (sequenceError) return NextResponse.json({ data: null, error: sequenceError.message })
 
-    return NextResponse.json({ data: { ...normalizeCampaignRow(data), sequences: sequences || [] }, error: null })
+    let leadsQuery = supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .or(`campaign_id.eq.${params.id},campaign_ids.cs.{${params.id}}`)
+
+    if (auth.organizationId) {
+      leadsQuery = leadsQuery.eq('organization_id', auth.organizationId)
+    }
+
+    const { count: totalLeads, error: leadsCountError } = await leadsQuery
+
+    if (leadsCountError) return NextResponse.json({ data: null, error: leadsCountError.message })
+
+    return NextResponse.json({ data: { ...normalizeCampaignRow(data), sequences: sequences || [], totalLeads: totalLeads ?? 0 }, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }

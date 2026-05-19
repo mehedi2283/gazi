@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
@@ -76,6 +77,26 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   }, [params.id])
 
   const campaignLeads = useMemo(() => (Array.isArray(leads) ? leads : []), [leads])
+
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const leadParam = searchParams?.get('lead')
+    if (leadParam && campaignLeads.length) {
+      const found = campaignLeads.find((l) => String(l.id) === String(leadParam) || String(l.email) === String(leadParam))
+      if (found) {
+        const leadIdKey = String(found.id || found.email || '')
+        setExpandedLeadId(leadIdKey)
+        loadThreadForLead(found)
+        setTimeout(() => {
+          try {
+            const el = document.getElementById(`lead-row-${leadIdKey}`)
+            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+          } catch {}
+        }, 200)
+      }
+    }
+  }, [searchParams, campaignLeads])
 
   function flattenLead(lead: Record<string, any>, prefix = ''): Record<string, any> {
     return Object.entries(lead || {}).reduce<Record<string, any>>((acc, [key, value]) => {
@@ -400,7 +421,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
 
                   return (
                     <React.Fragment key={leadId}>
-                      <tr className={`group transition-colors ${isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50/40'}`}>
+                      <tr id={`lead-row-${leadId}`} className={`group transition-colors ${isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50/40'}`}>
                         <td className="px-6 py-5">
                           <div className="font-bold text-slate-800">{getLeadLabel(lead, index)}</div>
                           <div className="mt-1 text-xs text-slate-400 font-medium truncate max-w-[200px]">

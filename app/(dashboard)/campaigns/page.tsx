@@ -1,12 +1,12 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
-import { Pause, Play, MoreVertical, Trash } from 'lucide-react'
+import { Calendar, Pause, Play, MoreVertical, Trash } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
 
@@ -39,9 +39,12 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
 
 export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedDate, setSelectedDate] = useState('')
   const [page, setPage] = useState(1)
   const perPage = 10
-  const { data, meta, isLoading, error } = useCampaigns(page, perPage, searchQuery)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const { data, meta, isLoading, error } = useCampaigns(page, perPage, searchQuery, selectedDate)
   const qc = useQueryClient()
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
@@ -69,6 +72,10 @@ export default function CampaignsPage() {
   useEffect(() => {
     setPage(1)
   }, [searchQuery])
+
+  useEffect(() => {
+    setPage(1)
+  }, [selectedDate])
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
@@ -137,13 +144,67 @@ export default function CampaignsPage() {
             <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">
               Active Sequences
             </h2>
-            <div className="relative">
-              <input
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="w-64 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 placeholder:text-slate-400 outline-none ring-indigo-500/20 focus:ring-2 transition-all"
-                placeholder="Search campaigns..."
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                className="flex min-w-[280px] flex-1 cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-800 shadow-sm ring-indigo-500/20 transition-all focus-within:ring-2"
+                role="button"
+                tabIndex={-1}
+                onClick={() => searchInputRef.current?.focus()}
+              >
+                <input
+                  ref={searchInputRef}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  className="w-full border-0 bg-transparent p-0 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:ring-0"
+                  placeholder="Search campaigns..."
+                />
+              </div>
+              <div
+                className="relative flex cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm ring-indigo-500/20 transition-all focus-within:ring-2"
+                role="button"
+                tabIndex={-1}
+                onClick={() => {
+                  const picker = dateInputRef.current as HTMLInputElement & { showPicker?: () => void }
+                  if (picker?.showPicker) {
+                    picker.showPicker()
+                  } else {
+                    dateInputRef.current?.focus()
+                  }
+                }}
+              >
+                <input
+                  ref={dateInputRef}
+                  type="date"
+                  value={selectedDate}
+                  onChange={(event) => setSelectedDate(event.target.value)}
+                  className="w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-8 text-sm text-slate-700 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:hidden"
+                  aria-label="Filter campaigns by created date"
+                />
+                <button
+                  type="button"
+                  className="absolute right-3 cursor-pointer text-slate-400 transition hover:text-slate-600"
+                  onClick={() => {
+                    const picker = dateInputRef.current as HTMLInputElement & { showPicker?: () => void }
+                    if (picker?.showPicker) {
+                      picker.showPicker()
+                    } else {
+                      dateInputRef.current?.focus()
+                    }
+                  }}
+                  aria-label="Open date picker"
+                >
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              {selectedDate ? (
+                <button
+                  type="button"
+                  onClick={() => setSelectedDate('')}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                >
+                  Clear date
+                </button>
+              ) : null}
             </div>
           </div>
         </div>

@@ -348,6 +348,37 @@ function applyCampaignScope(query: any, auth: { userId: string; organizationId: 
   return query.eq('created_by', auth.userId)
 }
 
+function applyLeadScope(query: any, auth: { userId: string; organizationId: string | null }) {
+  if (auth.organizationId) {
+    return query.eq('organization_id', auth.organizationId)
+  }
+
+  return query
+}
+
+async function fetchCampaignLeadCount(campaignId: string, auth: { userId: string; organizationId: string | null }) {
+  let query = supabase
+    .from('leads')
+    .select('id', { count: 'exact', head: true })
+    .or(`campaign_id.eq.${campaignId},campaign_ids.cs.{${campaignId}}`)
+
+  query = applyLeadScope(query, auth)
+
+  const { count, error } = await query
+  if (error) throw error
+
+  return count ?? 0
+}
+
+async function attachCampaignLeadCounts(campaigns: LocalCampaign[], auth: { userId: string; organizationId: string | null }) {
+  return Promise.all(
+    campaigns.map(async (campaign) => ({
+      ...campaign,
+      total_leads: await fetchCampaignLeadCount(campaign.id, auth)
+    }))
+  )
+}
+
 export async function GET(req: Request) {
   try {
     const auth = await requireApiAuth(req)
@@ -358,13 +389,14 @@ export async function GET(req: Request) {
     const perPage = parsePositiveInt(searchParams.get('per_page'), 25, 100)
     const shouldSyncInstantly = searchParams.get('sync') === '1'
     const search = (searchParams.get('q') || '').trim()
+    const selectedDate = (searchParams.get('date') || '').trim()
     const from = (page - 1) * perPage
     const to = from + perPage - 1
 
     let query = applyCampaignScope(
       supabase
         .from('campaigns')
-        .select('*, leads:leads(count)', { count: 'exact' })
+        .select('*', { count: 'exact' })
         .order('created_at', { ascending: false }),
       auth
     )
@@ -374,13 +406,19 @@ export async function GET(req: Request) {
       query = query.or(`name.ilike.%${escaped}%,status.ilike.%${escaped}%,instantly_campaign_id.ilike.%${escaped}%`)
     }
 
+    if (selectedDate) {
+      const start = new Date(`${selectedDate}T00:00:00.000Z`).toISOString()
+      const end = new Date(`${selectedDate}T23:59:59.999Z`).toISOString()
+      query = query.gte('created_at', start).lte('created_at', end)
+    }
+
     const { data, error, count } = await query.range(from, to)
 
     if (error) return NextResponse.json({ data: null, error: formatSchemaError(error) })
 
     let localCampaigns = (data || []).map((c: any) => ({
       ...c,
-      total_leads: c.leads?.[0]?.count ?? c.total_leads ?? 0
+      total_leads: c.total_leads ?? 0
     })) as LocalCampaign[]
 
     if (shouldSyncInstantly && process.env.INSTANTLY_API_KEY) {
@@ -439,18 +477,25 @@ export async function GET(req: Request) {
         )
       }
 
+      const campaignsForResponse = await attachCampaignLeadCounts([...mergedInstantlyCampaigns, ...localOnlyCampaigns], auth)
+
       return NextResponse.json({
-        data: sortCampaignsByCreatedAt([...mergedInstantlyCampaigns, ...localOnlyCampaigns]),
+        data: sortCampaignsByCreatedAt(campaignsForResponse),
         error: null,
         meta: { page, perPage, total: count ?? localCampaigns.length }
       })
     }
 
-    return NextResponse.json({
-      data: sortCampaignsByCreatedAt(localCampaigns.map((campaign) => ({
+    const campaignsForResponse = await attachCampaignLeadCounts(
+      localCampaigns.map((campaign) => ({
         ...campaign,
         status: normalizeCampaignStatus(campaign.status)
-      }))),
+      })),
+      auth
+    )
+
+    return NextResponse.json({
+      data: sortCampaignsByCreatedAt(campaignsForResponse),
       error: null,
       meta: { page, perPage, total: count ?? localCampaigns.length }
     })

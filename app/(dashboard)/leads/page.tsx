@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useMemo, useState } from 'react'
+import Link from 'next/link'
 import useCampaigns from '../../../hooks/useCampaigns'
 import useLeads from '../../../hooks/useLeads'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
@@ -10,7 +11,7 @@ function formatName(lead: any) {
 }
 
 function formatDate(value?: string) {
-  return value ? new Date(value).toLocaleString() : '-'
+  return value ? new Date(value).toLocaleDateString() : '-'
 }
 
 function SourceBadge({ source }: { source: string }) {
@@ -29,6 +30,33 @@ function SourceBadge({ source }: { source: string }) {
     border = 'border-indigo-200'
     text = 'text-indigo-700'
     label = 'External'
+  }
+
+  return (
+    <span className={`inline-flex rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${bg} ${border} ${text}`}>
+      {label}
+    </span>
+  )
+}
+
+function LeadScoreBadge({ score }: { score: string | null | undefined }) {
+  const normalized = String(score || 'cold').toLowerCase()
+
+  let bg = 'bg-blue-50'
+  let border = 'border-blue-200'
+  let text = 'text-blue-700'
+  let label = 'Cold'
+
+  if (normalized === 'warm') {
+    bg = 'bg-amber-50'
+    border = 'border-amber-200'
+    text = 'text-amber-700'
+    label = 'Warm'
+  } else if (normalized === 'hot') {
+    bg = 'bg-red-50'
+    border = 'border-red-200'
+    text = 'text-red-700'
+    label = 'Hot'
   }
 
   return (
@@ -79,7 +107,7 @@ export default function LeadsPage() {
                   <th className="px-4 py-3 font-semibold text-slate-500">Company</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Title</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Campaign</th>
-                  <th className="px-4 py-3 font-semibold text-slate-500">Status</th>
+                  <th className="px-4 py-3 font-semibold text-slate-500">Lead score</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Source</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Created</th>
                 </tr>
@@ -90,24 +118,65 @@ export default function LeadsPage() {
                     <td className="px-4 py-3 font-semibold text-slate-800">{lead.email}</td>
                     <td className="px-4 py-3 text-slate-600">{formatName(lead)}</td>
                     <td className="px-4 py-3 text-slate-600">{lead.company_name || '-'}</td>
-                    <td className="px-4 py-3 text-slate-600">{lead.title || '-'}</td>
                     <td className="px-4 py-3 text-slate-600">
-                      {lead.campaign_ids && lead.campaign_ids.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {lead.campaign_ids.map((id: string) => (
-                            <span key={id} className="rounded-md bg-slate-150/60 px-2 py-0.5 text-[10px] text-slate-600">
-                              {campaignNameById.get(id) || 'Unknown'}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        campaignNameById.get(lead.campaign_id) || '-'
-                      )}
+                      <span
+                        title={lead.title || '-'}
+                        className="block max-w-[260px] truncate"
+                      >
+                        {lead.title || '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {(() => {
+                        const ids: string[] = (lead.campaign_ids && lead.campaign_ids.length > 0)
+                          ? lead.campaign_ids
+                          : lead.campaign_id ? [String(lead.campaign_id)] : []
+
+                        if (!ids || ids.length === 0) return '-'
+
+                        const maxVisible = 3
+                        const visible = ids.slice(0, maxVisible)
+                        const overflow = ids.length - visible.length
+
+                        return (
+                          <div className="flex items-center gap-1">
+                            {visible.map((id: string) => (
+                              <Link
+                                key={id}
+                                href={`/dashboard/campaigns/${id}?lead=${lead.id}`}
+                                className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-50"
+                              >
+                                {campaignNameById.get(id) || 'Unknown'}
+                              </Link>
+                            ))}
+
+                            {overflow > 0 && (
+                              <div className="relative inline-block group">
+                                <span tabIndex={0} className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700 cursor-pointer">
+                                  +{overflow}
+                                </span>
+
+                                <div className="absolute left-0 z-50 mt-2 hidden w-max min-w-[160px] rounded-md border bg-white p-2 text-sm text-slate-700 shadow-lg group-hover:block group-focus:block">
+                                  <div className="flex flex-col gap-1">
+                                    {ids.slice(maxVisible).map((id: string) => (
+                                      <Link
+                                        key={id}
+                                        href={`/dashboard/campaigns/${id}?lead=${lead.id}`}
+                                        className="block truncate px-2 py-1 hover:bg-slate-50 rounded"
+                                      >
+                                        {campaignNameById.get(id) || 'Unknown'}
+                                      </Link>
+                                    ))}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </td>
                     <td className="px-4 py-3">
-                      <span className="rounded-md border border-indigo-100 bg-indigo-50/50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
-                        {lead.status || 'new'}
-                      </span>
+                      <LeadScoreBadge score={lead.lead_score} />
                     </td>
                     <td className="px-4 py-3">
                       <SourceBadge source={lead.source} />
