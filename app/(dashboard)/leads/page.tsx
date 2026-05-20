@@ -66,26 +66,26 @@ function LeadGptScoreBadge({ score }: { score: number | null | undefined }) {
   )
 }
 
-function LeadTempBadge({ temp }: { temp: string }) {
+function TempIcon({ temp }: { temp: string }) {
   const t = String(temp || 'cold').toLowerCase()
-  let bg = 'bg-blue-50 text-blue-700 border-blue-200'
-  let label = 'Cold'
+  let src = '/temp-cold.svg'
+  let title = 'Cold'
 
   if (t === 'hot') {
-    bg = 'bg-rose-50 text-rose-700 border-rose-200'
-    label = 'Hot'
+    src = '/temp-hot.svg'
+    title = 'Hot'
   } else if (t === 'warm') {
-    bg = 'bg-amber-50 text-amber-700 border-amber-200'
-    label = 'Warm'
-  } else if (t === 'neutral') {
-    bg = 'bg-slate-50 text-slate-600 border-slate-200'
-    label = 'Neutral'
+    src = '/temp-warm.svg'
+    title = 'Warm'
   }
 
   return (
-    <span className={`inline-flex rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${bg}`}>
-      {label}
-    </span>
+    <img
+      src={src}
+      alt={title}
+      title={title}
+      className="h-5 w-5 shrink-0"
+    />
   )
 }
 
@@ -339,14 +339,17 @@ export default function LeadsPage() {
                           })()}
                         </td>
                         <td className="px-4 py-2.5">
-                          <button
-                            type="button"
-                            onClick={() => setExpandedLeadId((current) => (current === leadId ? null : leadId))}
-                            className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
-                          >
-                            {isExpanded ? 'Hide' : 'View'}
-                            {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                          </button>
+                          <div className="flex items-center gap-2">
+                            <TempIcon temp={lead.lead_score} />
+                            <button
+                              type="button"
+                              onClick={() => setExpandedLeadId((current) => (current === leadId ? null : leadId))}
+                              className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-600 transition hover:bg-slate-50"
+                            >
+                              {isExpanded ? 'Hide' : 'View'}
+                              {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                            </button>
+                          </div>
                         </td>
                         {isAdmin ? (
                           <td className="px-4 py-2.5 text-right" data-lead-actions>
@@ -392,7 +395,7 @@ export default function LeadsPage() {
                       {isExpanded ? (
                         <tr className={expandedBg}>
                           <td colSpan={isAdmin ? 7 : 6} className="px-4 py-3">
-                            <div className="grid gap-3 text-xs text-slate-600 md:grid-cols-4">
+                            <div className="grid gap-3 text-xs text-slate-600 md:grid-cols-3">
                               <div>
                                 <div className="font-semibold text-slate-700">Title</div>
                                 <div>{lead.title || '-'}</div>
@@ -400,10 +403,6 @@ export default function LeadsPage() {
                               <div>
                                 <div className="font-semibold text-slate-700">Source</div>
                                 <div><SourceBadge source={lead.source} /></div>
-                              </div>
-                              <div>
-                                <div className="font-semibold text-slate-700">Temperature</div>
-                                <div className="mt-0.5"><LeadTempBadge temp={lead.lead_score} /></div>
                               </div>
                               <div>
                                 <div className="font-semibold text-slate-700">Created</div>
