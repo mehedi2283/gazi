@@ -23,6 +23,7 @@ type LocalCampaign = {
   from_time: string | null
   to_time: string | null
   target_lead_count: number | null
+  total_booking_count?: number | null
   attachment_url: string | null
   signature: string | null
   signature_url: string | null

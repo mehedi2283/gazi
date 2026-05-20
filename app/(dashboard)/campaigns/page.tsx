@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 import toast from 'react-hot-toast'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
-import { Calendar, Pause, Play, MoreVertical, Trash } from 'lucide-react'
+import { Calendar, Pause, Play, MoreVertical, Trash, Users } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
 import useCurrentUser from '../../../hooks/useCurrentUser'
@@ -266,19 +266,31 @@ export default function CampaignsPage() {
                       <td className="px-6 py-5 text-right">
                         <div className="flex items-center justify-end gap-3" data-campaign-actions>
                           <div className="flex items-center gap-3">
-                            <span 
-                              title={`${campaign.total_leads || 0} total leads`}
-                              className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-indigo-500/10 text-[11px] font-bold text-indigo-600 ring-1 ring-indigo-500/20"
-                            >
-                              {campaign.total_leads || 0}
-                            </span>
-                            <Link
-                              href={`/dashboard/campaigns/${campaign.id}`}
-                              className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
-                            >
-                              View leads
-                            </Link>
-                          </div>
+                              {/* Lead Count Badge */}
+                              <span 
+                                title={`${campaign.total_leads || 0} total leads`}
+                                className="flex h-7 px-2.5 flex-none items-center justify-center rounded-full bg-indigo-500/10 text-[11px] font-bold text-indigo-600 ring-1 ring-indigo-500/20 gap-1"
+                              >
+                                <Users className="h-3.5 w-3.5" />
+                                <span>{campaign.total_leads || 0}</span>
+                              </span>
+
+                              {/* Booking Count Badge */}
+                              <span 
+                                title={`${campaign.total_booking_count || 0} total bookings`}
+                                className="flex h-7 px-2.5 flex-none items-center justify-center rounded-full bg-emerald-500/10 text-[11px] font-bold text-emerald-600 ring-1 ring-emerald-500/20 gap-1"
+                              >
+                                <Calendar className="h-3.5 w-3.5" />
+                                <span>{campaign.total_booking_count || 0}</span>
+                              </span>
+
+                              <Link
+                                href={`/dashboard/campaigns/${campaign.id}`}
+                                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+                              >
+                                View leads
+                              </Link>
+                            </div>
 
                           <div className="relative inline-block text-left">
                             <button

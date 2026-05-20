@@ -188,6 +188,7 @@ type Tab = typeof TABS[number]
 export default function CampaignForm({ title, subtitle, submitLabel, mode, initialData, onSubmit }: CampaignFormProps) {
   const [activeTab, setActiveTab] = useState<Tab>('Basics')
   const [submitting, setSubmitting] = useState(false)
+  const [verifyingToken, setVerifyingToken] = useState(false)
   const [error, setError] = useState('')
   const [name, setName] = useState(initialData?.name || '')
   const [campaignOwner, setCampaignOwner] = useState({
@@ -715,6 +716,27 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
             mode: 'import',
             leads: leadRows
           }
+
+    // Verify Calendly Token
+    setVerifyingToken(true)
+    try {
+      const verifyRes = await fetch('/api/calendly/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: calendlyToken.trim() })
+      })
+      const verifyJson = await verifyRes.json()
+      if (!verifyRes.ok || !verifyJson.ok) {
+        throw new Error(verifyJson.error || 'This Calendly token is not available for use or expired')
+      }
+    } catch (err: any) {
+      setError(err?.message || 'This Calendly token is not available for use or expired')
+      setVerifyingToken(false)
+      setSubmitting(false)
+      return
+    } finally {
+      setVerifyingToken(false)
+    }
 
     try {
       await onSubmit({
@@ -1606,6 +1628,16 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           )}
         </div>
 
+        {verifyingToken && (
+          <div className="mt-6 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-750 border border-indigo-200 flex items-center gap-2 font-semibold shadow-sm animate-pulse">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+            </span>
+            Verifying Calendly Token...
+          </div>
+        )}
+
         {error && (
           <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-750 border border-red-200 flex items-center gap-2 font-semibold shadow-sm animate-bounce">
             <span className="font-extrabold text-red-800">Error:</span> {error}
@@ -1637,10 +1669,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
             ) : (
               <button
                 type="submit"
-                disabled={submitting || Boolean(sequenceError)}
+                disabled={submitting || verifyingToken || Boolean(sequenceError)}
                 className="rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-8 py-2.5 font-extrabold text-white shadow-md shadow-indigo-600/10 transition hover:opacity-95 hover:shadow-indigo-600/20 disabled:opacity-60"
               >
-                {submitting ? 'Launching...' : submitLabel}
+                {verifyingToken ? 'Verifying Token...' : submitting ? 'Launching...' : submitLabel}
               </button>
             )}
           </div>

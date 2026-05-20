@@ -51,7 +51,7 @@ export async function GET(req: Request) {
       scopeCampaignQuery(
         supabase
           .from('campaigns')
-          .select('id, name, status, created_at, total_leads, open_count, reply_count')
+          .select('id, name, status, created_at, total_leads, total_booking_count, open_count, reply_count')
           .order('created_at', { ascending: false })
           .limit(1000),
         auth

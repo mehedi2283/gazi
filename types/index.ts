@@ -16,6 +16,7 @@ export type Campaign = {
   from_time?: string | null
   to_time?: string | null
   total_leads?: number | null
+  total_booking_count?: number | null
   emails_sent?: number | null
   open_count?: number | null
   reply_count?: number | null

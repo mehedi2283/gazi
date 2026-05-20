@@ -108,6 +108,7 @@ export default function LeadsPage() {
   const [deleteModalFor, setDeleteModalFor] = useState<{ id: string; label: string } | null>(null)
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
+  const [openCampaignDropdownForLead, setOpenCampaignDropdownForLead] = useState<string | null>(null)
 
   const campaignNameById = useMemo(() => {
     return new Map<string, string>((campaigns || []).map((campaign: any) => [String(campaign.id), String(campaign.name)]))
@@ -123,8 +124,13 @@ export default function LeadsPage() {
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement | null
-      if (target && !target.closest('[data-lead-actions]')) {
-        setOpenMenuFor(null)
+      if (target) {
+        if (!target.closest('[data-lead-actions]')) {
+          setOpenMenuFor(null)
+        }
+        if (!target.closest('[data-campaign-overflow]')) {
+          setOpenCampaignDropdownForLead(null)
+        }
       }
     }
 
@@ -298,7 +304,34 @@ export default function LeadsPage() {
                                 ))}
 
                                 {overflow > 0 ? (
-                                  <span className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700">+{overflow}</span>
+                                  <div className="relative inline-block text-left" data-campaign-overflow>
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setOpenCampaignDropdownForLead(
+                                          openCampaignDropdownForLead === lead.id ? null : lead.id
+                                        )
+                                      }}
+                                      className="inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-200 transition"
+                                    >
+                                      +{overflow}
+                                    </button>
+                                    {openCampaignDropdownForLead === lead.id && (
+                                      <div className="absolute left-0 mt-1 z-30 w-48 rounded-md border border-slate-200 bg-white/95 py-1 shadow-lg backdrop-blur-sm max-h-48 overflow-y-auto">
+                                        {ids.slice(maxVisible).map((id: string) => (
+                                          <Link
+                                            key={id}
+                                            href={`/dashboard/campaigns/${id}?lead=${lead.id}`}
+                                            className="block px-3 py-1.5 text-left text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 transition"
+                                            onClick={() => setOpenCampaignDropdownForLead(null)}
+                                          >
+                                            {campaignNameById.get(id) || 'Unknown'}
+                                          </Link>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 ) : null}
                               </div>
                             )
