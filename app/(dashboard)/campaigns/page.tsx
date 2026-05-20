@@ -9,6 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Calendar, Pause, Play, MoreVertical, Trash } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
+import useCurrentUser from '../../../hooks/useCurrentUser'
 
 function statusStyles(status: string) {
   const norm = status ? status.toLowerCase() : 'draft'
@@ -45,6 +46,7 @@ export default function CampaignsPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const { data, meta, isLoading, error } = useCampaigns(page, perPage, searchQuery, selectedDate)
+  const { isAdmin } = useCurrentUser()
   const qc = useQueryClient()
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
@@ -239,16 +241,18 @@ export default function CampaignsPage() {
                       <td className="px-6 py-5">
                         <div className="flex flex-col">
                           <span className="font-bold text-slate-800 text-base">{campaign.name}</span>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="text-xs text-slate-400">
-                              Created {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '—'}
-                            </span>
+                          <div className="mt-1 flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                            <div className="text-xs text-slate-400">Created {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '—'}</div>
+                            {campaign.company_name ? (
+                              <div className="text-xs text-slate-400 sm:ml-2">• Company: <span className="text-slate-700 font-medium">{campaign.company_name}</span></div>
+                            ) : null}
+                            {campaign.created_from_company ? (
+                              <div className="text-xs text-slate-400 sm:ml-2">• Creator: <span className="text-slate-700 font-medium">{campaign.created_from_company}</span></div>
+                            ) : null}
                             {campaign.instantly_campaign_id && (
                               <>
-                                <span className="h-1 w-1 rounded-full bg-slate-300" />
-                                <span className="text-[10px] font-mono text-slate-400">
-                                  ID: {String(campaign.instantly_campaign_id).slice(0, 8)}...
-                                </span>
+                                <span className="h-1 w-1 rounded-full bg-slate-300 sm:ml-2" />
+                                <span className="text-[10px] font-mono text-slate-400 sm:ml-2">ID: {String(campaign.instantly_campaign_id).slice(0, 8)}...</span>
                               </>
                             )}
                           </div>
@@ -342,18 +346,20 @@ export default function CampaignsPage() {
                                   </button>
                                 ) : null}
 
-                                <button
-                                  type="button"
-                                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    setOpenMenuFor(null)
-                                    setDeleteModalFor(campaign)
-                                  }}
-                                >
-                                  <Trash className="h-4 w-4" />
-                                  Delete
-                                </button>
+                                {isAdmin ? (
+                                  <button
+                                    type="button"
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 transition hover:bg-red-50"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setOpenMenuFor(null)
+                                      setDeleteModalFor(campaign)
+                                    }}
+                                  >
+                                    <Trash className="h-4 w-4" />
+                                    Delete
+                                  </button>
+                                ) : null}
                               </div>
                             ) : null}
                           </div>

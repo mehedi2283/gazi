@@ -53,6 +53,19 @@ function normalizeTimezone(timezone: unknown) {
   return DEFAULT_TIMEZONE
 }
 
+function normalizeRequiredText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function getCampaignOwnerFields(body: any, existingCampaign: any) {
+  const owner = body?.campaign_owner || {}
+
+  return {
+    companyName: normalizeRequiredText(body?.company_name ?? owner.company_name ?? existingCampaign?.company_name),
+    createdFromCompany: normalizeRequiredText(body?.created_from_company ?? owner.created_from_company ?? existingCampaign?.created_from_company)
+  }
+}
+
 function buildInstantlyPayload(campaign: any, sequences: any[] = []) {
   const schedule = campaign?.campaign_schedule?.schedules?.[0] || {}
   const timezone = normalizeTimezone(campaign?.timezone || schedule?.timezone)
@@ -171,6 +184,11 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
     if (existingError) return NextResponse.json({ data: null, error: existingError.message })
 
+    const campaignOwner = getCampaignOwnerFields(body, existingCampaign)
+    if (!campaignOwner.companyName || !campaignOwner.createdFromCompany) {
+      return NextResponse.json({ data: null, error: 'Campaign owner details are required' }, { status: 400 })
+    }
+
     const { data: sequenceRows, error: sequenceError } = await supabase
       .from('sequences')
       .select('*')
@@ -198,6 +216,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const campaignUpdate = {
       organization_id: body.organization_id || body.organizationId || existingCampaign?.organization_id || auth.organizationId || null,
       name: body.name || existingCampaign?.name,
+      company_name: campaignOwner.companyName,
+      created_from_company: campaignOwner.createdFromCompany,
       daily_limit: Number(body.daily_limit ?? existingCampaign?.daily_limit ?? 50),
       email_gap: Number(body.email_gap ?? existingCampaign?.email_gap ?? 10),
       stop_on_reply: body.stop_on_reply ?? existingCampaign?.stop_on_reply ?? true,
@@ -258,6 +278,10 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   try {
     const auth = await requireApiAuth(req)
     if (isAuthResponse(auth)) return auth
+
+    if (auth.role !== 'admin') {
+      return NextResponse.json({ data: null, error: 'Only admins can delete campaigns' }, { status: 403 })
+    }
 
     const { data: existingCampaign, error: existingError } = await applyCampaignScope(
       supabase

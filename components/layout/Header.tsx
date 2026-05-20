@@ -44,6 +44,10 @@ function titleForPath(path: string): { title: string; subtitle?: string } {
       title: 'Settings',
       subtitle: 'Workspace and account preferences.'
     },
+    '/dashboard/users': {
+      title: 'Users',
+      subtitle: 'Create team members and manage access.'
+    },
     '/leads': {
       title: 'Leads',
       subtitle: 'Imported contacts and campaign associations.'
@@ -59,6 +63,10 @@ function titleForPath(path: string): { title: string; subtitle?: string } {
     '/settings': {
       title: 'Settings',
       subtitle: 'Workspace and account preferences.'
+    },
+    '/users': {
+      title: 'Users',
+      subtitle: 'Create team members and manage access.'
     }
   }
 

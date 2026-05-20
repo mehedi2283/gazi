@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ChevronDown, ChevronUp, Download } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, Download, Trash2 } from 'lucide-react'
 import useLeads from '../../../../hooks/useLeads'
 import useCurrentUser from '../../../../hooks/useCurrentUser'
 import { TableRowSkeleton } from '../../../../components/ui/Skeleton'
@@ -14,13 +14,15 @@ import { TableRowSkeleton } from '../../../../components/ui/Skeleton'
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
   const [page, setPage] = useState(1)
   const perPage = 10
-  const { data: leads, meta, isLoading, error: leadsQueryError } = useLeads(params.id, page, perPage)
+  const { data: leads, meta, isLoading, error: leadsQueryError, refetch } = useLeads(params.id, page, perPage)
   const { user, isAdmin } = useCurrentUser()
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
   const [threads, setThreads] = useState<Record<string, any>>({})
   const [campaign, setCampaign] = useState<{ name: string } | null>(null)
   const [campaignLoadState, setCampaignLoadState] = useState<'loading' | 'ok' | 'error'>('loading')
   const [campaignLoadError, setCampaignLoadError] = useState<string | null>(null)
+  const [deletingLeadId, setDeletingLeadId] = useState('')
+  const [leadDeleteModalFor, setLeadDeleteModalFor] = useState<Record<string, any> | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -61,7 +63,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
         const name =
           typeof rawName === 'string' && rawName.trim().length > 0 ? rawName.trim() : 'Untitled campaign'
 
-        setCampaign({ name })
+        setCampaign(row)
         setCampaignLoadState('ok')
       } catch {
         if (!cancelled) {
@@ -147,6 +149,36 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
     toast.success('Export started')
+  }
+
+  async function handleDeleteLead(lead: Record<string, any>) {
+    if (!isAdmin) return
+
+    const leadId = String(lead.id || '')
+    if (!leadId) return
+
+    setDeletingLeadId(leadId)
+    try {
+      const response = await fetch(`/api/leads/${encodeURIComponent(leadId)}`, { method: 'DELETE' })
+      const json = await response.json()
+
+      if (!response.ok || json.error) {
+        throw new Error(json.error?.message || json.error || 'Failed to delete lead')
+      }
+
+      toast.success('Lead deleted')
+      setExpandedLeadId((current) => (current === leadId ? null : current))
+      setThreads((current) => {
+        const next = { ...current }
+        delete next[leadId]
+        return next
+      })
+      await refetch()
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to delete lead')
+    } finally {
+      setDeletingLeadId('')
+    }
   }
 
   function getLeadLabel(lead: Record<string, any>, index: number) {
@@ -362,6 +394,10 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
               <h1 className="text-3xl font-extrabold tracking-tight text-slate-800 md:text-4xl">
                 {displayName}
               </h1>
+              <div className="mt-1 text-sm text-slate-500">
+                {campaign?.company_name ? <span className="mr-3">Company: <strong className="text-slate-700">{campaign.company_name}</strong></span> : null}
+                {campaign?.created_from_company ? <span>Creator: <strong className="text-slate-700">{campaign.created_from_company}</strong></span> : null}
+              </div>
               <span className="mt-1 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5 font-mono text-[10px] text-slate-500">
                 ID: {params.id.slice(0, 8)}...
               </span>
@@ -442,22 +478,36 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                           </span>
                         </td>
                         <td className="px-6 py-5 text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleToggleLead(lead, leadId)}
-                            className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
-                              isExpanded 
-                                ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500/20' 
-                                : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200 shadow-sm'
-                            }`}
-                          >
-                            {isExpanded ? 'Hide info' : 'View info'}
-                            {isExpanded ? (
-                              <ChevronUp className="h-3.5 w-3.5" />
-                            ) : (
-                              <ChevronDown className="h-3.5 w-3.5 opacity-60" />
-                            )}
-                          </button>
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleToggleLead(lead, leadId)}
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+                                isExpanded 
+                                  ? 'bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500/20' 
+                                  : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-200 shadow-sm'
+                              }`}
+                            >
+                              {isExpanded ? 'Hide info' : 'View info'}
+                              {isExpanded ? (
+                                <ChevronUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+                              )}
+                            </button>
+
+                            {isAdmin ? (
+                              <button
+                                type="button"
+                                onClick={() => setLeadDeleteModalFor(lead)}
+                                disabled={deletingLeadId === leadId}
+                                className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 transition-all hover:bg-red-100 disabled:opacity-50"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                {deletingLeadId === leadId ? 'Deleting...' : 'Delete'}
+                              </button>
+                            ) : null}
+                          </div>
                         </td>
                       </tr>
                       {isExpanded ? (
@@ -480,6 +530,39 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                                       <div>
                                         <label className="text-[10px] text-slate-400 block uppercase font-bold">Campaign ID</label>
                                         <code className="text-xs text-slate-600 font-medium break-all">{lead.campaign_id || params.id}</code>
+
+                                  <Modal
+                                    open={Boolean(leadDeleteModalFor)}
+                                    title="Delete lead"
+                                    onClose={() => setLeadDeleteModalFor(null)}
+                                  >
+                                    <div className="space-y-4">
+                                      <p className="text-sm leading-relaxed text-slate-600">
+                                        Delete <strong className="text-slate-800">{leadDeleteModalFor ? getLeadLabel(leadDeleteModalFor, 0) : ''}</strong>? This cannot be undone.
+                                      </p>
+                                      <div className="flex items-center justify-end gap-2">
+                                        <button
+                                          type="button"
+                                          className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                                          onClick={() => setLeadDeleteModalFor(null)}
+                                        >
+                                          Cancel
+                                        </button>
+                                        <button
+                                          type="button"
+                                          className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+                                          onClick={async () => {
+                                            if (!leadDeleteModalFor) return
+                                            const target = leadDeleteModalFor
+                                            setLeadDeleteModalFor(null)
+                                            await handleDeleteLead(target)
+                                          }}
+                                        >
+                                          Delete
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </Modal>
                                       </div>
                                       <div>
                                         <label className="text-[10px] text-slate-400 block uppercase font-bold">Lead Ref</label>

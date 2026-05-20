@@ -30,7 +30,9 @@ export default function LoginPage() {
 
       const params = new URLSearchParams(window.location.search)
       const next = params.get('next')
-      router.push(next && next.startsWith('/') ? next : '/dashboard')
+      const role = String(json.data?.user?.role || '').toLowerCase()
+      const fallback = role === 'admin' ? '/dashboard/users' : '/dashboard'
+      router.push(next && next.startsWith('/') ? next : fallback)
       router.refresh()
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in')

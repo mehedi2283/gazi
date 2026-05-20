@@ -16,6 +16,19 @@ export async function POST(req: Request) {
     const resp = await searchPeople(filters)
     const people = resp?.people || resp?.results || []
 
+    // preload campaign info
+    const campaignId = body.campaign_id || null
+    let campaignRow: any = null
+    if (campaignId) {
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id, company_name, created_from_company')
+        .eq('id', campaignId)
+        .limit(1)
+
+      campaignRow = (campaigns && campaigns[0]) || null
+    }
+
     const mapped = people.map((p: any) => ({
       email: p.email || p.primary_email,
       first_name: p.first_name || p.given_name,
@@ -31,6 +44,8 @@ export async function POST(req: Request) {
       employees: p.organization?.employee_count || null,
       sender_info,
       campaign_id: body.campaign_id || null,
+      campaign_company_name: campaignRow?.company_name || (sender_info?.company || null),
+      campaign_creator: campaignRow?.created_from_company || (sender_info?.creator || null),
       organization_id: auth.organizationId || null,
       source: 'apollo'
     }))

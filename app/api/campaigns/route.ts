@@ -9,6 +9,8 @@ type LocalCampaign = {
   id: string
   organization_id: string | null
   name: string
+  company_name: string | null
+  created_from_company: string | null
   status: string | null
   instantly_campaign_id: string | null
   daily_limit: number | null
@@ -50,6 +52,19 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 function normalizeEmail(value: unknown) {
   return typeof value === 'string' ? value.trim().toLowerCase() : ''
+}
+
+function normalizeRequiredText(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function getCampaignOwnerFields(body: any) {
+  const owner = body?.campaign_owner || {}
+
+  return {
+    companyName: normalizeRequiredText(body?.company_name ?? owner.company_name),
+    createdFromCompany: normalizeRequiredText(body?.created_from_company ?? owner.created_from_company)
+  }
 }
 
 async function saveEmailAccount(emailAddress: string, accountName?: string | null) {
@@ -510,9 +525,14 @@ export async function POST(req: Request) {
     if (isAuthResponse(auth)) return auth
 
     const body = await req.json()
+    const campaignOwner = getCampaignOwnerFields(body)
 
     if (!body?.name) {
       return NextResponse.json({ data: null, error: 'Campaign name is required' }, { status: 400 })
+    }
+
+    if (!campaignOwner.companyName || !campaignOwner.createdFromCompany) {
+      return NextResponse.json({ data: null, error: 'Campaign owner details are required' }, { status: 400 })
     }
 
     const organizationId = body.organization_id || body.organizationId || auth.organizationId || null
@@ -551,6 +571,8 @@ export async function POST(req: Request) {
     const { data: campaignRows, error: campaignInsertError } = await supabase.from('campaigns').insert([{
       organization_id: organizationId,
       name: body.name,
+      company_name: campaignOwner.companyName,
+      created_from_company: campaignOwner.createdFromCompany,
       status: 'draft',
       instantly_campaign_id: null,
       daily_limit: Number.isFinite(dailyLimit) ? dailyLimit : 50,

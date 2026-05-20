@@ -40,12 +40,29 @@ export async function POST(req: Request) {
       return undefined
     }
 
+    // Preload campaign info if a campaign_id was provided
+    const campaignIds = Array.from(new Set([campaign_id].filter(Boolean))) as string[]
+    const campaignMap = new Map<string, any>()
+    if (campaignIds.length > 0) {
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id, company_name, created_from_company')
+        .in('id', campaignIds)
+
+      for (const c of campaigns || []) {
+        if (c?.id) campaignMap.set(String(c.id), c)
+      }
+    }
+
     const mapped = rows.map((r: any) => {
       const nr = normalizeKeys(r)
+      const campaignRow = campaignMap.get(String(campaign_id)) || null
       return {
         organization_id: organization_id || auth.organizationId || null,
         campaign_id: campaign_id || null,
         sender_info: sender_info || null,
+        campaign_company_name: campaignRow?.company_name || (sender_info?.company || null),
+        campaign_creator: campaignRow?.created_from_company || (sender_info?.creator || null),
         email: findByKeys(nr, ['Email'], 'Email'),
         first_name: findByKeys(nr, ['First Name'], 'First Name'),
         last_name: findByKeys(nr, ['Last Name'], 'Last Name'),

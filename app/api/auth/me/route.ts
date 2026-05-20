@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
-import { isAuthResponse, requireApiAuth } from '../../../lib/api/auth'
-import supabase from '../../../lib/supabase/server'
+import { isAuthResponse, requireApiAuth } from '../../../../lib/api/auth'
+import supabase from '../../../../lib/supabase/server'
 
 export async function GET(req: Request) {
   try {

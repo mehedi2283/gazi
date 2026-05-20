@@ -12,9 +12,25 @@ export async function POST(req: Request) {
     const { leads, campaign_id, organization_id, sender_info } = body
 
     // validate minimal shape
+    // Collect campaign ids present in payload
+    const campaignIds = Array.from(new Set((leads || []).map((l: any) => l.campaign_id || campaign_id).filter(Boolean))) as string[]
+    const campaignMap = new Map<string, any>()
+    if (campaignIds.length > 0) {
+      const { data: campaigns } = await supabase
+        .from('campaigns')
+        .select('id, company_name, created_from_company')
+        .in('id', campaignIds)
+
+      for (const c of campaigns || []) {
+        if (c?.id) campaignMap.set(String(c.id), c)
+      }
+    }
+
     const sanitized = (leads || []).map((l: any) => ({
       organization_id: l.organization_id || organization_id || auth.organizationId || null,
       campaign_id: l.campaign_id || campaign_id || null,
+      campaign_company_name: (campaignMap.get(String(l.campaign_id || campaign_id))?.company_name) || (l.sender_info?.company || null),
+      campaign_creator: (campaignMap.get(String(l.campaign_id || campaign_id))?.created_from_company) || (l.sender_info?.creator || null),
       email: l.email,
       first_name: l.first_name,
       last_name: l.last_name,

@@ -3,6 +3,8 @@ export type Campaign = {
   organization_id: string | null
   created_by?: string | null
   name: string
+  company_name?: string | null
+  created_from_company?: string | null
   status: string
   instantly_campaign_id?: string | null
   daily_limit?: number | null
@@ -30,6 +32,8 @@ export type Lead = {
   company_linkedin_url?: string | null
   company_domain?: string | null
   website?: string | null
+  campaign_company_name?: string | null
+  campaign_creator?: string | null
   linkedin_url?: string | null
   facebook_url?: string | null
   twitter_url?: string | null
@@ -51,4 +55,5 @@ export type Lead = {
   last_raised_at?: string | null
   phone?: string | null
   status?: string | null
+  sent_at?: string | null
 }

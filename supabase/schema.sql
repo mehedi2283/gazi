@@ -32,6 +32,8 @@ create table if not exists campaigns (
   organization_id uuid references organizations(id) on delete cascade,
   created_by uuid references auth.users(id),
   name text not null,
+  company_name text,
+  created_from_company text,
   status text default 'draft',
   instantly_campaign_id text,
   total_leads int default 0,

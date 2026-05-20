@@ -8,7 +8,7 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 function getAuthClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
     {
       auth: {
         autoRefreshToken: false,
@@ -101,6 +101,62 @@ export async function POST(req: Request) {
       data: profile,
       error: null
     })
+  } catch (err: any) {
+    return NextResponse.json({ data: null, error: err.message || String(err) }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const auth = await requireApiAuth(req)
+    if (isAuthResponse(auth)) return auth
+
+    if (auth.role !== 'admin') {
+      return NextResponse.json({ data: null, error: 'Only admins can delete users' }, { status: 403 })
+    }
+
+    const { searchParams } = new URL(req.url)
+    const userId = searchParams.get('id')?.trim() || ''
+
+    if (!userId) {
+      return NextResponse.json({ data: null, error: 'User id is required' }, { status: 400 })
+    }
+
+    if (userId === auth.userId) {
+      return NextResponse.json({ data: null, error: 'You cannot delete your own account' }, { status: 400 })
+    }
+
+    const { data: targetProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, organization_id, role')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (profileError) {
+      return NextResponse.json({ data: null, error: profileError.message }, { status: 500 })
+    }
+
+    if (!targetProfile || targetProfile.organization_id !== auth.organizationId) {
+      return NextResponse.json({ data: null, error: 'User not found' }, { status: 404 })
+    }
+
+    const authClient = getAuthClient()
+    const { error: authDeleteError } = await authClient.auth.admin.deleteUser(userId)
+
+    if (authDeleteError) {
+      return NextResponse.json({ data: null, error: authDeleteError.message || 'Unable to delete auth user' }, { status: 500 })
+    }
+
+    const { error: deleteProfileError } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId)
+
+    if (deleteProfileError) {
+      return NextResponse.json({ data: null, error: deleteProfileError.message || 'Unable to delete user profile' }, { status: 500 })
+    }
+
+    return NextResponse.json({ data: { id: userId }, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) }, { status: 500 })
   }

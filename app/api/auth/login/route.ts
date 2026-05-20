@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import supabase from '../../../../lib/supabase/server'
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -38,11 +39,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ data: null, error: error?.message || 'Invalid email or password' }, { status: 401 })
     }
 
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, organization_id, full_name')
+      .eq('id', data.user.id)
+      .maybeSingle()
+
     const response = NextResponse.json({
       data: {
         user: {
           id: data.user.id,
-          email: data.user.email
+          email: data.user.email,
+          role: profile?.role || 'user',
+          organization_id: profile?.organization_id || null,
+          full_name: profile?.full_name || null
         }
       },
       error: null

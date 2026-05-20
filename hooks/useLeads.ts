@@ -18,7 +18,7 @@ export function useLeads(
       }
 
       if (options?.search) params.search = options.search
-      if (options?.leadScore) params.lead_score = options.leadScore
+      if (options?.leadScore) params.lead_gpt_score_bucket = options.leadScore
       if (options?.source) params.source = options.source
 
       const r = await axios.get('/api/leads', { params })

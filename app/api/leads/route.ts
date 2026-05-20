@@ -24,6 +24,7 @@ export async function GET(req: Request) {
     let query = supabase
       .from('leads')
       .select('*', { count: 'exact' })
+      .order('lead_gpt_score', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false })
 
     if (campaignId) {
@@ -61,10 +62,25 @@ export async function GET(req: Request) {
       query = query.or(`first_name.ilike.${q},last_name.ilike.${q},company_name.ilike.${q},title.ilike.${q},email.ilike.${q}`)
     }
 
-    // Filter by lead_score (cold/warm/hot)
+    // Filter by lead_score (cold/warm/hot) - legacy support
     const leadScore = searchParams.get('lead_score')
     if (leadScore) {
       query = query.eq('lead_score', leadScore)
+    }
+
+    // Filter by lead_gpt_score buckets
+    const leadGptScoreBucket = searchParams.get('lead_gpt_score_bucket')
+    if (leadGptScoreBucket) {
+      const bucket = leadGptScoreBucket.toLowerCase()
+      if (bucket === 'high') {
+        query = query.gte('lead_gpt_score', 8).lte('lead_gpt_score', 10)
+      } else if (bucket === 'medium') {
+        query = query.gte('lead_gpt_score', 4).lte('lead_gpt_score', 7)
+      } else if (bucket === 'low') {
+        query = query.gte('lead_gpt_score', 0).lte('lead_gpt_score', 3)
+      } else if (bucket === 'none') {
+        query = query.is('lead_gpt_score', null)
+      }
     }
 
     // Filter by source

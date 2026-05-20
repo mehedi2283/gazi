@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
-import { ChevronDown, Lock, Plus, Trash2, Paperclip, Loader2, X, Settings, Calendar, UserCircle, ListOrdered, Users } from 'lucide-react'
+import { ChevronDown, Lock, Plus, Trash2, Paperclip, Loader2, X, Settings, Calendar, UserCircle, ListOrdered, Users, Building2 } from 'lucide-react'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../lib/timezones'
 import { supabase } from '../../lib/supabase/client'
 
@@ -36,6 +36,8 @@ type SequenceStep = {
 
 type CampaignInitialData = {
   name?: string
+  company_name?: string | null
+  created_from_company?: string | null
   daily_limit?: number | null
   email_gap?: number | null
   stop_on_reply?: boolean | null
@@ -176,7 +178,7 @@ function LockedLabel({ children }: { children: React.ReactNode }) {
   )
 }
 
-const TABS = ['Basics', 'Schedule', 'Sender Profile', 'Sequences', 'Leads'] as const
+const TABS = ['Basics', 'Campaign Owner', 'Schedule', 'Sender Profile', 'Sequences', 'Leads'] as const
 type Tab = typeof TABS[number]
 
 export default function CampaignForm({ title, subtitle, submitLabel, mode, initialData, onSubmit }: CampaignFormProps) {
@@ -184,6 +186,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [name, setName] = useState(initialData?.name || '')
+  const [campaignOwner, setCampaignOwner] = useState({
+    company_name: initialData?.company_name || '',
+    created_from_company: initialData?.created_from_company || ''
+  })
   const [timezone, setTimezone] = useState(initialData?.timezone || DEFAULT_TIMEZONE)
   const [dailyLimit, setDailyLimit] = useState(String(initialData?.daily_limit ?? 50))
   const [emailGap, setEmailGap] = useState(String(initialData?.email_gap ?? 10))
@@ -321,6 +327,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
   useEffect(() => {
     setName(initialData?.name || '')
+    setCampaignOwner({
+      company_name: initialData?.company_name || '',
+      created_from_company: initialData?.created_from_company || ''
+    })
     setTimezone(initialData?.timezone || DEFAULT_TIMEZONE)
     setDailyLimit(String(initialData?.daily_limit ?? 50))
     setEmailGap(String(initialData?.email_gap ?? 10))
@@ -567,6 +577,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     const payload = {
       name: name.trim(),
+      company_name: campaignOwner.company_name.trim(),
+      created_from_company: campaignOwner.created_from_company.trim(),
       daily_limit: Number(dailyLimit || 50),
       email_gap: Number(emailGap || 10),
       stop_on_reply: stopOnReply,
@@ -600,6 +612,12 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     if (!payload.name) {
       setError('Campaign name is required')
+      setSubmitting(false)
+      return
+    }
+
+    if (!payload.company_name || !payload.created_from_company) {
+      setError('Campaign owner details are required')
       setSubmitting(false)
       return
     }
@@ -688,6 +706,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         {(
           [
             { id: 'Basics', icon: Settings },
+            { id: 'Campaign Owner', icon: Building2 },
             { id: 'Schedule', icon: Calendar },
             { id: 'Sender Profile', icon: UserCircle },
             { id: 'Sequences', icon: ListOrdered },
@@ -766,6 +785,39 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                 <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-750 transition hover:bg-slate-50 cursor-pointer shadow-sm">
                   <input type="checkbox" name="link_tracking" checked={linkTracking} onChange={(event) => setLinkTracking(event.target.checked)} className="h-4 w-4 rounded border-slate-350 bg-transparent text-indigo-650 focus:ring-indigo-500/20" />
                   <span className="text-sm font-bold">Link Tracking</span>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'Campaign Owner' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+              <div>
+                <h2 className="text-lg font-bold text-slate-800">Campaign Owner</h2>
+                <p className="text-sm font-medium text-slate-400">These fields are required and identify the company behind this campaign.</p>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Company Name</span>
+                  <input
+                    value={campaignOwner.company_name}
+                    onChange={(event) => setCampaignOwner((current) => ({ ...current, company_name: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="Acme Inc."
+                    required
+                  />
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Creator</span>
+                  <input
+                    value={campaignOwner.created_from_company}
+                    onChange={(event) => setCampaignOwner((current) => ({ ...current, created_from_company: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="Creator name"
+                    required
+                  />
                 </label>
               </div>
             </div>
@@ -1268,6 +1320,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                                 className={`min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}
                                 onClick={() => {
                                   setSelectedEmail(account.email_address)
+                                  setError('')
                                   setEmailMenuOpen(false)
                                 }}
                               >
