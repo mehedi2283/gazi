@@ -8,12 +8,14 @@ import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
 import { ArrowLeft, ChevronDown, ChevronUp, Download } from 'lucide-react'
 import useLeads from '../../../../hooks/useLeads'
+import useCurrentUser from '../../../../hooks/useCurrentUser'
 import { TableRowSkeleton } from '../../../../components/ui/Skeleton'
 
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
   const [page, setPage] = useState(1)
   const perPage = 10
   const { data: leads, meta, isLoading, error: leadsQueryError } = useLeads(params.id, page, perPage)
+  const { user, isAdmin } = useCurrentUser()
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
   const [threads, setThreads] = useState<Record<string, any>>({})
   const [campaign, setCampaign] = useState<{ name: string } | null>(null)
@@ -367,15 +369,17 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={handleExport}
-          className="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-250 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm disabled:opacity-45"
-          disabled={!campaignLeads.length}
-        >
-          <Download className="h-4 w-4" />
-          Export leads
-        </button>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={handleExport}
+            className="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-250 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm disabled:opacity-45"
+            disabled={!campaignLeads.length}
+          >
+            <Download className="h-4 w-4" />
+            Export leads
+          </button>
+        )}
       </div>
 
       {/* Main Content Area */}

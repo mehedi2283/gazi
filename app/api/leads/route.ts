@@ -74,6 +74,10 @@ export async function GET(req: Request) {
     }
 
     if (exportAll) {
+      // Only admins can export leads
+      if (auth.role !== 'admin') {
+        return NextResponse.json({ data: null, error: 'Only admins can export leads' }, { status: 403 })
+      }
       query = query.limit(50000)
     } else {
       query = query.range(from, to)

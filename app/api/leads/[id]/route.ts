@@ -48,6 +48,11 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     const auth = await requireApiAuth(req)
     if (isAuthResponse(auth)) return auth
 
+    // Only admins can delete leads
+    if (auth.role !== 'admin') {
+      return NextResponse.json({ data: null, error: 'Only admins can delete leads' }, { status: 403 })
+    }
+
     const id = params.id
     const query = scopeLeadQuery(supabase.from('leads').delete().eq('id', id), auth)
     if (!query) return NextResponse.json({ data: null, error: 'Lead not found' }, { status: 404 })

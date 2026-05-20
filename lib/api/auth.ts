@@ -5,6 +5,7 @@ import supabase from '../supabase/server'
 type AuthContext = {
   userId: string
   organizationId: string | null
+  role: string | null
 }
 
 function getAuthClient() {
@@ -47,13 +48,14 @@ export async function requireApiAuth(req: Request): Promise<AuthContext | NextRe
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('organization_id')
+    .select('organization_id, role')
     .eq('id', data.user.id)
     .maybeSingle()
 
   return {
     userId: data.user.id,
-    organizationId: profile?.organization_id || null
+    organizationId: profile?.organization_id || null,
+    role: profile?.role || null
   }
 }
 

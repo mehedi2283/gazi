@@ -68,7 +68,7 @@ export async function POST(req: Request) {
           id: data.user.id,
           organization_id: organization.id,
           full_name: fullName,
-          role: 'member'
+          role: 'admin'
         },
         { onConflict: 'id' }
       )
