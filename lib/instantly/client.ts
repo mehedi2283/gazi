@@ -68,6 +68,14 @@ export async function listCampaigns(params: ListCampaignsParams = {}) {
   }
 }
 
+export async function listAccounts(params: Record<string, any> = {}) {
+  try {
+    return await retryRequest(() => axios.get(`${BASE}/accounts`, { headers: getAuthHeaders(), params }))
+  } catch (err: any) {
+    throw getAxiosError(err)
+  }
+}
+
 export async function listAllCampaigns(params: Omit<ListCampaignsParams, 'starting_after'> = {}) {
   const campaigns: any[] = []
   let startingAfter: string | undefined

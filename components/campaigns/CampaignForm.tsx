@@ -197,11 +197,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [leadFileName, setLeadFileName] = useState('')
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([])
   const [selectedEmail, setSelectedEmail] = useState('')
-  const [newEmailAddress, setNewEmailAddress] = useState('')
-  const [newEmailName, setNewEmailName] = useState('')
-  const [addingEmail, setAddingEmail] = useState(false)
+  
   const [emailMenuOpen, setEmailMenuOpen] = useState(false)
   const [deletingEmailId, setDeletingEmailId] = useState('')
+  const [syncingEmails, setSyncingEmails] = useState(false)
   const [apolloLead, setApolloLead] = useState({
     market_name: '',
     product_name: ''
@@ -273,38 +272,27 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     fetchEmailAccounts()
   }, [])
 
-  function selectTypedEmail() {
-    const normalizedEmail = newEmailAddress.trim().toLowerCase()
-
-    if (!EMAIL_REGEX.test(normalizedEmail)) {
-      toast.error('Please enter a valid email address')
-      return
+  async function handleSyncEmailAccounts() {
+    setSyncingEmails(true)
+    try {
+      const resp = await fetch('/api/email-accounts/sync', { method: 'POST' })
+      const json = await resp.json()
+      if (!resp.ok || json.error) throw new Error(json.error || 'Sync failed')
+      // refresh local list
+      const r2 = await fetch('/api/email-accounts')
+      const j2 = await r2.json()
+      if (Array.isArray(j2.data)) setEmailAccounts(j2.data)
+      toast.success(`Synced ${json.data?.synced || 0} accounts`)    
+    } catch (err: any) {
+      console.error('Sync failed', err)
+      toast.error(err?.message || 'Failed to sync accounts')
+    } finally {
+      setSyncingEmails(false)
     }
-
-    setSelectedEmail(normalizedEmail)
-    setEmailMenuOpen(false)
   }
 
   async function handleAddEmailAccount() {
-    if (!newEmailAddress.trim()) {
-      toast.error('Please provide an email address')
-      return
-    }
-
-    if (!EMAIL_REGEX.test(newEmailAddress.trim().toLowerCase())) {
-      toast.error('Please enter a valid email address')
-      return
-    }
-
-    setAddingEmail(true)
-    try {
-      selectTypedEmail()
-    } catch (err: any) {
-      console.error('Failed to use email account:', err)
-      toast.error(err?.message || 'Failed to use email account')
-    } finally {
-      setAddingEmail(false)
-    }
+    // Manual addition removed — syncing and selecting from saved accounts only
   }
 
   async function handleDeleteEmailAccount(account: EmailAccount) {
@@ -616,19 +604,14 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       return
     }
 
-    const typedEmail = newEmailAddress.trim().toLowerCase()
     let sendingEmail = selectedEmail.trim().toLowerCase()
     let sendingEmailAccountName = selectedEmailAccount?.account_name || sendingEmail
 
-    if (typedEmail) {
-      if (!EMAIL_REGEX.test(typedEmail)) {
-        setError('Please enter a valid sending email address')
-        setSubmitting(false)
-        return
-      }
-
-      sendingEmail = typedEmail
-      sendingEmailAccountName = newEmailName.trim() || typedEmail
+    // REQUIRE sending email
+    if (!sendingEmail) {
+      setError('Sending email is required')
+      setSubmitting(false)
+      return
     }
 
     if (leadMode === 'apollo' && (!apolloLead.market_name.trim() || !apolloLead.product_name.trim())) {
@@ -1271,8 +1254,6 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                           className={`flex w-full items-center px-4 py-2 text-left text-sm hover:bg-slate-50 ${!selectedEmail ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}
                           onClick={() => {
                             setSelectedEmail('')
-                            setNewEmailAddress('')
-                            setNewEmailName('')
                             setEmailMenuOpen(false)
                           }}
                         >
@@ -1287,8 +1268,6 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                                 className={`min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}
                                 onClick={() => {
                                   setSelectedEmail(account.email_address)
-                                  setNewEmailAddress('')
-                                  setNewEmailName('')
                                   setEmailMenuOpen(false)
                                 }}
                               >
@@ -1316,28 +1295,14 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                     )}
                   </div>
 
-                  <div className="grid w-full gap-3 sm:grid-cols-[minmax(260px,1fr)_minmax(180px,240px)_auto]">
-                    <input
-                      type="email"
-                      value={newEmailAddress}
-                      onChange={(event) => setNewEmailAddress(event.target.value)}
-                      placeholder="Or enter new email: new@email.com"
-                      className="h-11 min-w-0 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 shadow-sm"
-                    />
-                    <input
-                      type="text"
-                      value={newEmailName}
-                      onChange={(event) => setNewEmailName(event.target.value)}
-                      placeholder="Account Name"
-                      className="h-11 min-w-0 rounded-md border border-slate-200 bg-white px-3 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 shadow-sm"
-                    />
+                  <div className="flex w-full items-center">
                     <button
                       type="button"
-                      onClick={handleAddEmailAccount}
-                      disabled={addingEmail || !newEmailAddress.trim()}
-                      className="h-11 rounded-md bg-white border border-slate-200 hover:bg-slate-50 px-5 text-sm font-semibold text-slate-700 transition-colors shadow-sm disabled:opacity-50"
+                      onClick={handleSyncEmailAccounts}
+                      disabled={syncingEmails}
+                      className="h-11 rounded-md bg-white border border-indigo-200 hover:bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition-colors shadow-sm disabled:opacity-50"
                     >
-                      Use
+                      {syncingEmails ? 'Syncing...' : 'Sync now'}
                     </button>
                   </div>
                 </div>

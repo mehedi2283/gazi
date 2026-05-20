@@ -44,7 +44,7 @@ export async function syncInstantly(): Promise<SyncResult> {
         },
       }),
       axios.get(`${INSTANTLY_BASE_URL}/campaigns/analytics/overview`, { headers }),
-      axios.get(`${INSTANTLY_BASE_URL}/accounts/list`, { headers }).catch(() => ({ data: [] })),
+      axios.get(`${INSTANTLY_BASE_URL}/accounts`, { headers }).catch(() => ({ data: [] })),
     ])
 
     const campaigns = campaignsRes.data || []

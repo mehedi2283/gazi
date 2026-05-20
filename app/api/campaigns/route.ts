@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createCampaign, listAllCampaigns, updateCampaign } from '../../../lib/instantly/client'
+import { createCampaign, listAllCampaigns, updateCampaign, listAccounts } from '../../../lib/instantly/client'
 import supabase from '../../../lib/supabase/server'
 import { sendImportedLeadsToWebhook, sendLeadsToWebhook } from '../../../lib/webhook/leads'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../../lib/timezones'
@@ -607,6 +607,29 @@ export async function POST(req: Request) {
           .eq('id', campaign.id)
 
         return NextResponse.json({ data: campaign, error: formatSchemaError(sequenceError) }, { status: 500 })
+      }
+    }
+
+    // Validate selected sending email exists in Instantly account
+    if (sendingEmail) {
+      try {
+        const accountsRes = await listAccounts()
+        let accounts: any[] = []
+
+        if (Array.isArray(accountsRes?.data)) {
+          accounts = accountsRes.data
+        } else if (Array.isArray(accountsRes?.data?.items)) {
+          accounts = accountsRes.data.items
+        } else if (Array.isArray(accountsRes?.items)) {
+          accounts = accountsRes.items
+        }
+
+        const found = accounts.find((a: any) => String((a.email || a.email_address || '')).toLowerCase() === sendingEmail)
+        if (!found) {
+          return NextResponse.json({ data: null, error: `The sending email ${sendingEmail} is not present in your Instantly account. Please add it there or sync accounts.` }, { status: 400 })
+        }
+      } catch (err) {
+        // If listing accounts fails, continue and let Instantly return the error on create
       }
     }
 
