@@ -532,7 +532,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     const file = event.target.files?.[0]
     if (!file) return
 
-    setLeadFileError('')
+    setLeadFileError([])
     setLeadFileName(file.name)
     const reader = new FileReader()
     reader.onload = (e) => {
