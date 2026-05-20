@@ -7,7 +7,8 @@ import { chartTooltipProps } from '@/lib/chart-theme'
 const STATUS_COLORS: Record<string, string> = {
   cold: '#3b82f6', // Cool Blue
   warm: '#f59e0b', // Warm Amber
-  hot: '#ef4444'   // Hot Red
+  hot: '#ef4444',  // Hot Red
+  neutral: '#64748b' // Slate Gray
 }
 
 const DEFAULT_COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#10b981']

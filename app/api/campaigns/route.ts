@@ -103,6 +103,19 @@ function formatInstantlyError(error: any) {
   return message
 }
 
+function formatCalendarLink(link: string | null | undefined, instantlyCampaignId: string | null) {
+  if (!link) return null
+  if (!instantlyCampaignId) return link
+  try {
+    const url = new URL(link)
+    url.searchParams.set('utm_campaign', instantlyCampaignId)
+    return url.toString()
+  } catch (e) {
+    const separator = link.includes('?') ? '&' : '?'
+    return `${link}${separator}utm_campaign=${encodeURIComponent(instantlyCampaignId)}`
+  }
+}
+
 function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: string | null) {
   const senderInfo = body?.sender_info || null
   const sendingEmail = normalizeEmail(body?.sending_email)
@@ -116,9 +129,11 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
     organization_id: campaign?.organization_id || null,
     instantly_campaign_id: instantlyCampaignId,
     sequence_count: sequenceCount,
+    calendly_token: body?.calendly_token || campaign?.calendly_token || null,
+    client_email: body?.client_email || campaign?.client_email || null,
     sender_info: {
       address: body?.sender_info?.address || null,
-      booking_calendar_link: body?.sender_info?.booking_calendar_link || null,
+      booking_calendar_link: formatCalendarLink(body?.sender_info?.booking_calendar_link || body?.booking_calendar_link, instantlyCampaignId),
       attachment_url: body?.attachment_url || body?.sender_info?.attachment_url || null,
       signature: body?.signature || body?.sender_info?.signature || null,
       signature_url: body?.signature_url || body?.sender_info?.signature_url || null
@@ -590,6 +605,8 @@ export async function POST(req: Request) {
       attachment_url: body.attachment_url || body?.sender_info?.attachment_url || null,
       signature: body.signature || body?.sender_info?.signature || null,
       signature_url: body.signature_url || body?.sender_info?.signature_url || null,
+      calendly_token: body.calendly_token || null,
+      client_email: body.client_email || null,
       created_by: createdBy,
       total_leads: 0,
       emails_sent: 0,
@@ -784,13 +801,18 @@ export async function POST(req: Request) {
             updatedCampaign?.name || body?.name || '',
             updatedCampaign?.id || campaign.id,
             {
-              sender_info: body?.sender_info || null,
+              sender_info: body?.sender_info ? {
+                ...body.sender_info,
+                booking_calendar_link: formatCalendarLink(body.sender_info.booking_calendar_link, instantlyCampaignId)
+              } : null,
               sending_email: sendingEmail || null,
               instantly_campaign_id: instantlyCampaignId,
               sequence_count: sequenceCount,
               target_lead_count: Number(body.target_lead_count ?? 0),
               attachment_url: body.attachment_url || null,
-              signature: body.signature || null
+              signature: body.signature || null,
+              calendly_token: body?.calendly_token || null,
+              client_email: body?.client_email || null
             }
           )
         } catch (error: any) {

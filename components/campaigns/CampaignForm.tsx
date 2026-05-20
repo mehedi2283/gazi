@@ -71,6 +71,10 @@ type CampaignInitialData = {
   attachment_url?: string | null
   signature?: string | null
   report_email?: string | null
+  booking_calendar_link?: string | null
+  signature_url?: string | null
+  calendly_token?: string | null
+  client_email?: string | null
 }
 
 type CampaignFormProps = {
@@ -218,11 +222,16 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     long_message: '',
     location: '',
     address: '',
-    booking_calendar_link: '',
-    signature: '',
-    signature_url: ''
+    booking_calendar_link: initialData?.booking_calendar_link || '',
+    signature: initialData?.signature || '',
+    signature_url: initialData?.signature_url || ''
   })
   const [reportEmail, setReportEmail] = useState(initialData?.report_email || '')
+  const [calendlyToken, setCalendlyToken] = useState(initialData?.calendly_token || '')
+  const [clientEmail, setClientEmail] = useState(initialData?.client_email || '')
+  const [existingTokens, setExistingTokens] = useState<Array<{ token: string; campaign_name: string }>>([])
+  const [loadingTokens, setLoadingTokens] = useState(false)
+  const [useExistingToken, setUseExistingToken] = useState(false)
   const [targetLeadCount, setTargetLeadCount] = useState(String(initialData?.target_lead_count ?? 100))
   const [attachmentUrl, setAttachmentUrl] = useState(initialData?.attachment_url || '')
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
@@ -359,11 +368,46 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     setAttachmentUrl(initialData?.attachment_url || '')
     setSenderInfo((prev) => ({
       ...prev,
-      signature: initialData?.signature || ''
+      signature: initialData?.signature || '',
+      booking_calendar_link: initialData?.booking_calendar_link || '',
+      signature_url: initialData?.signature_url || ''
     }))
     setReportEmail(initialData?.report_email || '')
+    setCalendlyToken(initialData?.calendly_token || '')
+    setClientEmail(initialData?.client_email || '')
+    setExistingTokens([])
+    setUseExistingToken(false)
     setError('')
   }, [initialData])
+
+  // Lookup existing tokens when client email changes
+  useEffect(() => {
+    const email = clientEmail.trim().toLowerCase()
+    if (!email || !email.includes('@')) {
+      setExistingTokens([])
+      return
+    }
+
+    const timeout = setTimeout(async () => {
+      setLoadingTokens(true)
+      try {
+        const res = await fetch(`/api/campaigns/tokens?client_email=${encodeURIComponent(email)}`)
+        const json = await res.json()
+
+        if (json.data && json.data.length > 0) {
+          setExistingTokens(json.data)
+        } else {
+          setExistingTokens([])
+        }
+      } catch {
+        setExistingTokens([])
+      } finally {
+        setLoadingTokens(false)
+      }
+    }, 500)
+
+    return () => clearTimeout(timeout)
+  }, [clientEmail])
 
   const sequenceError = useMemo(() => getSequenceError(steps), [steps])
   const selectedEmailAccount = useMemo(() => {
@@ -644,8 +688,16 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       return
     }
 
-    if (!senderInfo.name.trim() || !senderInfo.company.trim() || !senderInfo.location.trim() || !senderInfo.address.trim() || !senderInfo.booking_calendar_link.trim()) {
-      setError('Complete sender information is required')
+    if (
+      !senderInfo.name.trim() ||
+      !senderInfo.company.trim() ||
+      !senderInfo.location.trim() ||
+      !senderInfo.address.trim() ||
+      !senderInfo.booking_calendar_link.trim() ||
+      !calendlyToken.trim() ||
+      !clientEmail.trim()
+    ) {
+      setError('Complete sender information is required (including Calendly Token and Client Email)')
       setSubmitting(false)
       return
     }
@@ -668,6 +720,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       await onSubmit({
         ...payload,
         report_email: reportEmail.trim() || null,
+        calendly_token: calendlyToken.trim() || null,
+        client_email: clientEmail.trim() || null,
         sender_info: {
           name: senderInfo.name.trim(),
           company: senderInfo.company.trim(),
@@ -1045,6 +1099,71 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                     required
                   />
                 </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Client Email</span>
+                  <input
+                    type="email"
+                    value={clientEmail}
+                    onChange={(event) => {
+                      setClientEmail(event.target.value)
+                      setUseExistingToken(false)
+                    }}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="client@email.com"
+                    required
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Calendly Token</span>
+                  {loadingTokens ? (
+                    <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Looking up existing tokens…
+                    </div>
+                  ) : existingTokens.length > 0 && !useExistingToken ? (
+                    <div className="space-y-2">
+                      <select
+                        value={calendlyToken}
+                        onChange={(event) => {
+                          setCalendlyToken(event.target.value)
+                          if (event.target.value === '__new__') {
+                            setCalendlyToken('')
+                            setUseExistingToken(true)
+                          }
+                        }}
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                        required
+                      >
+                        <option value="">Select an existing token</option>
+                        {existingTokens.map((item, idx) => (
+                          <option key={idx} value={item.token}>
+                            {item.token.slice(0, 20)}… — from "{item.campaign_name}"
+                          </option>
+                        ))}
+                        <option value="__new__">＋ Enter a new token</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <input
+                        value={calendlyToken}
+                        onChange={(event) => setCalendlyToken(event.target.value)}
+                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                        placeholder="Enter Calendly Token"
+                        required
+                      />
+                      {existingTokens.length > 0 && useExistingToken && (
+                        <button
+                          type="button"
+                          onClick={() => { setUseExistingToken(false); setCalendlyToken('') }}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                        >
+                          ← Back to existing tokens
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
  
                 <label className="space-y-2 md:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">Company Details</span>

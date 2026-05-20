@@ -8,7 +8,16 @@ const supabase = createClient(supabaseUrl, serviceRoleKey, {
 });
 
 async function run() {
-  const { data: leads, error: leadsErr } = await supabase.from('leads').select('id, source, status, lead_score, created_at, email_open_count, email_reply_count');
-  console.log('Leads:', leads?.length, leadsErr);
+  const { data: leads, error: leadsErr } = await supabase
+    .from('leads')
+    .select('id, email, lead_score, lead_gpt_score');
+  if (leadsErr) {
+    console.error('Error fetching leads:', leadsErr);
+  } else {
+    console.log('Leads detail list:');
+    leads.forEach(l => {
+      console.log(`- Email: ${l.email}, GPT Score: ${l.lead_gpt_score}, Lead Score (Temp): ${l.lead_score}`);
+    });
+  }
 }
 run();

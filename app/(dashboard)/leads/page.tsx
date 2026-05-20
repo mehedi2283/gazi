@@ -66,18 +66,43 @@ function LeadGptScoreBadge({ score }: { score: number | null | undefined }) {
   )
 }
 
+function LeadTempBadge({ temp }: { temp: string }) {
+  const t = String(temp || 'cold').toLowerCase()
+  let bg = 'bg-blue-50 text-blue-700 border-blue-200'
+  let label = 'Cold'
+
+  if (t === 'hot') {
+    bg = 'bg-rose-50 text-rose-700 border-rose-200'
+    label = 'Hot'
+  } else if (t === 'warm') {
+    bg = 'bg-amber-50 text-amber-700 border-amber-200'
+    label = 'Warm'
+  } else if (t === 'neutral') {
+    bg = 'bg-slate-50 text-slate-600 border-slate-200'
+    label = 'Neutral'
+  }
+
+  return (
+    <span className={`inline-flex rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${bg}`}>
+      {label}
+    </span>
+  )
+}
+
 export default function LeadsPage() {
   const [page, setPage] = useState(1)
   const perPage = 10
   const [searchTerm, setSearchTerm] = useState('')
   const [filterScore, setFilterScore] = useState('')
   const [filterSource, setFilterSource] = useState('')
+  const [filterTemp, setFilterTemp] = useState('')
   const { isAdmin, isLoading: userLoading } = useCurrentUser()
   const { data: campaigns, isLoading: campaignsLoading } = useCampaigns(1, 100)
   const { data: leads, meta, isLoading: leadsLoading, error: leadsError, refetch } = useLeads(undefined, page, perPage, {
     search: searchTerm,
     leadScore: filterScore,
-    source: filterSource
+    source: filterSource,
+    leadTemp: filterTemp
   })
   const [deletingLeadId, setDeletingLeadId] = useState('')
   const [deleteModalFor, setDeleteModalFor] = useState<{ id: string; label: string } | null>(null)
@@ -89,7 +114,7 @@ export default function LeadsPage() {
   }, [campaigns])
 
   const loading = campaignsLoading || leadsLoading
-  const activeFilterCount = [searchTerm, filterScore, filterSource].filter((value) => String(value || '').trim().length > 0).length
+  const activeFilterCount = [searchTerm, filterScore, filterSource, filterTemp].filter((value) => String(value || '').trim().length > 0).length
 
   const totalLeads = meta?.total ?? leads?.length ?? 0
   const totalPages = Math.max(1, Math.ceil(totalLeads / perPage))
@@ -159,6 +184,17 @@ export default function LeadsPage() {
               <option value="none">No score</option>
             </select>
             <select
+              value={filterTemp}
+              onChange={(e) => { setFilterTemp(e.target.value); setPage(1) }}
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
+            >
+              <option value="">All temperatures</option>
+              <option value="hot">Hot</option>
+              <option value="warm">Warm</option>
+              <option value="cold">Cold</option>
+              <option value="neutral">Neutral</option>
+            </select>
+            <select
               value={filterSource}
               onChange={(e) => { setFilterSource(e.target.value); setPage(1) }}
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
@@ -175,6 +211,7 @@ export default function LeadsPage() {
                   setSearchTerm('')
                   setFilterScore('')
                   setFilterSource('')
+                  setFilterTemp('')
                   setPage(1)
                 }}
                 className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
@@ -209,9 +246,27 @@ export default function LeadsPage() {
                   const leadId = String(lead.id)
                   const isExpanded = expandedLeadId === leadId
 
+                  const temp = String(lead.lead_score || 'cold').toLowerCase()
+                  let rowBg = 'bg-white hover:bg-slate-50/50'
+                  let expandedBg = 'bg-slate-50/50'
+
+                  if (temp === 'hot') {
+                    rowBg = 'bg-rose-50/50 hover:bg-rose-100/50'
+                    expandedBg = 'bg-rose-50/30'
+                  } else if (temp === 'warm') {
+                    rowBg = 'bg-amber-50/60 hover:bg-amber-100/60'
+                    expandedBg = 'bg-amber-50/40'
+                  } else if (temp === 'cold') {
+                    rowBg = 'bg-blue-50/50 hover:bg-blue-100/50'
+                    expandedBg = 'bg-blue-50/30'
+                  } else if (temp === 'neutral') {
+                    rowBg = 'bg-slate-50/70 hover:bg-slate-100/70'
+                    expandedBg = 'bg-slate-50/40'
+                  }
+
                   return (
                     <React.Fragment key={lead.id}>
-                      <tr className="transition-colors hover:bg-slate-50/50">
+                      <tr className={`transition-colors ${rowBg}`}>
                         <td className="px-4 py-2.5 font-semibold text-slate-800">{lead.email}</td>
                         <td className="px-4 py-2.5 text-slate-700">{formatName(lead)}</td>
                         <td className="px-4 py-2.5 text-slate-600">{lead.company_name || '-'}</td>
@@ -301,9 +356,9 @@ export default function LeadsPage() {
                       </tr>
 
                       {isExpanded ? (
-                        <tr className="bg-slate-50/50">
+                        <tr className={expandedBg}>
                           <td colSpan={isAdmin ? 7 : 6} className="px-4 py-3">
-                            <div className="grid gap-3 text-xs text-slate-600 md:grid-cols-3">
+                            <div className="grid gap-3 text-xs text-slate-600 md:grid-cols-4">
                               <div>
                                 <div className="font-semibold text-slate-700">Title</div>
                                 <div>{lead.title || '-'}</div>
@@ -311,6 +366,10 @@ export default function LeadsPage() {
                               <div>
                                 <div className="font-semibold text-slate-700">Source</div>
                                 <div><SourceBadge source={lead.source} /></div>
+                              </div>
+                              <div>
+                                <div className="font-semibold text-slate-700">Temperature</div>
+                                <div className="mt-0.5"><LeadTempBadge temp={lead.lead_score} /></div>
                               </div>
                               <div>
                                 <div className="font-semibold text-slate-700">Created</div>

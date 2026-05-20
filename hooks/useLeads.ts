@@ -6,10 +6,10 @@ export function useLeads(
   campaignId?: string,
   page = 1,
   perPage = 25,
-  options?: { search?: string; leadScore?: string; source?: string }
+  options?: { search?: string; leadScore?: string; source?: string; leadTemp?: string }
 ) {
   const query = useQuery({
-    queryKey: ['leads', campaignId || 'all', page, perPage, options?.search || '', options?.leadScore || '', options?.source || ''],
+    queryKey: ['leads', campaignId || 'all', page, perPage, options?.search || '', options?.leadScore || '', options?.source || '', options?.leadTemp || ''],
     queryFn: async () => {
       const params: Record<string, any> = {
         ...(campaignId ? { campaign_id: campaignId } : {}),
@@ -20,6 +20,7 @@ export function useLeads(
       if (options?.search) params.search = options.search
       if (options?.leadScore) params.lead_gpt_score_bucket = options.leadScore
       if (options?.source) params.source = options.source
+      if (options?.leadTemp) params.lead_score = options.leadTemp
 
       const r = await axios.get('/api/leads', { params })
       return {

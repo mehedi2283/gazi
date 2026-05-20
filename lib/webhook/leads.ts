@@ -44,6 +44,8 @@ export async function sendImportedLeadsToWebhook(
     target_lead_count?: number | null
     attachment_url?: string | null
     signature?: string | null
+    calendly_token?: string | null
+    client_email?: string | null
   } = {}
 ) {
   const payload = {
@@ -58,6 +60,8 @@ export async function sendImportedLeadsToWebhook(
     target_lead_count: options.target_lead_count ?? 0,
     attachment_url: options.attachment_url || null,
     signature: options.signature || null,
+    calendly_token: options.calendly_token || null,
+    client_email: options.client_email || null,
     total_leads: leads.length,
     leads: leads
   }

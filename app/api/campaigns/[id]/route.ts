@@ -232,6 +232,8 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       signature: body.signature ?? existingCampaign?.signature ?? null,
       signature_url: body.signature_url ?? body?.sender_info?.signature_url ?? existingCampaign?.signature_url ?? null,
       booking_calendar_link: body.booking_calendar_link ?? body?.sender_info?.booking_calendar_link ?? existingCampaign?.booking_calendar_link ?? null,
+      calendly_token: body.calendly_token ?? existingCampaign?.calendly_token ?? null,
+      client_email: body.client_email ?? existingCampaign?.client_email ?? null,
       updated_at: new Date().toISOString()
     }
 

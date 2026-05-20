@@ -52,6 +52,9 @@ create table if not exists campaigns (
   sending_days jsonb default '{"monday":true,"tuesday":true,"wednesday":true,"thursday":true,"friday":true,"saturday":false,"sunday":false}'::jsonb,
   booking_calendar_link text,
   report_email text,
+  calendly_token text,
+  calendly_webhook_id text,
+  client_email text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

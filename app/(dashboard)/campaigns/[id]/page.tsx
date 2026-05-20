@@ -10,6 +10,7 @@ import { ArrowLeft, ChevronDown, ChevronUp, Download, Trash2 } from 'lucide-reac
 import useLeads from '../../../../hooks/useLeads'
 import useCurrentUser from '../../../../hooks/useCurrentUser'
 import { TableRowSkeleton } from '../../../../components/ui/Skeleton'
+import Modal from '../../../../components/ui/Modal'
 
 export default function CampaignDetailPage({ params }: { params: { id: string } }) {
   const [page, setPage] = useState(1)
@@ -18,7 +19,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   const { user, isAdmin } = useCurrentUser()
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
   const [threads, setThreads] = useState<Record<string, any>>({})
-  const [campaign, setCampaign] = useState<{ name: string } | null>(null)
+  const [campaign, setCampaign] = useState<any | null>(null)
   const [campaignLoadState, setCampaignLoadState] = useState<'loading' | 'ok' | 'error'>('loading')
   const [campaignLoadError, setCampaignLoadError] = useState<string | null>(null)
   const [deletingLeadId, setDeletingLeadId] = useState('')
@@ -459,9 +460,27 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                   const leadId = String(lead.id || lead.email || index)
                   const isExpanded = expandedLeadId === leadId
 
+                  const temp = String(lead.lead_score || 'cold').toLowerCase()
+                  let rowBg = isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50/40'
+                  let expandedBg = 'bg-slate-50/50'
+
+                  if (temp === 'hot') {
+                    rowBg = isExpanded ? 'bg-rose-50/70' : 'bg-rose-50/50 hover:bg-rose-100/50'
+                    expandedBg = 'bg-rose-50/30'
+                  } else if (temp === 'warm') {
+                    rowBg = isExpanded ? 'bg-amber-50/80' : 'bg-amber-50/60 hover:bg-amber-100/60'
+                    expandedBg = 'bg-amber-50/40'
+                  } else if (temp === 'cold') {
+                    rowBg = isExpanded ? 'bg-blue-50/70' : 'bg-blue-50/50 hover:bg-blue-100/50'
+                    expandedBg = 'bg-blue-50/30'
+                  } else if (temp === 'neutral') {
+                    rowBg = isExpanded ? 'bg-slate-50/85' : 'bg-slate-50/70 hover:bg-slate-100/70'
+                    expandedBg = 'bg-slate-50/40'
+                  }
+
                   return (
                     <React.Fragment key={leadId}>
-                      <tr id={`lead-row-${leadId}`} className={`group transition-colors ${isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50/40'}`}>
+                      <tr id={`lead-row-${leadId}`} className={`group transition-colors ${rowBg}`}>
                         <td className="px-6 py-5">
                           <div className="font-bold text-slate-800">{getLeadLabel(lead, index)}</div>
                           <div className="mt-1 text-xs text-slate-400 font-medium truncate max-w-[200px]">
@@ -518,7 +537,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                               animate={{ opacity: 1, height: 'auto' }}
                               className="overflow-hidden"
                             >
-                              <div className="my-4 rounded-xl border border-slate-200 bg-slate-50/50 p-6 shadow-sm">
+                              <div className={`my-4 rounded-xl border border-slate-200 p-6 shadow-sm ${expandedBg}`}>
                                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                                           <div className="space-y-4">
                                             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">Lead Metadata</h4>
