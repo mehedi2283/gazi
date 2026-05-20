@@ -10,7 +10,11 @@ const inter = Inter({
 })
 
 export const metadata = {
-  title: 'GaziAI Buyer Discovery'
+  title: 'GaziAI Buyer Discovery',
+  description: 'AI-powered buyer discovery platform by GazI',
+  icons: {
+    icon: '/favicon.svg',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

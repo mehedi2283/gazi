@@ -39,8 +39,15 @@ function isActive(pathname: string, href: string, exact?: boolean) {
 export default function Sidebar() {
   const router = useRouter()
   const pathname = usePathname() || ''
-  const { isAdmin } = useCurrentUser()
+  const { isAdmin, user } = useCurrentUser()
   const navItems = NAV
+  const userName = user?.full_name || 'User'
+  const userInitials = userName
+    .split(' ')
+    .map((w: string) => w[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2)
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -147,7 +154,18 @@ export default function Sidebar() {
         ) : null}
       </nav>
 
-      <div className="mt-auto border-t border-slate-200/50 pt-4">
+      <div className="mt-auto border-t border-slate-200/50 pt-4 space-y-2">
+        <div className="flex items-center gap-3 rounded-lg px-3 py-2.5">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-500 text-[11px] font-bold text-white shadow-sm">
+            {userInitials}
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-slate-700">{userName}</div>
+            <div className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
+              {user?.role || 'user'}
+            </div>
+          </div>
+        </div>
         <motion.button
           type="button"
           onClick={handleLogout}

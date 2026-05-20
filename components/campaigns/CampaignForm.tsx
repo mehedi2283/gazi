@@ -108,6 +108,33 @@ const COUNTRY_OPTIONS = [
 const CONTENT_LOCK_TOOLTIP = 'Email content is AI-personalized per lead and cannot be edited manually'
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+const REQUIRED_COLUMNS = [
+  'email', 'first_name', 'last_name', 'title', 'company_name',
+  'company_domain', 'website', 'linkedin_url', 'city', 'state',
+  'country', 'industry', 'employees', 'annual_revenue', 'phone',
+  'company_linkedin_url', 'facebook_url', 'twitter_url',
+  'company_address', 'company_city', 'company_state', 'company_country',
+  'company_phone', 'technologies', 'total_funding', 'latest_funding',
+  'latest_funding_amount', 'last_raised_at'
+]
+
+function normalizeColumnName(name: string): string {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+}
+
+function validateColumns(rows: Record<string, any>[]): string[] {
+  if (!rows.length) return []
+  const headers = Object.keys(rows[0]).map(normalizeColumnName)
+  return REQUIRED_COLUMNS.filter((col) => {
+    // Check exact match or substring match (e.g. "First Name" -> "first_name")
+    return !headers.some((h) => h === col || h.includes(col) || col.includes(h))
+  })
+}
+
 function getSubjectVariable(stepNumber: number) {
   return `{{custom_subject_${stepNumber}}}`
 }
@@ -206,6 +233,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [leadMode, setLeadMode] = useState<LeadCreationMode>('apollo')
   const [leadRows, setLeadRows] = useState<Record<string, any>[]>([])
   const [leadFileName, setLeadFileName] = useState('')
+  const [leadFileError, setLeadFileError] = useState<string[]>([])
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([])
   const [selectedEmail, setSelectedEmail] = useState('')
   
@@ -504,22 +532,37 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     const file = event.target.files?.[0]
     if (!file) return
 
+    setLeadFileError('')
     setLeadFileName(file.name)
     const reader = new FileReader()
     reader.onload = (e) => {
       const content = e.target?.result
       if (typeof content !== 'string') return
 
+      let rows: Record<string, any>[] = []
+
       if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
         const parsed = Papa.parse(content, { header: true, skipEmptyLines: true })
-        setLeadRows(parsed.data as Record<string, any>[])
+        rows = parsed.data as Record<string, any>[]
       } else {
         const workbook = XLSX.read(content, { type: 'binary' })
         const sheetName = workbook.SheetNames[0]
         const worksheet = workbook.Sheets[sheetName]
-        const data = XLSX.utils.sheet_to_json(worksheet)
-        setLeadRows(data as Record<string, any>[])
+        rows = XLSX.utils.sheet_to_json(worksheet) as Record<string, any>[]
       }
+
+      // Validate required columns
+      const missingColumns = validateColumns(rows)
+      if (missingColumns.length > 0) {
+        setLeadFileError(missingColumns)
+        setLeadRows([])
+        toast.error(`File is missing ${missingColumns.length} required column(s)`)
+        return
+      }
+
+      setLeadFileError([])
+      setLeadRows(rows)
+      toast.success(`${rows.length} rows loaded successfully`)
     }
 
     if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
@@ -1615,7 +1658,44 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                         className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 shadow-sm font-medium"
                       />
                     </label>
-                    {leadFileName && (
+
+                    {leadFileError.length > 0 && (
+                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+                        <div className="flex items-center gap-2 text-sm font-bold text-red-700 mb-2">
+                          <X className="h-4 w-4 text-red-500 shrink-0" />
+                          File validation failed — {leadFileError.length} column(s) missing
+                        </div>
+                        <p className="text-xs text-slate-500 font-medium mb-3">Click a <span className="text-red-600 font-bold">red</span> column name to copy it to your clipboard.</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {REQUIRED_COLUMNS.map((col) => {
+                            const isMissing = leadFileError.includes(col)
+                            return (
+                              <button
+                                key={col}
+                                type="button"
+                                disabled={!isMissing}
+                                onClick={() => {
+                                  if (isMissing) {
+                                    navigator.clipboard.writeText(col)
+                                    toast.success(`Copied "${col}" to clipboard`)
+                                  }
+                                }}
+                                className={`inline-flex rounded border px-2 py-0.5 text-[10px] font-semibold transition ${
+                                  isMissing
+                                    ? 'bg-red-100 border-red-300 text-red-700 cursor-pointer hover:bg-red-200 active:scale-95'
+                                    : 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
+                                }`}
+                                title={isMissing ? `Click to copy "${col}"` : 'Found in file'}
+                              >
+                                {col}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {leadFileName && leadFileError.length === 0 && (
                       <div className="flex items-center gap-3 rounded-md border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 font-bold shadow-sm">
                         <span className="font-semibold">{leadFileName}</span>
                         <span className="text-emerald-600/80">• {leadRows.length} rows loaded</span>

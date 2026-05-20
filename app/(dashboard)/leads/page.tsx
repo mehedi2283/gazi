@@ -7,7 +7,7 @@ import useLeads from '../../../hooks/useLeads'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
 import useCurrentUser from '../../../hooks/useCurrentUser'
 import toast from 'react-hot-toast'
-import { ChevronDown, ChevronUp, MoreVertical, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronUp, MoreVertical, Trash2, Loader2 } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 
 function formatName(lead: any) {
@@ -106,6 +106,7 @@ export default function LeadsPage() {
   })
   const [deletingLeadId, setDeletingLeadId] = useState('')
   const [deleteModalFor, setDeleteModalFor] = useState<{ id: string; label: string } | null>(null)
+  const [deletingFromModal, setDeletingFromModal] = useState(false)
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
   const [openCampaignDropdownForLead, setOpenCampaignDropdownForLead] = useState<string | null>(null)
@@ -453,11 +454,10 @@ export default function LeadsPage() {
           </div>
         )}
       </div>
-
       <Modal
         open={Boolean(deleteModalFor)}
         title="Delete lead"
-        onClose={() => setDeleteModalFor(null)}
+        onClose={() => !deletingFromModal && setDeleteModalFor(null)}
       >
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-slate-600">
@@ -466,22 +466,38 @@ export default function LeadsPage() {
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              disabled={deletingFromModal}
+              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               onClick={() => setDeleteModalFor(null)}
             >
               Cancel
             </button>
             <button
               type="button"
-              className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+              disabled={deletingFromModal}
+              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
               onClick={async () => {
                 if (!deleteModalFor) return
                 const target = deleteModalFor
-                setDeleteModalFor(null)
-                await handleDeleteLead(target.id, target.label)
+                setDeletingFromModal(true)
+                try {
+                  await handleDeleteLead(target.id, target.label)
+                  setDeleteModalFor(null)
+                } catch (err) {
+                  // error already toasted in handleDeleteLead
+                } finally {
+                  setDeletingFromModal(false)
+                }
               }}
             >
-              Delete
+              {deletingFromModal ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </button>
           </div>
         </div>

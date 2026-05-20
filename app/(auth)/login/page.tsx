@@ -1,8 +1,8 @@
 'use client'
 
 import React, { useState } from 'react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -30,9 +30,7 @@ export default function LoginPage() {
 
       const params = new URLSearchParams(window.location.search)
       const next = params.get('next')
-      const role = String(json.data?.user?.role || '').toLowerCase()
-      const fallback = role === 'admin' ? '/dashboard/users' : '/dashboard'
-      router.push(next && next.startsWith('/') ? next : fallback)
+      router.push(next && next.startsWith('/') ? next : '/dashboard')
       router.refresh()
     } catch (err: any) {
       setError(err?.message || 'Unable to sign in')
@@ -65,17 +63,18 @@ export default function LoginPage() {
           {error ? <p className="text-sm text-red-650 font-semibold">{error}</p> : null}
           <button
             disabled={submitting}
-            className="w-full rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 py-2.5 font-bold text-white shadow-md shadow-indigo-600/10 hover:opacity-95 hover:shadow-indigo-600/20 disabled:opacity-60 transition"
+            className="w-full rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 py-2.5 font-bold text-white shadow-md shadow-indigo-600/10 hover:opacity-95 hover:shadow-indigo-600/20 disabled:opacity-60 transition flex items-center justify-center gap-2"
           >
-            {submitting ? 'Signing in...' : 'Sign in'}
+            {submitting ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Signing in...
+              </>
+            ) : (
+              'Sign in'
+            )}
           </button>
         </form>
-        <p className="mt-4 text-sm text-slate-500 font-medium">
-          Don&apos;t have an account?{' '}
-          <Link href="/register" className="font-bold text-indigo-650 hover:text-indigo-500 transition">
-            Register
-          </Link>
-        </p>
       </div>
     </div>
   )

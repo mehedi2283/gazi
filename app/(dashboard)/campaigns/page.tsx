@@ -6,7 +6,7 @@ import Papa from 'papaparse'
 import toast from 'react-hot-toast'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
-import { Calendar, Pause, Play, MoreVertical, Trash, Users } from 'lucide-react'
+import { Calendar, Pause, Play, MoreVertical, Trash, Users, Loader2 } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
 import useCurrentUser from '../../../hooks/useCurrentUser'
@@ -51,6 +51,9 @@ export default function CampaignsPage() {
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
   const [deleteModalFor, setDeleteModalFor] = useState<any | null>(null)
+  const [deletingCampaign, setDeletingCampaign] = useState(false)
+  const [activatingCampaignId, setActivatingCampaignId] = useState('')
+  const [pausingCampaignId, setPausingCampaignId] = useState('')
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement | null
@@ -100,15 +103,18 @@ export default function CampaignsPage() {
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              disabled={deletingCampaign}
+              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               onClick={() => setDeleteModalFor(null)}
             >
               Cancel
             </button>
             <button
               type="button"
-              className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+              disabled={deletingCampaign}
+              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
               onClick={async () => {
+                setDeletingCampaign(true)
                 try {
                   const leadsResponse = await fetch(`/api/leads?campaign_id=${deleteModalFor.id}&export=1`)
                   const leadsJson = await leadsResponse.json()
@@ -130,10 +136,19 @@ export default function CampaignsPage() {
                   toast.success('Campaign deleted')
                 } catch (err) {
                   toast.error(String(err))
+                } finally {
+                  setDeletingCampaign(false)
                 }
               }}
             >
-              Delete
+              {deletingCampaign ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </button>
           </div>
         </div>
@@ -317,8 +332,10 @@ export default function CampaignsPage() {
                                 {canActivate ? (
                                   <button
                                     type="button"
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-750 transition hover:bg-slate-50"
+                                    disabled={activatingCampaignId === campaign.id}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-750 transition hover:bg-slate-50 disabled:opacity-50"
                                     onClick={async () => {
+                                      setActivatingCampaignId(campaign.id)
                                       try {
                                         const resp = await fetch(`/api/campaigns/${campaign.id}/activate`, { method: 'POST' })
                                         const json = await resp.json()
@@ -328,19 +345,27 @@ export default function CampaignsPage() {
                                         toast.success('Campaign activated')
                                       } catch (e) {
                                         toast.error(String(e))
+                                      } finally {
+                                        setActivatingCampaignId('')
                                       }
                                     }}
                                   >
-                                    <Play className="h-4 w-4" />
-                                    Activate / Resume
+                                    {activatingCampaignId === campaign.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Play className="h-4 w-4" />
+                                    )}
+                                    {activatingCampaignId === campaign.id ? 'Activating...' : 'Activate / Resume'}
                                   </button>
                                 ) : null}
 
                                 {canPause ? (
                                   <button
                                     type="button"
-                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-750 transition hover:bg-slate-50"
+                                    disabled={pausingCampaignId === campaign.id}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-750 transition hover:bg-slate-50 disabled:opacity-50"
                                     onClick={async () => {
+                                      setPausingCampaignId(campaign.id)
                                       try {
                                         const resp = await fetch(`/api/campaigns/${campaign.id}/pause`, { method: 'POST' })
                                         const json = await resp.json()
@@ -350,11 +375,17 @@ export default function CampaignsPage() {
                                         toast.success('Campaign paused')
                                       } catch (e) {
                                         toast.error(String(e))
+                                      } finally {
+                                        setPausingCampaignId('')
                                       }
                                     }}
                                   >
-                                    <Pause className="h-4 w-4" />
-                                    Pause
+                                    {pausingCampaignId === campaign.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Pause className="h-4 w-4" />
+                                    )}
+                                    {pausingCampaignId === campaign.id ? 'Pausing...' : 'Pause'}
                                   </button>
                                 ) : null}
 

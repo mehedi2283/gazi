@@ -22,6 +22,7 @@ export default function UsersPage() {
   const [creating, setCreating] = useState(false)
   const [deletingUserId, setDeletingUserId] = useState('')
   const [deleteModalFor, setDeleteModalFor] = useState<TeamUser | null>(null)
+  const [deletingFromModal, setDeletingFromModal] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [error, setError] = useState('')
   const [fullName, setFullName] = useState('')
@@ -284,7 +285,7 @@ export default function UsersPage() {
       <Modal
         open={Boolean(deleteModalFor)}
         title="Delete user"
-        onClose={() => setDeleteModalFor(null)}
+        onClose={() => !deletingFromModal && setDeleteModalFor(null)}
       >
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-slate-600">
@@ -293,22 +294,38 @@ export default function UsersPage() {
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              disabled={deletingFromModal}
+              className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               onClick={() => setDeleteModalFor(null)}
             >
               Cancel
             </button>
             <button
               type="button"
-              className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
+              disabled={deletingFromModal}
+              className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
               onClick={async () => {
                 if (!deleteModalFor) return
                 const target = deleteModalFor
-                setDeleteModalFor(null)
-                await handleDeleteUser(target)
+                setDeletingFromModal(true)
+                try {
+                  await handleDeleteUser(target)
+                  setDeleteModalFor(null)
+                } catch (err) {
+                  // error already set and shown
+                } finally {
+                  setDeletingFromModal(false)
+                }
               }}
             >
-              Delete
+              {deletingFromModal ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Delete'
+              )}
             </button>
           </div>
         </div>

@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import Papa from 'papaparse'
 import toast from 'react-hot-toast'
 import { motion } from 'framer-motion'
-import { ArrowLeft, ChevronDown, ChevronUp, Download, Trash2 } from 'lucide-react'
+import { ArrowLeft, ChevronDown, ChevronUp, Download, Trash2, Loader2 } from 'lucide-react'
 import useLeads from '../../../../hooks/useLeads'
 import useCurrentUser from '../../../../hooks/useCurrentUser'
 import { TableRowSkeleton } from '../../../../components/ui/Skeleton'
@@ -24,6 +24,8 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
   const [campaignLoadError, setCampaignLoadError] = useState<string | null>(null)
   const [deletingLeadId, setDeletingLeadId] = useState('')
   const [leadDeleteModalFor, setLeadDeleteModalFor] = useState<Record<string, any> | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [deletingFromModal, setDeletingFromModal] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -122,34 +124,41 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
       return
     }
 
-    let rows = campaignLeads.map((lead) => flattenLead(lead))
-
+    setExporting(true)
     try {
-      const response = await fetch(`/api/leads?campaign_id=${params.id}&export=1`)
-      const result = await response.json()
-      if (response.ok && Array.isArray(result?.data)) {
-        rows = result.data.map((lead: Record<string, any>) => flattenLead(lead))
+      let rows = campaignLeads.map((lead) => flattenLead(lead))
+
+      try {
+        const response = await fetch(`/api/leads?campaign_id=${params.id}&export=1`)
+        const result = await response.json()
+        if (response.ok && Array.isArray(result?.data)) {
+          rows = result.data.map((lead: Record<string, any>) => flattenLead(lead))
+        }
+      } catch {
+        rows = campaignLeads.map((lead) => flattenLead(lead))
       }
-    } catch {
-      rows = campaignLeads.map((lead) => flattenLead(lead))
+
+      const csv = Papa.unparse(rows)
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+
+      const sanitizedName = campaign?.name
+        ? campaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
+        : 'campaign'
+
+      link.download = `${sanitizedName}_${params.id}-leads.csv`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+      toast.success('Export completed')
+    } catch (err: any) {
+      toast.error('Export failed')
+    } finally {
+      setExporting(false)
     }
-
-    const csv = Papa.unparse(rows)
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-
-    const sanitizedName = campaign?.name
-      ? campaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase()
-      : 'campaign'
-
-    link.download = `${sanitizedName}_${params.id}-leads.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    toast.success('Export started')
   }
 
   async function handleDeleteLead(lead: Record<string, any>) {
@@ -411,10 +420,14 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
             type="button"
             onClick={handleExport}
             className="inline-flex items-center gap-2 rounded-lg bg-white border border-slate-250 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm disabled:opacity-45"
-            disabled={!campaignLeads.length}
+            disabled={!campaignLeads.length || exporting}
           >
-            <Download className="h-4 w-4" />
-            Export leads
+            {exporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {exporting ? 'Exporting...' : 'Export leads'}
           </button>
         )}
       </div>
@@ -550,38 +563,54 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
                                         <label className="text-[10px] text-slate-400 block uppercase font-bold">Campaign ID</label>
                                         <code className="text-xs text-slate-600 font-medium break-all">{lead.campaign_id || params.id}</code>
 
-                                  <Modal
-                                    open={Boolean(leadDeleteModalFor)}
-                                    title="Delete lead"
-                                    onClose={() => setLeadDeleteModalFor(null)}
-                                  >
-                                    <div className="space-y-4">
-                                      <p className="text-sm leading-relaxed text-slate-600">
-                                        Delete <strong className="text-slate-800">{leadDeleteModalFor ? getLeadLabel(leadDeleteModalFor, 0) : ''}</strong>? This cannot be undone.
-                                      </p>
-                                      <div className="flex items-center justify-end gap-2">
-                                        <button
-                                          type="button"
-                                          className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                                          onClick={() => setLeadDeleteModalFor(null)}
-                                        >
-                                          Cancel
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500"
-                                          onClick={async () => {
-                                            if (!leadDeleteModalFor) return
-                                            const target = leadDeleteModalFor
-                                            setLeadDeleteModalFor(null)
-                                            await handleDeleteLead(target)
-                                          }}
-                                        >
-                                          Delete
-                                        </button>
+                                    <Modal
+                                      open={Boolean(leadDeleteModalFor)}
+                                      title="Delete lead"
+                                      onClose={() => !deletingFromModal && setLeadDeleteModalFor(null)}
+                                    >
+                                      <div className="space-y-4">
+                                        <p className="text-sm leading-relaxed text-slate-600">
+                                          Delete <strong className="text-slate-800">{leadDeleteModalFor ? getLeadLabel(leadDeleteModalFor, 0) : ''}</strong>? This cannot be undone.
+                                        </p>
+                                        <div className="flex items-center justify-end gap-2">
+                                          <button
+                                            type="button"
+                                            disabled={deletingFromModal}
+                                            className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
+                                            onClick={() => setLeadDeleteModalFor(null)}
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={deletingFromModal}
+                                            className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
+                                            onClick={async () => {
+                                              if (!leadDeleteModalFor) return
+                                              const target = leadDeleteModalFor
+                                              setDeletingFromModal(true)
+                                              try {
+                                                await handleDeleteLead(target)
+                                                setLeadDeleteModalFor(null)
+                                              } catch (err) {
+                                                // error already toasted in handleDeleteLead
+                                              } finally {
+                                                setDeletingFromModal(false)
+                                              }
+                                            }}
+                                          >
+                                            {deletingFromModal ? (
+                                              <>
+                                                <Loader2 className="h-4 w-4 animate-spin" />
+                                                Deleting...
+                                              </>
+                                            ) : (
+                                              'Delete'
+                                            )}
+                                          </button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  </Modal>
+                                    </Modal>
                                       </div>
                                       <div>
                                         <label className="text-[10px] text-slate-400 block uppercase font-bold">Lead Ref</label>
