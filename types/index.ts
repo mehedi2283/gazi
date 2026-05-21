@@ -21,6 +21,12 @@ export type Campaign = {
   open_count?: number | null
   reply_count?: number | null
   bounce_count?: number | null
+  sender_name?: string | null
+  sender_company?: string | null
+  sender_company_details?: string | null
+  long_message?: string | null
+  location?: string | null
+  sender_address?: string | null
 }
 
 export type Lead = {

@@ -193,7 +193,7 @@ export default function LeadsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-slate-800">All leads</h2>
-            <p className="text-sm text-slate-400">{leads?.length || 0} leads in Supabase</p>
+            <p className="text-sm text-slate-400">{totalLeads} leads in Supabase</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input

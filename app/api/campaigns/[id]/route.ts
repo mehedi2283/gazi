@@ -234,6 +234,12 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       booking_calendar_link: body.booking_calendar_link ?? body?.sender_info?.booking_calendar_link ?? existingCampaign?.booking_calendar_link ?? null,
       calendly_token: body.calendly_token ?? existingCampaign?.calendly_token ?? null,
       client_email: body.client_email ?? existingCampaign?.client_email ?? null,
+      sender_name: body?.sender_info?.name ?? body?.sender_name ?? existingCampaign?.sender_name ?? null,
+      sender_company: body?.sender_info?.company ?? body?.sender_company ?? existingCampaign?.sender_company ?? null,
+      sender_company_details: body?.sender_info?.company_details ?? body?.sender_company_details ?? existingCampaign?.sender_company_details ?? null,
+      long_message: body?.sender_info?.long_message ?? body?.long_message ?? existingCampaign?.long_message ?? null,
+      location: body?.sender_info?.location ?? body?.location ?? existingCampaign?.location ?? null,
+      sender_address: body?.sender_info?.address ?? body?.sender_address ?? existingCampaign?.sender_address ?? null,
       updated_at: new Date().toISOString()
     }
 

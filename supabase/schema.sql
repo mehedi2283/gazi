@@ -55,6 +55,12 @@ create table if not exists campaigns (
   calendly_token text,
   calendly_webhook_id text,
   client_email text,
+  sender_name text,
+  sender_company text,
+  sender_company_details text,
+  long_message text,
+  location text,
+  sender_address text,
   created_at timestamptz default now(),
   updated_at timestamptz default now()
 );

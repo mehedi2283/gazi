@@ -75,6 +75,12 @@ type CampaignInitialData = {
   signature_url?: string | null
   calendly_token?: string | null
   client_email?: string | null
+  sender_name?: string | null
+  sender_company?: string | null
+  sender_company_details?: string | null
+  long_message?: string | null
+  location?: string | null
+  sender_address?: string | null
 }
 
 type CampaignFormProps = {
@@ -245,12 +251,12 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     product_name: ''
   })
   const [senderInfo, setSenderInfo] = useState({
-    name: '',
-    company: '',
-    company_details: '',
-    long_message: '',
-    location: '',
-    address: '',
+    name: initialData?.sender_name || '',
+    company: initialData?.sender_company || '',
+    company_details: initialData?.sender_company_details || '',
+    long_message: initialData?.long_message || '',
+    location: initialData?.location || '',
+    address: initialData?.sender_address || '',
     booking_calendar_link: initialData?.booking_calendar_link || '',
     signature: initialData?.signature || '',
     signature_url: initialData?.signature_url || ''
@@ -397,6 +403,12 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     setAttachmentUrl(initialData?.attachment_url || '')
     setSenderInfo((prev) => ({
       ...prev,
+      name: initialData?.sender_name || '',
+      company: initialData?.sender_company || '',
+      company_details: initialData?.sender_company_details || '',
+      long_message: initialData?.long_message || '',
+      location: initialData?.location || '',
+      address: initialData?.sender_address || '',
       signature: initialData?.signature || '',
       booking_calendar_link: initialData?.booking_calendar_link || '',
       signature_url: initialData?.signature_url || ''
