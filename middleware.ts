@@ -42,6 +42,27 @@ function redirectToLogin(req: NextRequest) {
   return NextResponse.redirect(loginUrl)
 }
 
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return true
+    const base64Url = parts[1]
+    let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
+    while (base64.length % 4) {
+      base64 += '='
+    }
+    const jsonPayload = atob(base64)
+    const payload = JSON.parse(jsonPayload)
+    if (!payload.exp) return true
+    
+    // Add a 10-second buffer
+    const now = Math.floor(Date.now() / 1000)
+    return now >= (payload.exp - 10)
+  } catch (e) {
+    return true
+  }
+}
+
 export async function middleware(req: NextRequest) {
   if (!isProtectedPath(req.nextUrl.pathname)) {
     return NextResponse.next()
@@ -49,16 +70,15 @@ export async function middleware(req: NextRequest) {
 
   const accessToken = req.cookies.get('sb-access-token')?.value
   const refreshToken = req.cookies.get('sb-refresh-token')?.value
-  const authClient = getAuthClient()
 
-  if (accessToken) {
-    const { data } = await authClient.auth.getUser(accessToken)
-    if (data.user) {
-      return NextResponse.next()
-    }
+  // If the access token is present and valid/not expired, allow navigation instantly (takes 0ms)
+  if (accessToken && !isTokenExpired(accessToken)) {
+    return NextResponse.next()
   }
 
+  // If access token is missing or expired, attempt to refresh session
   if (refreshToken) {
+    const authClient = getAuthClient()
     const { data } = await authClient.auth.refreshSession({ refresh_token: refreshToken })
     if (data.session) {
       const response = NextResponse.next()
