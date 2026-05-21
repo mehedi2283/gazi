@@ -276,6 +276,8 @@ export default function LeadsPage() {
                 {paginatedLeads.map((lead: any) => {
                   const leadId = String(lead.id)
                   const isExpanded = expandedLeadId === leadId
+                  const isAnyExpanded = expandedLeadId !== null
+                  const isBlurry = isAnyExpanded && !isExpanded
 
                   const temp = String(lead.lead_score || 'cold').toLowerCase()
                   let rowBg = 'bg-white hover:bg-slate-50/50'
@@ -297,7 +299,7 @@ export default function LeadsPage() {
 
                   return (
                     <React.Fragment key={lead.id}>
-                      <tr className={`transition-colors ${rowBg}`}>
+                      <tr className={`transition-all duration-300 ${rowBg} ${isBlurry ? 'blur-[1px] opacity-35 hover:blur-[0.5px] hover:opacity-60' : ''}`}>
                         <td className="px-4 py-2.5 font-semibold text-slate-800">{lead.email}</td>
                         <td className="px-4 py-2.5 text-slate-700">{formatName(lead)}</td>
                         <td className="px-4 py-2.5 text-slate-600">{lead.company_name || '-'}</td>
@@ -420,7 +422,7 @@ export default function LeadsPage() {
                       </tr>
 
                       {isExpanded ? (
-                        <tr className={expandedBg}>
+                        <tr className={`transition-all duration-300 ${expandedBg}`}>
                           <td colSpan={isAdmin ? 8 : 7} className="px-4 py-3">
                             <div className="flex flex-col gap-3 text-xs text-slate-600">
                               <div className="grid gap-3 md:grid-cols-3">
