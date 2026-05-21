@@ -241,6 +241,8 @@ export default function CampaignsPage() {
               <thead className="border-b border-slate-100 bg-slate-50/70">
                 <tr>
                   <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Campaign</th>
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Company</th>
+                  <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Creator</th>
                   <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Status</th>
                   <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-slate-500">Actions</th>
                 </tr>
@@ -258,12 +260,6 @@ export default function CampaignsPage() {
                           <span className="font-bold text-slate-800 text-base">{campaign.name}</span>
                           <div className="mt-1 flex flex-col sm:flex-row sm:items-center sm:gap-2">
                             <div className="text-xs text-slate-400">Created {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '—'}</div>
-                            {campaign.company_name ? (
-                              <div className="text-xs text-slate-400 sm:ml-2">• Company: <span className="text-slate-700 font-medium">{campaign.company_name}</span></div>
-                            ) : null}
-                            {campaign.created_from_company ? (
-                              <div className="text-xs text-slate-400 sm:ml-2">• Creator: <span className="text-slate-700 font-medium">{campaign.created_from_company}</span></div>
-                            ) : null}
                             {campaign.instantly_campaign_id && (
                               <>
                                 <span className="h-1 w-1 rounded-full bg-slate-300 sm:ml-2" />
@@ -272,6 +268,12 @@ export default function CampaignsPage() {
                             )}
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="text-sm font-medium text-slate-700">{campaign.company_name || '—'}</span>
+                      </td>
+                      <td className="px-6 py-5">
+                        <span className="text-sm font-medium text-slate-700">{campaign.created_from_company || '—'}</span>
                       </td>
                       <td className="px-6 py-5">
                         <span className={`inline-flex rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusStyles(campaign.status)}`}>
