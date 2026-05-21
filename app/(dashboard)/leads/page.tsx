@@ -66,6 +66,29 @@ function LeadGptScoreBadge({ score }: { score: number | null | undefined }) {
   )
 }
 
+function LeadConfidenceScoreBadge({ score }: { score: number | null | undefined }) {
+  if (score == null || !Number.isFinite(Number(score))) {
+    return <span className="text-slate-400">-</span>
+  }
+
+  const value = Number(score)
+  let style = 'border-blue-200 bg-blue-50 text-blue-700'
+
+  if (value >= 80) {
+    style = 'border-emerald-200 bg-emerald-50 text-emerald-700'
+  } else if (value >= 50) {
+    style = 'border-amber-200 bg-amber-50 text-amber-700'
+  } else if (value >= 0) {
+    style = 'border-rose-200 bg-rose-50 text-rose-700'
+  }
+
+  return (
+    <span className={`inline-flex min-w-[2.5rem] items-center justify-center rounded-md border px-2 py-0.5 text-xs font-bold ${style}`}>
+      {value}%
+    </span>
+  )
+}
+
 function TempIcon({ temp }: { temp: string }) {
   const t = String(temp || 'cold').toLowerCase()
   let src = '/temp-cold.svg'
@@ -243,6 +266,7 @@ export default function LeadsPage() {
                   <th className="px-4 py-3 font-semibold text-slate-500">Name</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Company</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Lead score</th>
+                  <th className="px-4 py-3 font-semibold text-slate-500">Confidence</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Campaign</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Details</th>
                   {isAdmin ? <th className="px-4 py-3 font-semibold text-slate-500 text-right">Actions</th> : null}
@@ -279,6 +303,9 @@ export default function LeadsPage() {
                         <td className="px-4 py-2.5 text-slate-600">{lead.company_name || '-'}</td>
                         <td className="px-4 py-2.5">
                           <LeadGptScoreBadge score={lead.lead_gpt_score} />
+                        </td>
+                        <td className="px-4 py-2.5">
+                          <LeadConfidenceScoreBadge score={lead.lead_gpt_confidence_score} />
                         </td>
                         <td className="px-4 py-2.5 text-slate-600">
                           {(() => {
@@ -394,20 +421,30 @@ export default function LeadsPage() {
 
                       {isExpanded ? (
                         <tr className={expandedBg}>
-                          <td colSpan={isAdmin ? 7 : 6} className="px-4 py-3">
-                            <div className="grid gap-3 text-xs text-slate-600 md:grid-cols-3">
-                              <div>
-                                <div className="font-semibold text-slate-700">Title</div>
-                                <div>{lead.title || '-'}</div>
+                          <td colSpan={isAdmin ? 8 : 7} className="px-4 py-3">
+                            <div className="flex flex-col gap-3 text-xs text-slate-600">
+                              <div className="grid gap-3 md:grid-cols-3">
+                                <div>
+                                  <div className="font-semibold text-slate-700">Title</div>
+                                  <div>{lead.title || '-'}</div>
+                                </div>
+                                <div>
+                                  <div className="font-semibold text-slate-700">Source</div>
+                                  <div><SourceBadge source={lead.source} /></div>
+                                </div>
+                                <div>
+                                  <div className="font-semibold text-slate-700">Created</div>
+                                  <div>{formatDate(lead.created_at)}</div>
+                                </div>
                               </div>
-                              <div>
-                                <div className="font-semibold text-slate-700">Source</div>
-                                <div><SourceBadge source={lead.source} /></div>
-                              </div>
-                              <div>
-                                <div className="font-semibold text-slate-700">Created</div>
-                                <div>{formatDate(lead.created_at)}</div>
-                              </div>
+                              {lead.confidence_reason && (
+                                <div className="border-t border-slate-100/80 pt-3">
+                                  <div className="font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-1">Confidence Reason</div>
+                                  <div className="rounded-lg bg-indigo-50/30 border border-indigo-100/50 p-2.5 text-slate-600 leading-relaxed">
+                                    {lead.confidence_reason}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
