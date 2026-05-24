@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import toast from 'react-hot-toast'
-import { supabase } from '@/lib/supabase/client'
 import {
   CartesianGrid,
   Legend,
@@ -278,27 +277,16 @@ export default function InstantlyDashboard() {
     try {
       const { start, end } = getDateRange()
 
-      const [dailyResult, campaignsResult, overviewResult] = await Promise.all([
-        supabase
-          .from('instantly_daily')
-          .select('*')
-          .gte('date', start)
-          .lte('date', end)
-          .order('date', { ascending: true }),
-        supabase
-          .from('instantly_campaigns')
-          .select('*')
-          .order('synced_at', { ascending: false }),
-        supabase
-          .from('instantly_overview')
-          .select('synced_at')
-          .order('synced_at', { ascending: false })
-          .limit(1),
-      ])
+      const response = await fetch(`/api/instantly/stats?start=${start}&end=${end}`)
+      const result = await response.json()
 
-      const dailyData = (dailyResult.data || []) as DailyRow[]
-      const campaignData = (campaignsResult.data || []) as CampaignRow[]
-      const overviewData = overviewResult.data || []
+      if (!response.ok || result.error) {
+        throw new Error(result.error || 'Failed to load instantly stats')
+      }
+
+      const dailyData = (result.data.daily || []) as DailyRow[]
+      const campaignData = (result.data.campaigns || []) as CampaignRow[]
+      const overviewData = result.data.overview || []
 
       setDailyRows(dailyData)
       setCampaigns(campaignData)
@@ -308,6 +296,7 @@ export default function InstantlyDashboard() {
       }
     } catch (error) {
       console.error('Error loading Instantly dashboard data:', error)
+      toast.error('Failed to load Instantly analytics')
     } finally {
       setLoading(false)
       setKpiLoading(false)
@@ -385,7 +374,7 @@ export default function InstantlyDashboard() {
   }, [visibleCampaigns])
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 -mx-2 px-2 pb-2">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-800">Instantly analytics</h2>

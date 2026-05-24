@@ -9,7 +9,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="pointer-events-none absolute left-0 top-0 h-full w-[3px] sidebar-gradient-edge opacity-90" aria-hidden />
         <Sidebar />
       </aside>
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col overflow-visible">
         <Header />
         <main className="flex-1 px-5 py-6 md:px-8 md:py-8">{children}</main>
       </div>

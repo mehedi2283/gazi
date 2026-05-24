@@ -76,6 +76,13 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next()
   }
 
+  // If this is a client-side navigation/prefetch RSC request, and we have a refresh token,
+  // allow the transition instantly. The client-side TokenRefresher or API requests will handle refresh if needed.
+  const isRsc = req.headers.has('x-next-rsc') || req.headers.has('rsc') || req.nextUrl.searchParams.has('_rsc')
+  if (isRsc && refreshToken) {
+    return NextResponse.next()
+  }
+
   // If access token is missing or expired, attempt to refresh session
   if (refreshToken) {
     const authClient = getAuthClient()
@@ -89,6 +96,12 @@ export async function middleware(req: NextRequest) {
       response.cookies.set('sb-refresh-token', data.session.refresh_token, {
         ...COOKIE_OPTIONS,
         maxAge: 60 * 60 * 24 * 30
+      })
+      response.cookies.set('sb-token-expires-at', String(Date.now() + (data.session.expires_in || 3600) * 1000), {
+        path: '/',
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        httpOnly: false
       })
       return response
     }

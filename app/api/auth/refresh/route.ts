@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import supabase from '../../../../lib/supabase/server'
 
 const COOKIE_OPTIONS = {
   httpOnly: true,
@@ -24,39 +23,27 @@ function getAuthClient() {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json()
-    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
-    const password = typeof body?.password === 'string' ? body.password : ''
+    const cookie = req.headers.get('cookie') || ''
+    const refreshToken = cookie
+      .split(';')
+      .map((part) => part.trim())
+      .find((part) => part.startsWith('sb-refresh-token='))
+      ?.split('=')
+      .slice(1)
+      .join('=')
 
-    if (!email || !password) {
-      return NextResponse.json({ data: null, error: 'Email and password are required' }, { status: 400 })
+    if (!refreshToken) {
+      return NextResponse.json({ error: 'No refresh token' }, { status: 401 })
     }
 
     const authClient = getAuthClient()
-    const { data, error } = await authClient.auth.signInWithPassword({ email, password })
+    const { data, error } = await authClient.auth.refreshSession({ refresh_token: decodeURIComponent(refreshToken) })
 
     if (error || !data.session) {
-      return NextResponse.json({ data: null, error: error?.message || 'Invalid email or password' }, { status: 401 })
+      return NextResponse.json({ error: error?.message || 'Failed to refresh session' }, { status: 401 })
     }
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, organization_id, full_name')
-      .eq('id', data.user.id)
-      .maybeSingle()
-
-    const response = NextResponse.json({
-      data: {
-        user: {
-          id: data.user.id,
-          email: data.user.email,
-          role: profile?.role || 'user',
-          organization_id: profile?.organization_id || null,
-          full_name: profile?.full_name || null
-        }
-      },
-      error: null
-    })
+    const response = NextResponse.json({ success: true })
 
     response.cookies.set('sb-access-token', data.session.access_token, {
       ...COOKIE_OPTIONS,
@@ -75,6 +62,6 @@ export async function POST(req: Request) {
 
     return response
   } catch (err: any) {
-    return NextResponse.json({ data: null, error: err.message || String(err) }, { status: 500 })
+    return NextResponse.json({ error: err.message || String(err) }, { status: 500 })
   }
 }

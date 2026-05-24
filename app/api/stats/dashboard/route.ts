@@ -93,27 +93,17 @@ export async function GET(req: Request) {
     const campaigns = campaignsRes.data || []
     const recentCampaigns = recentCampaignsRes.data || []
     const leadsBreakdown = (leadsBreakdownRes.data || []) as any[]
-    const campaignIds = campaigns.map((campaign: any) => campaign.id).filter(Boolean)
-    const statsRes = campaignIds.length
-      ? await supabase
-          .from('campaign_stats')
-          .select('campaign_id, date, emails_sent, opens, replies, clicks, bounces')
-          .in('campaign_id', campaignIds)
-          .order('date', { ascending: false })
-          .limit(30)
-      : { data: [], error: null }
-
-    if (statsRes.error) return NextResponse.json({ data: null, error: statsRes.error.message })
-
-    const stats = statsRes.data || []
 
     const totalLeads = totalLeadsRes.count || 0
     const activeLeads = activeLeadsRes.count || 0
     const activeCampaigns = campaigns.filter((campaign: any) => campaign.status === 'active').length
-    const totalOpens = stats.reduce((sum: number, stat: any) => sum + (stat.opens || 0), 0)
-    const totalReplies = stats.reduce((sum: number, stat: any) => sum + (stat.replies || 0), 0)
-    const replyRate = safeRate(totalReplies, totalLeads)
-    const openRate = safeRate(totalOpens, totalLeads)
+
+    // Use reply_count and open_count from campaigns table directly
+    const totalReplies = campaigns.reduce((sum: number, c: any) => sum + (c.reply_count || 0), 0)
+    const totalOpens = campaigns.reduce((sum: number, c: any) => sum + (c.open_count || 0), 0)
+    const totalEmailsSent = campaigns.reduce((sum: number, c: any) => sum + (c.total_leads || 0), 0)
+    const replyRate = safeRate(totalReplies, totalEmailsSent || totalLeads)
+    const openRate = safeRate(totalOpens, totalEmailsSent || totalLeads)
 
     const leadSources = leadsBreakdown.reduce<Record<string, number>>((acc, lead: any) => {
       const source = lead.source || 'manual'
@@ -127,21 +117,18 @@ export async function GET(req: Request) {
       return acc
     }, {})
 
-    const campaignPerformance = Array.from(
-      stats
-        .reduce((map, row) => {
-          const key = String(row.date)
-          const current = map.get(key) || { date: key, emailsSent: 0, opens: 0, replies: 0, clicks: 0, bounces: 0 }
-          current.emailsSent += row.emails_sent || 0
-          current.opens += row.opens || 0
-          current.replies += row.replies || 0
-          current.clicks += row.clicks || 0
-          current.bounces += row.bounces || 0
-          map.set(key, current)
-          return map
-        }, new Map<string, { date: string; emailsSent: number; opens: number; replies: number; clicks: number; bounces: number }>())
-        .values()
-    ).sort((a, b) => a.date.localeCompare(b.date))
+    // Build campaign performance from campaigns table data
+    const campaignPerformance = campaigns
+      .filter((c: any) => c.created_at)
+      .map((c: any) => ({
+        date: String(c.created_at).split('T')[0],
+        emailsSent: c.total_leads || 0,
+        opens: c.open_count || 0,
+        replies: c.reply_count || 0,
+        clicks: 0,
+        bounces: 0,
+      }))
+      .sort((a: any, b: any) => a.date.localeCompare(b.date))
 
     return NextResponse.json({
       data: {

@@ -44,7 +44,7 @@ export default function DashboardPage() {
   }
 
   const overviewContent = (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500">
+    <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 -mx-2 px-2 pb-2">
       <StatsGrid initialData={data} />
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 mt-6">
         <CampaignPerformanceChart data={campaignPerformance} />
