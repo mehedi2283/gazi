@@ -285,7 +285,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           organization_id: auth.organizationId,
           client_email: updatedCampaign.client_email.trim().toLowerCase(),
           calendly_token: updatedCampaign.calendly_token.trim()
-        }, { onConflict: 'organization_id,client_email,calendly_token' })
+        }, { onConflict: 'calendly_token' })
     }
 
     return NextResponse.json({ data: { ...normalizeCampaignRow(updatedCampaign), sequences: normalizedSequences }, error: null })

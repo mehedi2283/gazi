@@ -652,7 +652,7 @@ export async function POST(req: Request) {
           organization_id: auth.organizationId,
           client_email: campaign.client_email.trim().toLowerCase(),
           calendly_token: campaign.calendly_token.trim()
-        }, { onConflict: 'organization_id,client_email,calendly_token' })
+        }, { onConflict: 'calendly_token' })
     }
 
     if (campaign?.id && sequenceSteps.length > 0) {

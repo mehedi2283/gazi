@@ -234,6 +234,6 @@ create table if not exists calendly_tokens (
   updated_at timestamptz default now()
 );
 
-create unique index if not exists calendly_tokens_org_email_token_idx 
-  on calendly_tokens(organization_id, client_email, calendly_token);
+create unique index if not exists calendly_tokens_token_key 
+  on calendly_tokens(calendly_token);
 
