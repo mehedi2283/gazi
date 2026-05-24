@@ -44,14 +44,15 @@ export async function GET(req: Request) {
       activeLeadsRes,
       campaignsRes,
       recentCampaignsRes,
-      leadsBreakdownRes
+      leadsBreakdownRes,
+      instantlyCampaignsRes
     ] = await Promise.all([
       scopeLeadQuery(supabase.from('leads').select('id', { count: 'exact', head: true }), auth),
       scopeLeadQuery(supabase.from('leads').select('id', { count: 'exact', head: true }).eq('status', 'active'), auth),
       scopeCampaignQuery(
         supabase
           .from('campaigns')
-          .select('id, name, status, created_at, total_leads, total_booking_count, open_count, reply_count')
+          .select('id, name, status, created_at, instantly_campaign_id')
           .order('created_at', { ascending: false })
           .limit(1000),
         auth
@@ -64,7 +65,11 @@ export async function GET(req: Request) {
           .limit(5),
         auth
       ),
-      leadsBreakdownQuery
+      leadsBreakdownQuery,
+      // Fetch Instantly analytics data - the real source of truth for email engagement
+      supabase
+        .from('instantly_campaigns')
+        .select('campaign_id, emails_sent_count, open_count_unique, reply_count_unique, bounced_count, leads_count')
     ])
 
     if (!totalLeadsRes || !activeLeadsRes || !leadsBreakdownRes) {
@@ -93,15 +98,26 @@ export async function GET(req: Request) {
     const campaigns = campaignsRes.data || []
     const recentCampaigns = recentCampaignsRes.data || []
     const leadsBreakdown = (leadsBreakdownRes.data || []) as any[]
+    const instantlyCampaigns = instantlyCampaignsRes?.data || []
 
     const totalLeads = totalLeadsRes.count || 0
     const activeLeads = activeLeadsRes.count || 0
     const activeCampaigns = campaigns.filter((campaign: any) => campaign.status === 'active').length
 
-    // Use reply_count and open_count from campaigns table directly
-    const totalReplies = campaigns.reduce((sum: number, c: any) => sum + (c.reply_count || 0), 0)
-    const totalOpens = campaigns.reduce((sum: number, c: any) => sum + (c.open_count || 0), 0)
-    const totalEmailsSent = campaigns.reduce((sum: number, c: any) => sum + (c.total_leads || 0), 0)
+    // Build a set of instantly_campaign_ids that belong to this org's campaigns
+    const orgInstantlyIds = new Set(
+      campaigns.map((c: any) => c.instantly_campaign_id).filter(Boolean)
+    )
+
+    // Filter instantly_campaigns to only include ones linked to this org
+    const orgInstantlyData = instantlyCampaigns.filter((ic: any) =>
+      orgInstantlyIds.has(ic.campaign_id)
+    )
+
+    // Calculate reply rate from Instantly data (the real source of truth)
+    const totalEmailsSent = orgInstantlyData.reduce((sum: number, ic: any) => sum + (ic.emails_sent_count || 0), 0)
+    const totalReplies = orgInstantlyData.reduce((sum: number, ic: any) => sum + (ic.reply_count_unique || 0), 0)
+    const totalOpens = orgInstantlyData.reduce((sum: number, ic: any) => sum + (ic.open_count_unique || 0), 0)
     const replyRate = safeRate(totalReplies, totalEmailsSent || totalLeads)
     const openRate = safeRate(totalOpens, totalEmailsSent || totalLeads)
 
@@ -117,17 +133,21 @@ export async function GET(req: Request) {
       return acc
     }, {})
 
-    // Build campaign performance from campaigns table data
-    const campaignPerformance = campaigns
-      .filter((c: any) => c.created_at)
-      .map((c: any) => ({
-        date: String(c.created_at).split('T')[0],
-        emailsSent: c.total_leads || 0,
-        opens: c.open_count || 0,
-        replies: c.reply_count || 0,
-        clicks: 0,
-        bounces: 0,
-      }))
+    // Build campaign performance from Instantly analytics data
+    const campaignPerformance = orgInstantlyData
+      .map((ic: any) => {
+        // Find the matching local campaign to get the created_at date
+        const localCamp = campaigns.find((c: any) => c.instantly_campaign_id === ic.campaign_id)
+        return {
+          date: localCamp?.created_at ? String(localCamp.created_at).split('T')[0] : 'unknown',
+          emailsSent: ic.emails_sent_count || 0,
+          opens: ic.open_count_unique || 0,
+          replies: ic.reply_count_unique || 0,
+          clicks: 0,
+          bounces: ic.bounced_count || 0,
+        }
+      })
+      .filter((p: any) => p.date !== 'unknown')
       .sort((a: any, b: any) => a.date.localeCompare(b.date))
 
     return NextResponse.json({
