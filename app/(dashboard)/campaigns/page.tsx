@@ -236,7 +236,7 @@ export default function CampaignsPage() {
           </div>
         ) : filteredCampaigns.length ? (
           <>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[240px]">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50/70">
                 <tr>

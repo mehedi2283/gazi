@@ -258,7 +258,7 @@ export default function LeadsPage() {
           <div className="p-6 text-sm text-red-500">Failed to load leads.</div>
         ) : leads?.length ? (
           <>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto min-h-[240px]">
             <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
               <thead className="bg-slate-50/70 text-xs uppercase tracking-wider text-slate-550">
                 <tr>
