@@ -645,6 +645,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ data: null, error: 'Campaign was saved, but no local campaign id was returned.' }, { status: 500 })
     }
 
+    if (campaign.calendly_token && campaign.client_email) {
+      await supabase
+        .from('calendly_tokens')
+        .upsert({
+          organization_id: auth.organizationId,
+          client_email: campaign.client_email.trim().toLowerCase(),
+          calendly_token: campaign.calendly_token.trim()
+        }, { onConflict: 'organization_id,client_email,calendly_token' })
+    }
+
     if (campaign?.id && sequenceSteps.length > 0) {
       const sequenceRows = sequenceSteps.map((sequence) => ({
         campaign_id: campaign.id,

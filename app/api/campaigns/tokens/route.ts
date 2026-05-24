@@ -14,10 +14,10 @@ export async function GET(request: Request) {
   }
 
   const { data, error } = await supabase
-    .from('campaigns')
-    .select('calendly_token, name')
+    .from('calendly_tokens')
+    .select('calendly_token, client_email')
+    .eq('organization_id', auth.organizationId)
     .eq('client_email', clientEmail)
-    .not('calendly_token', 'is', null)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     return true
   }).map((row: any) => ({
     token: row.calendly_token,
-    campaign_name: row.name || 'Unnamed'
+    campaign_name: row.client_email || 'Saved Token'
   }))
 
   return NextResponse.json({ data: unique })

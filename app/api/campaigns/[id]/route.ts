@@ -276,7 +276,19 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       auth
     ).select()
     if (error) return NextResponse.json({ data: null, error: error.message })
-    return NextResponse.json({ data: { ...normalizeCampaignRow(data?.[0]), sequences: normalizedSequences }, error: null })
+
+    const updatedCampaign = data?.[0]
+    if (updatedCampaign?.calendly_token && updatedCampaign?.client_email) {
+      await supabase
+        .from('calendly_tokens')
+        .upsert({
+          organization_id: auth.organizationId,
+          client_email: updatedCampaign.client_email.trim().toLowerCase(),
+          calendly_token: updatedCampaign.calendly_token.trim()
+        }, { onConflict: 'organization_id,client_email,calendly_token' })
+    }
+
+    return NextResponse.json({ data: { ...normalizeCampaignRow(updatedCampaign), sequences: normalizedSequences }, error: null })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) })
   }

@@ -224,3 +224,16 @@ alter table instantly_overview enable row level security;
 create policy "Allow public read instantly_campaigns" on instantly_campaigns for select using (true);
 create policy "Allow public read instantly_daily" on instantly_daily for select using (true);
 create policy "Allow public read instantly_overview" on instantly_overview for select using (true);
+
+create table if not exists calendly_tokens (
+  id uuid primary key default gen_random_uuid(),
+  organization_id uuid references organizations(id) on delete cascade,
+  client_email text not null,
+  calendly_token text not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+create unique index if not exists calendly_tokens_org_email_token_idx 
+  on calendly_tokens(organization_id, client_email, calendly_token);
+
