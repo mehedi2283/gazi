@@ -43,6 +43,7 @@ export async function requireApiAuth(req: Request): Promise<AuthContext | NextRe
   const { data, error } = await authClient.auth.getUser(decodeURIComponent(accessToken))
 
   if (error || !data.user?.id) {
+    console.error('requireApiAuth error:', error, 'data:', data)
     return unauthorizedResponse()
   }
 
