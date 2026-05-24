@@ -814,11 +814,13 @@ export async function POST(req: Request) {
 
       const webhookErrors: string[] = []
 
-      try {
-        const webhookPayload = buildWebhookPayload(updatedCampaign, body, instantlyCampaignId)
-        await sendLeadsToWebhook(webhookPayload)
-      } catch (error: any) {
-        webhookErrors.push(error?.message || String(error))
+      if (body?.lead_creation?.mode === 'apollo') {
+        try {
+          const webhookPayload = buildWebhookPayload(updatedCampaign, body, instantlyCampaignId)
+          await sendLeadsToWebhook(webhookPayload)
+        } catch (error: any) {
+          webhookErrors.push(error?.message || String(error))
+        }
       }
 
       if (body?.lead_creation?.mode === 'import' && Array.isArray(body?.lead_creation?.leads)) {
