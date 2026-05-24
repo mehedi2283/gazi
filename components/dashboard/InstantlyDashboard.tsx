@@ -111,11 +111,12 @@ function ConcentricRingChart({
   })
 
   return (
-    <div className="relative flex items-center justify-center">
+    <div className="relative flex items-center justify-center overflow-visible">
       <svg
         width={size}
         height={size}
         viewBox={`0 0 ${size} ${size}`}
+        style={{ overflow: 'visible' }}
         onMouseLeave={() => setHovered(null)}
       >
         {rings.map((ring) => {
@@ -176,7 +177,7 @@ function ConcentricRingChart({
       {/* Floating tooltip */}
       {hovered !== null && data[hovered] && (
         <div
-          className="pointer-events-none absolute -right-2 top-1/2 -translate-y-1/2 rounded-lg border border-slate-200/80 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-md"
+          className="pointer-events-none absolute -right-2 top-1/2 -translate-y-1/2 rounded-lg border border-slate-200/80 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-md z-50"
           style={{ minWidth: 100 }}
         >
           <div className="flex items-center gap-2">
@@ -536,7 +537,7 @@ export default function InstantlyDashboard() {
             )}
           </div>
 
-          <div className="min-h-[360px] rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl">
+          <div className="min-h-[360px] rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl overflow-visible">
             <div className="mb-4 text-sm font-bold text-slate-700">Engagement breakdown</div>
             {loading ? (
               <LoadingBlock className="h-[280px] w-full" />
