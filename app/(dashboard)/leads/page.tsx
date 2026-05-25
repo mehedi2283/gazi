@@ -262,9 +262,9 @@ export default function LeadsPage() {
             <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
               <thead className="bg-slate-50/70 text-xs uppercase tracking-wider text-slate-550">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-slate-500">Email</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Name</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Company</th>
+                  <th className="px-4 py-3 font-semibold text-slate-500">Title</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Lead score</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Confidence</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Campaign</th>
@@ -300,9 +300,9 @@ export default function LeadsPage() {
                   return (
                     <React.Fragment key={lead.id}>
                       <tr className={`transition-all duration-300 ${rowBg} ${isBlurry ? 'blur-[1px] opacity-35 hover:blur-[0.5px] hover:opacity-60' : ''}`}>
-                        <td className="px-4 py-2.5 font-semibold text-slate-800">{lead.email}</td>
-                        <td className="px-4 py-2.5 text-slate-700">{formatName(lead)}</td>
-                        <td className="px-4 py-2.5 text-slate-600">{lead.company_name || '-'}</td>
+                        <td className="px-4 py-2.5 font-semibold text-slate-800">{formatName(lead)}</td>
+                        <td className="px-4 py-2.5 text-slate-700">{lead.company_name || '-'}</td>
+                        <td className="px-4 py-2.5 text-slate-600 truncate max-w-[200px]" title={lead.title}>{lead.title || '-'}</td>
                         <td className="px-4 py-2.5">
                           <LeadGptScoreBadge score={lead.lead_gpt_score} />
                         </td>
@@ -427,8 +427,8 @@ export default function LeadsPage() {
                             <div className="flex flex-col gap-3 text-xs text-slate-600">
                               <div className="grid gap-3 md:grid-cols-3">
                                 <div>
-                                  <div className="font-semibold text-slate-700">Title</div>
-                                  <div>{lead.title || '-'}</div>
+                                  <div className="font-semibold text-slate-700">Email</div>
+                                  <div className="font-medium text-slate-800 break-all select-all">{lead.email || '-'}</div>
                                 </div>
                                 <div>
                                   <div className="font-semibold text-slate-700">Source</div>
