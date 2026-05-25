@@ -156,7 +156,7 @@ export default function CampaignsPage() {
       </Modal>
 
       {/* Main Table Section */}
-      <div className="rounded-xl border border-slate-200 bg-white/70 shadow-glass backdrop-blur-xl overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white/70 shadow-glass backdrop-blur-xl overflow-visible">
         <div className="border-b border-slate-100 bg-slate-50/10 px-6 py-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-sm font-bold uppercase tracking-widest text-slate-400">
