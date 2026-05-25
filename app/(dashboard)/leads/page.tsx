@@ -199,7 +199,7 @@ export default function LeadsPage() {
             <input
               value={searchTerm}
               onChange={(e) => { setSearchTerm(e.target.value); setPage(1) }}
-              placeholder="Search name, company, title..."
+              placeholder="Search name, company, industry, title..."
               className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none"
             />
             <select
@@ -264,6 +264,7 @@ export default function LeadsPage() {
                 <tr>
                   <th className="px-4 py-3 font-semibold text-slate-500">Name</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Company</th>
+                  <th className="px-4 py-3 font-semibold text-slate-500">Industry</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Title</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Lead score</th>
                   <th className="px-4 py-3 font-semibold text-slate-500">Confidence</th>
@@ -302,6 +303,7 @@ export default function LeadsPage() {
                       <tr className={`transition-all duration-300 ${rowBg} ${isBlurry ? 'blur-[1px] opacity-35 hover:blur-[0.5px] hover:opacity-60' : ''}`}>
                         <td className="px-4 py-2.5 font-semibold text-slate-800">{formatName(lead)}</td>
                         <td className="px-4 py-2.5 text-slate-700">{lead.company_name || '-'}</td>
+                        <td className="px-4 py-2.5 text-slate-600 truncate max-w-[150px]" title={lead.industry}>{lead.industry || '-'}</td>
                         <td className="px-4 py-2.5 text-slate-600 truncate max-w-[200px]" title={lead.title}>{lead.title || '-'}</td>
                         <td className="px-4 py-2.5">
                           <LeadGptScoreBadge score={lead.lead_gpt_score} />
@@ -423,12 +425,16 @@ export default function LeadsPage() {
 
                       {isExpanded ? (
                         <tr className={`transition-all duration-300 ${expandedBg}`}>
-                          <td colSpan={isAdmin ? 8 : 7} className="px-4 py-3">
+                          <td colSpan={isAdmin ? 9 : 8} className="px-4 py-3">
                             <div className="flex flex-col gap-3 text-xs text-slate-600">
-                              <div className="grid gap-3 md:grid-cols-3">
+                              <div className="grid gap-3 md:grid-cols-4">
                                 <div>
                                   <div className="font-semibold text-slate-700">Email</div>
                                   <div className="font-medium text-slate-800 break-all select-all">{lead.email || '-'}</div>
+                                </div>
+                                <div>
+                                  <div className="font-semibold text-slate-700">Industry</div>
+                                  <div className="font-medium text-slate-800 break-words">{lead.industry || '-'}</div>
                                 </div>
                                 <div>
                                   <div className="font-semibold text-slate-700">Source</div>
