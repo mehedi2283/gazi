@@ -13,7 +13,7 @@ export default function DashboardTabs({ children }: DashboardTabsProps) {
 
   const tabs = [
     { id: 'overview' as const, label: 'Overview' },
-    { id: 'instantly' as const, label: 'Instantly analytics' }
+    { id: 'instantly' as const, label: 'Analytics' }
   ]
 
   return (
