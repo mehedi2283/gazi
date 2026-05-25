@@ -6,6 +6,7 @@ import Papa from 'papaparse'
 import toast from 'react-hot-toast'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
+import DateRangePicker from '../../../components/ui/DateRangePicker'
 import { Calendar, Pause, Play, MoreVertical, Trash, Users, Loader2 } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
@@ -45,8 +46,6 @@ export default function CampaignsPage() {
   const [page, setPage] = useState(1)
   const perPage = 10
   const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const startDateInputRef = useRef<HTMLInputElement | null>(null)
-  const endDateInputRef = useRef<HTMLInputElement | null>(null)
   const { data, meta, isLoading, error } = useCampaigns(page, perPage, searchQuery, startDate, endDate)
   const { isAdmin } = useCurrentUser()
   const qc = useQueryClient()
@@ -178,99 +177,18 @@ export default function CampaignsPage() {
                   placeholder="Search campaigns..."
                 />
               </div>
-              {/* Start Date */}
-              <div
-                className="relative flex cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm ring-indigo-500/20 transition-all focus-within:ring-2"
-                role="button"
-                tabIndex={-1}
-                onClick={() => {
-                  const picker = startDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
-                  if (picker?.showPicker) {
-                    picker.showPicker()
-                  } else {
-                    startDateInputRef.current?.focus()
-                  }
+              <DateRangePicker
+                startDate={startDate}
+                endDate={endDate}
+                onChange={(start, end) => {
+                  setStartDate(start)
+                  setEndDate(end)
                 }}
-              >
-                <span className="text-xs font-semibold text-slate-400 mr-2 select-none uppercase tracking-wider">Start:</span>
-                <input
-                  ref={startDateInputRef}
-                  type="date"
-                  value={startDate}
-                  onChange={(event) => setStartDate(event.target.value)}
-                  className="w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-8 text-sm text-slate-700 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:hidden"
-                  aria-label="Filter campaigns by start date"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 cursor-pointer text-slate-400 transition hover:text-slate-600"
-                  onClick={() => {
-                    const picker = startDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
-                    if (picker?.showPicker) {
-                      picker.showPicker()
-                    } else {
-                      startDateInputRef.current?.focus()
-                    }
-                  }}
-                  aria-label="Open start date picker"
-                >
-                  <Calendar className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-
-              {/* End Date */}
-              <div
-                className="relative flex cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm ring-indigo-500/20 transition-all focus-within:ring-2"
-                role="button"
-                tabIndex={-1}
-                onClick={() => {
-                  const picker = endDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
-                  if (picker?.showPicker) {
-                    picker.showPicker()
-                  } else {
-                    endDateInputRef.current?.focus()
-                  }
+                onClear={() => {
+                  setStartDate('')
+                  setEndDate('')
                 }}
-              >
-                <span className="text-xs font-semibold text-slate-400 mr-2 select-none uppercase tracking-wider">End:</span>
-                <input
-                  ref={endDateInputRef}
-                  type="date"
-                  value={endDate}
-                  onChange={(event) => setEndDate(event.target.value)}
-                  className="w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-8 text-sm text-slate-700 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:hidden"
-                  aria-label="Filter campaigns by end date"
-                />
-                <button
-                  type="button"
-                  className="absolute right-3 cursor-pointer text-slate-400 transition hover:text-slate-600"
-                  onClick={() => {
-                    const picker = endDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
-                    if (picker?.showPicker) {
-                      picker.showPicker()
-                    } else {
-                      endDateInputRef.current?.focus()
-                    }
-                  }}
-                  aria-label="Open end date picker"
-                >
-                  <Calendar className="h-4 w-4" aria-hidden="true" />
-                </button>
-              </div>
-
-              {/* Clear button */}
-              {startDate || endDate ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setStartDate('')
-                    setEndDate('')
-                  }}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
-                >
-                  Clear dates
-                </button>
-              ) : null}
+              />
             </div>
           </div>
         </div>
