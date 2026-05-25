@@ -1535,7 +1535,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
                       type="button"
                       onClick={handleAddEmail}
                       disabled={addingEmail || !emailInput.trim()}
-                      className="inline-flex h-10 items-center justify-center rounded-md bg-indigo-650 hover:bg-indigo-700 px-5 text-sm font-semibold text-white transition shadow-sm disabled:opacity-50 min-w-[72px]"
+                      className="inline-flex h-10 items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-700 px-5 text-sm font-semibold text-white transition shadow-sm disabled:opacity-50 min-w-[72px]"
                     >
                       {addingEmail ? (
                         <Loader2 className="h-4 w-4 animate-spin text-white" />
