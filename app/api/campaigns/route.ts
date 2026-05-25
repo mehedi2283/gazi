@@ -126,6 +126,9 @@ function formatCalendarLink(link: string | null | undefined, instantlyCampaignId
 function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: string | null) {
   const senderInfo = body?.sender_info || null
   const sendingEmail = normalizeEmail(body?.sending_email)
+  const emailList: string[] = Array.isArray(body?.email_list)
+    ? body.email_list.map((email: unknown) => normalizeEmail(email)).filter(Boolean)
+    : []
   const leadCreation: LeadCreationPayload = body?.lead_creation || { mode: 'none' }
   const sequenceCount = normalizeSequenceSteps(body?.sequences).length
 
@@ -151,7 +154,7 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
       signature_url: body?.signature_url || body?.sender_info?.signature_url || campaign?.signature_url || null
     },
     sending_email: sendingEmail || null,
-    email_list: sendingEmail ? [sendingEmail] : [],
+    email_list: emailList.length > 0 ? emailList : sendingEmail ? [sendingEmail] : [],
     lead_creation_mode: leadCreation.mode,
     lead_creation: leadCreation,
     target_lead_count: body?.target_lead_count ?? 0,
@@ -575,11 +578,20 @@ export async function POST(req: Request) {
     const organizationId = body.organization_id || body.organizationId || auth.organizationId || null
     const createdBy = auth.userId
     const sendingEmail = normalizeEmail(body.sending_email)
+    const emailList: string[] = Array.isArray(body.email_list)
+      ? body.email_list.map((email: unknown) => normalizeEmail(email)).filter(Boolean)
+      : []
     const schedule = body.campaign_schedule?.schedules?.[0] || {}
     const sequenceSteps = normalizeSequenceSteps(body.sequences)
     const sequenceError = validateSequenceSteps(sequenceSteps)
 
-    if (body.sending_email && !EMAIL_REGEX.test(sendingEmail)) {
+    if (emailList.length > 0) {
+      for (const email of emailList) {
+        if (!EMAIL_REGEX.test(email)) {
+          return NextResponse.json({ data: null, error: `Please enter a valid sending email address: ${email}` }, { status: 400 })
+        }
+      }
+    } else if (body.sending_email && !EMAIL_REGEX.test(sendingEmail)) {
       return NextResponse.json({ data: null, error: 'Please enter a valid sending email address' }, { status: 400 })
     }
 
@@ -688,7 +700,9 @@ export async function POST(req: Request) {
     }
 
     // Validate selected sending email exists in Instantly account
-    if (sendingEmail) {
+    const emailsToValidate = emailList.length > 0 ? emailList : sendingEmail ? [sendingEmail] : []
+
+    if (emailsToValidate.length > 0) {
       try {
         const accountsRes = await listAccounts()
         let accounts: any[] = []
@@ -701,9 +715,11 @@ export async function POST(req: Request) {
           accounts = accountsRes.items
         }
 
-        const found = accounts.find((a: any) => String((a.email || a.email_address || '')).toLowerCase() === sendingEmail)
-        if (!found) {
-          return NextResponse.json({ data: null, error: `The sending email ${sendingEmail} is not present in your Instantly account. Please add it there or sync accounts.` }, { status: 400 })
+        for (const email of emailsToValidate) {
+          const found = accounts.find((a: any) => String((a.email || a.email_address || '')).toLowerCase() === email)
+          if (!found) {
+            return NextResponse.json({ data: null, error: `The sending email ${email} is not present in your Instantly account. Please add it there or sync accounts.` }, { status: 400 })
+          }
         }
       } catch (err) {
         // If listing accounts fails, continue and let Instantly return the error on create
@@ -730,7 +746,7 @@ export async function POST(req: Request) {
       stop_on_reply: stopOnReply,
       open_tracking: openTracking,
       link_tracking: linkTracking,
-      ...(sendingEmail ? { email_list: [sendingEmail] } : {})
+      ...(emailList.length > 0 ? { email_list: emailList } : sendingEmail ? { email_list: [sendingEmail] } : {})
     }
 
     let instantlyCampaignId: string | null = null
@@ -814,7 +830,14 @@ export async function POST(req: Request) {
 
       const updatedCampaign = updatedRows?.[0] || { ...campaign, instantly_campaign_id: instantlyCampaignId, status: instantlyStatus }
 
-      if (sendingEmail) {
+      if (emailList.length > 0) {
+        for (const email of emailList) {
+          const emailAccountError = await saveEmailAccount(email, email)
+          if (emailAccountError) {
+            return NextResponse.json({ data: updatedCampaign, error: emailAccountError }, { status: 500 })
+          }
+        }
+      } else if (sendingEmail) {
         const emailAccountError = await saveEmailAccount(sendingEmail, body?.sending_email_account_name || null)
 
         if (emailAccountError) {

@@ -241,7 +241,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   const [leadFileName, setLeadFileName] = useState('')
   const [leadFileError, setLeadFileError] = useState<string[]>([])
   const [emailAccounts, setEmailAccounts] = useState<EmailAccount[]>([])
-  const [selectedEmail, setSelectedEmail] = useState('')
+  const [selectedEmails, setSelectedEmails] = useState<string[]>([])
+  const selectedEmail = selectedEmails[0] || ''
+  const [emailInput, setEmailInput] = useState('')
+  const [addingEmail, setAddingEmail] = useState(false)
   
   const [emailMenuOpen, setEmailMenuOpen] = useState(false)
   const [deletingEmailId, setDeletingEmailId] = useState('')
@@ -358,14 +361,58 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       }
 
       setEmailAccounts((prev) => prev.filter((item) => item.id !== account.id))
-      if (selectedEmail.toLowerCase() === account.email_address.toLowerCase()) {
-        setSelectedEmail('')
-      }
+      setSelectedEmails((prev) => prev.filter((item) => item.toLowerCase() !== account.email_address.toLowerCase()))
       toast.success('Email account deleted')
     } catch (err: any) {
       toast.error(err?.message || 'Failed to delete email account')
     } finally {
       setDeletingEmailId('')
+    }
+  }
+
+  async function handleAddEmail() {
+    const email = emailInput.trim().toLowerCase()
+    if (!email) return
+
+    // Simple regex validation
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+
+    if (selectedEmails.map(e => e.toLowerCase()).includes(email)) {
+      toast.error('This email is already added')
+      return
+    }
+
+    setAddingEmail(true)
+    try {
+      // Sync with Instantly first to make sure we check against the latest accounts
+      const resp = await fetch('/api/email-accounts/sync', { method: 'POST' })
+      const json = await resp.json()
+      if (!resp.ok || json.error) throw new Error(json.error || 'Sync failed')
+
+      // Fetch the latest email accounts list
+      const r2 = await fetch('/api/email-accounts')
+      const j2 = await r2.json()
+      let accounts: EmailAccount[] = []
+      if (Array.isArray(j2.data)) {
+        accounts = j2.data
+        setEmailAccounts(j2.data)
+      }
+
+      const match = accounts.find((acc) => acc.email_address.toLowerCase() === email)
+      if (match) {
+        setSelectedEmails((prev) => [...prev, email])
+        setEmailInput('')
+        toast.success(`Verified and added: ${email}`)
+      } else {
+        toast.error(`There is no sending email with this address in your Instantly account.`)
+      }
+    } catch (err: any) {
+      toast.error(err?.message || 'Failed to verify email account')
+    } finally {
+      setAddingEmail(false)
     }
   }
 
@@ -477,17 +524,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     return () => window.removeEventListener('mousedown', handleOutsideClick)
   }, [])
 
-  useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
-      if (!emailPickerRef.current) return
-      if (!emailPickerRef.current.contains(event.target as Node)) {
-        setEmailMenuOpen(false)
-      }
-    }
 
-    window.addEventListener('mousedown', handleOutsideClick)
-    return () => window.removeEventListener('mousedown', handleOutsideClick)
-  }, [])
 
   useEffect(() => {
     function handleTimezoneOutsideClick(event: MouseEvent) {
@@ -814,9 +851,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         lead_creation: leadCreation,
         lead_creation_mode: leadMode,
         target_lead_count: Number(targetLeadCount || 0),
-        ...(sendingEmail ? {
-          sending_email: sendingEmail,
-          sending_email_account_name: sendingEmailAccountName
+        ...(selectedEmails.length > 0 ? {
+          sending_email: selectedEmails[0],
+          sending_email_account_name: emailAccounts.find(acc => acc.email_address.toLowerCase() === selectedEmails[0].toLowerCase())?.account_name || selectedEmails[0],
+          email_list: selectedEmails
         } : {})
       })
     } catch (err: any) {
@@ -1478,82 +1516,62 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
               <div className="space-y-3">
                 <span className="text-sm font-semibold text-slate-700">Sending Email Account</span>
-                <div className="grid gap-4 xl:grid-cols-[minmax(280px,360px)_1fr]">
-                  <div ref={emailPickerRef} className="relative w-full">
+                <div className="flex flex-col gap-3">
+                  <div className="flex max-w-md gap-3">
+                    <input
+                      type="email"
+                      value={emailInput}
+                      onChange={(e) => setEmailInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          handleAddEmail()
+                        }
+                      }}
+                      placeholder="Enter sending email (e.g. sender@company.com)"
+                      className="w-full rounded-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    />
                     <button
                       type="button"
-                      onClick={() => setEmailMenuOpen((current) => !current)}
-                      className="flex h-11 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-4 text-left text-sm text-slate-800 shadow-sm transition hover:border-slate-350"
+                      onClick={handleAddEmail}
+                      disabled={addingEmail || !emailInput.trim()}
+                      className="inline-flex h-10 items-center justify-center rounded-md bg-indigo-650 hover:bg-indigo-700 px-5 text-sm font-semibold text-white transition shadow-sm disabled:opacity-50 min-w-[72px]"
                     >
-                      <span className="truncate">
-                        {selectedEmail
-                          ? selectedEmailAccount
-                            ? `${selectedEmailAccount.account_name || selectedEmailAccount.email_address} (${selectedEmailAccount.email_address})`
-                            : selectedEmail
-                          : 'No sender selected'}
-                      </span>
-                      <ChevronDown className="ml-2 h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
-                    </button>
-
-                    {emailMenuOpen && (
-                      <div className="absolute z-30 mt-1 max-h-72 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-xl">
-                        <button
-                          type="button"
-                          className={`flex w-full items-center px-4 py-2 text-left text-sm hover:bg-slate-50 ${!selectedEmail ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}
-                          onClick={() => {
-                            setSelectedEmail('')
-                            setEmailMenuOpen(false)
-                          }}
-                        >
-                          No sender selected
-                        </button>
-
-                        {emailAccounts.length ? (
-                          emailAccounts.map((account) => (
-                            <div key={account.id} className="flex items-center gap-1 px-1">
-                              <button
-                                type="button"
-                                className={`min-w-0 flex-1 rounded-md px-3 py-2 text-left text-sm hover:bg-slate-50 ${selectedEmail.toLowerCase() === account.email_address.toLowerCase() ? 'font-semibold text-indigo-600' : 'text-slate-700'}`}
-                                onClick={() => {
-                                  setSelectedEmail(account.email_address)
-                                  setError('')
-                                  setEmailMenuOpen(false)
-                                }}
-                              >
-                                <span className="block truncate font-semibold">{account.account_name || account.email_address}</span>
-                                <span className="block truncate text-xs font-normal text-slate-400">{account.email_address}</span>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation()
-                                  handleDeleteEmailAccount(account)
-                                }}
-                                disabled={deletingEmailId === account.id}
-                                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
-                                aria-label={`Delete ${account.email_address}`}
-                              >
-                                <Trash2 className="h-4 w-4" aria-hidden="true" />
-                              </button>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="px-4 py-2 text-sm text-slate-400 font-medium">No saved email accounts</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex w-full items-center">
-                    <button
-                      type="button"
-                      onClick={handleSyncEmailAccounts}
-                      disabled={syncingEmails}
-                      className="h-11 rounded-md bg-white border border-indigo-200 hover:bg-indigo-50 px-4 text-sm font-semibold text-indigo-700 transition-colors shadow-sm disabled:opacity-50"
-                    >
-                      {syncingEmails ? 'Syncing...' : 'Sync now'}
+                      {addingEmail ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      ) : (
+                        'Add'
+                      )}
                     </button>
                   </div>
+
+                  {/* Selected emails tag list */}
+                  {selectedEmails.length > 0 && (
+                    <div className="flex flex-wrap gap-2 max-w-2xl pt-1">
+                      {selectedEmails.map((email) => {
+                        const account = emailAccounts.find(acc => acc.email_address.toLowerCase() === email.toLowerCase())
+                        const displayName = account ? (account.account_name || account.email_address) : email
+                        return (
+                          <span
+                            key={email}
+                            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 border border-indigo-200 pl-3 pr-2 py-1 text-xs font-semibold text-indigo-700 shadow-sm animate-in fade-in zoom-in duration-200"
+                          >
+                            <span className="truncate max-w-[280px]" title={email}>
+                              {displayName}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEmails(prev => prev.filter(e => e.toLowerCase() !== email.toLowerCase()))}
+                              className="rounded-full p-0.5 hover:bg-indigo-100 hover:text-indigo-900 transition"
+                              aria-label={`Remove ${email}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
 
