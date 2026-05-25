@@ -432,6 +432,8 @@ export async function GET(req: Request) {
     const shouldSyncInstantly = searchParams.get('sync') === '1'
     const search = (searchParams.get('q') || '').trim()
     const selectedDate = (searchParams.get('date') || '').trim()
+    const startDate = (searchParams.get('startDate') || '').trim()
+    const endDate = (searchParams.get('endDate') || '').trim()
     const from = (page - 1) * perPage
     const to = from + perPage - 1
 
@@ -448,7 +450,15 @@ export async function GET(req: Request) {
       query = query.or(`name.ilike.%${escaped}%,status.ilike.%${escaped}%,instantly_campaign_id.ilike.%${escaped}%`)
     }
 
-    if (selectedDate) {
+    if (startDate) {
+      const start = new Date(`${startDate}T00:00:00.000Z`).toISOString()
+      query = query.gte('created_at', start)
+    }
+    if (endDate) {
+      const end = new Date(`${endDate}T23:59:59.999Z`).toISOString()
+      query = query.lte('created_at', end)
+    }
+    if (!startDate && !endDate && selectedDate) {
       const start = new Date(`${selectedDate}T00:00:00.000Z`).toISOString()
       const end = new Date(`${selectedDate}T23:59:59.999Z`).toISOString()
       query = query.gte('created_at', start).lte('created_at', end)

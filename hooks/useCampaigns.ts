@@ -2,12 +2,18 @@
 import { useQuery } from '@tanstack/react-query'
 import axios from 'axios'
 
-export function useCampaigns(page = 1, perPage = 25, search = '', date = '') {
+export function useCampaigns(page = 1, perPage = 25, search = '', startDate = '', endDate = '') {
   const query = useQuery({
-    queryKey: ['campaigns', page, perPage, search, date],
+    queryKey: ['campaigns', page, perPage, search, startDate, endDate],
     queryFn: async () => {
       const r = await axios.get('/api/campaigns', {
-        params: { page, per_page: perPage, ...(search ? { q: search } : {}), ...(date ? { date } : {}) }
+        params: {
+          page,
+          per_page: perPage,
+          ...(search ? { q: search } : {}),
+          ...(startDate ? { startDate } : {}),
+          ...(endDate ? { endDate } : {})
+        }
       })
       return {
         data: r.data.data || [],

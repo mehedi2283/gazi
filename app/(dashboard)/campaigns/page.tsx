@@ -40,12 +40,14 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
 
 export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedDate, setSelectedDate] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [page, setPage] = useState(1)
   const perPage = 10
   const searchInputRef = useRef<HTMLInputElement | null>(null)
-  const dateInputRef = useRef<HTMLInputElement | null>(null)
-  const { data, meta, isLoading, error } = useCampaigns(page, perPage, searchQuery, selectedDate)
+  const startDateInputRef = useRef<HTMLInputElement | null>(null)
+  const endDateInputRef = useRef<HTMLInputElement | null>(null)
+  const { data, meta, isLoading, error } = useCampaigns(page, perPage, searchQuery, startDate, endDate)
   const { isAdmin } = useCurrentUser()
   const qc = useQueryClient()
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
@@ -80,7 +82,7 @@ export default function CampaignsPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [selectedDate])
+  }, [startDate, endDate])
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
@@ -176,50 +178,97 @@ export default function CampaignsPage() {
                   placeholder="Search campaigns..."
                 />
               </div>
+              {/* Start Date */}
               <div
                 className="relative flex cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm ring-indigo-500/20 transition-all focus-within:ring-2"
                 role="button"
                 tabIndex={-1}
                 onClick={() => {
-                  const picker = dateInputRef.current as HTMLInputElement & { showPicker?: () => void }
+                  const picker = startDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
                   if (picker?.showPicker) {
                     picker.showPicker()
                   } else {
-                    dateInputRef.current?.focus()
+                    startDateInputRef.current?.focus()
                   }
                 }}
               >
+                <span className="text-xs font-semibold text-slate-400 mr-2 select-none uppercase tracking-wider">Start:</span>
                 <input
-                  ref={dateInputRef}
+                  ref={startDateInputRef}
                   type="date"
-                  value={selectedDate}
-                  onChange={(event) => setSelectedDate(event.target.value)}
+                  value={startDate}
+                  onChange={(event) => setStartDate(event.target.value)}
                   className="w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-8 text-sm text-slate-700 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:hidden"
-                  aria-label="Filter campaigns by created date"
+                  aria-label="Filter campaigns by start date"
                 />
                 <button
                   type="button"
                   className="absolute right-3 cursor-pointer text-slate-400 transition hover:text-slate-600"
                   onClick={() => {
-                    const picker = dateInputRef.current as HTMLInputElement & { showPicker?: () => void }
+                    const picker = startDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
                     if (picker?.showPicker) {
                       picker.showPicker()
                     } else {
-                      dateInputRef.current?.focus()
+                      startDateInputRef.current?.focus()
                     }
                   }}
-                  aria-label="Open date picker"
+                  aria-label="Open start date picker"
                 >
                   <Calendar className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>
-              {selectedDate ? (
+
+              {/* End Date */}
+              <div
+                className="relative flex cursor-pointer items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm ring-indigo-500/20 transition-all focus-within:ring-2"
+                role="button"
+                tabIndex={-1}
+                onClick={() => {
+                  const picker = endDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
+                  if (picker?.showPicker) {
+                    picker.showPicker()
+                  } else {
+                    endDateInputRef.current?.focus()
+                  }
+                }}
+              >
+                <span className="text-xs font-semibold text-slate-400 mr-2 select-none uppercase tracking-wider">End:</span>
+                <input
+                  ref={endDateInputRef}
+                  type="date"
+                  value={endDate}
+                  onChange={(event) => setEndDate(event.target.value)}
+                  className="w-full cursor-pointer appearance-none border-0 bg-transparent py-0 pr-8 text-sm text-slate-700 outline-none focus:ring-0 [&::-webkit-calendar-picker-indicator]:hidden"
+                  aria-label="Filter campaigns by end date"
+                />
                 <button
                   type="button"
-                  onClick={() => setSelectedDate('')}
+                  className="absolute right-3 cursor-pointer text-slate-400 transition hover:text-slate-600"
+                  onClick={() => {
+                    const picker = endDateInputRef.current as HTMLInputElement & { showPicker?: () => void }
+                    if (picker?.showPicker) {
+                      picker.showPicker()
+                    } else {
+                      endDateInputRef.current?.focus()
+                    }
+                  }}
+                  aria-label="Open end date picker"
+                >
+                  <Calendar className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+
+              {/* Clear button */}
+              {startDate || endDate ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('')
+                    setEndDate('')
+                  }}
                   className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
                 >
-                  Clear date
+                  Clear dates
                 </button>
               ) : null}
             </div>
