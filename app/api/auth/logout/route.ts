@@ -6,14 +6,14 @@ export async function POST() {
   response.cookies.set('sb-access-token', '', {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     path: '/',
     maxAge: 0
   })
   response.cookies.set('sb-refresh-token', '', {
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    secure: false,
     path: '/',
     maxAge: 0
   })

@@ -5,7 +5,7 @@ import supabase from '../../../../lib/supabase/server'
 const COOKIE_OPTIONS = {
   httpOnly: true,
   sameSite: 'lax' as const,
-  secure: process.env.NODE_ENV === 'production',
+  secure: false,
   path: '/'
 }
 
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
     response.cookies.set('sb-token-expires-at', String(Date.now() + (data.session.expires_in || 3600) * 1000), {
       path: '/',
       sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      secure: false,
       httpOnly: false
     })
 
