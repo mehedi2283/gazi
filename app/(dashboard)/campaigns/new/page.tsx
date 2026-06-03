@@ -30,7 +30,7 @@ export default function NewCampaignPage() {
       <CampaignForm
         mode="create"
         title="New Campaign"
-        subtitle="Create an AI-personalized sequence and send it to Instantly."
+        subtitle="Create an AI-personalized sequence and launch it with your connected sending account."
         submitLabel="Launch Campaign"
         onSubmit={handleCreate}
       />

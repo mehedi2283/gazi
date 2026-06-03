@@ -404,6 +404,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       const match = accounts.find((acc) => acc.email_address.toLowerCase() === email)
       if (match) {
         setSelectedEmails((prev) => [...prev, email])
+        setError('')
         setEmailInput('')
         toast.success(`Verified and added: ${email}`)
       } else {
@@ -762,8 +763,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     let sendingEmail = selectedEmail.trim().toLowerCase()
     let sendingEmailAccountName = selectedEmailAccount?.account_name || sendingEmail
 
-    // REQUIRE sending email
-    if (!sendingEmail) {
+    // REQUIRE sending email — skip this error when a sending email has been added
+    if (selectedEmails.length === 0) {
       setError('Sending email is required')
       setSubmitting(false)
       return
