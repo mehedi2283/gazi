@@ -64,7 +64,7 @@ export default function CampaignEditPage({ id }: CampaignEditPageProps) {
     <CampaignForm
       mode="edit"
       title="Edit Campaign"
-      subtitle="Update the campaign settings and sync changes to Instantly."
+      subtitle="Update the campaign settings and sync changes with the sending provider."
       submitLabel="Save Changes"
       initialData={campaign}
       onSubmit={handleSave}

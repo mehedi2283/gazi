@@ -34,7 +34,7 @@ function titleForPath(path: string): { title: string; subtitle?: string } {
     },
     '/dashboard/campaigns': {
       title: 'Campaigns',
-      subtitle: 'Sequences synced with Instantly.'
+      subtitle: 'Sequences synced.'
     },
     '/dashboard/ai-personalization': {
       title: 'AI personalization',
@@ -54,7 +54,7 @@ function titleForPath(path: string): { title: string; subtitle?: string } {
     },
     '/campaigns': {
       title: 'Campaigns',
-      subtitle: 'Sequences synced with Instantly.'
+      subtitle: 'Sequences synced.'
     },
     '/ai-personalization': {
       title: 'AI personalization',

@@ -387,7 +387,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     setAddingEmail(true)
     try {
-      // Sync with Instantly first to make sure we check against the latest accounts
+      // Sync with the sending provider first to make sure we check against the latest accounts
       const resp = await fetch('/api/email-accounts/sync', { method: 'POST' })
       const json = await resp.json()
       if (!resp.ok || json.error) throw new Error(json.error || 'Sync failed')
@@ -408,7 +408,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         setEmailInput('')
         toast.success(`Verified and added: ${email}`)
       } else {
-        toast.error(`There is no sending email with this address in your Instantly account.`)
+        toast.error(`There is no sending email with this address in your account.`)
       }
     } catch (err: any) {
       toast.error(err?.message || 'Failed to verify email account')

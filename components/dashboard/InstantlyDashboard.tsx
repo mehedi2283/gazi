@@ -282,7 +282,7 @@ export default function InstantlyDashboard() {
       const result = await response.json()
 
       if (!response.ok || result.error) {
-        throw new Error(result.error || 'Failed to load instantly stats')
+        throw new Error(result.error || 'Failed to load analytics stats')
       }
 
       const dailyData = (result.data.daily || []) as DailyRow[]
@@ -296,7 +296,7 @@ export default function InstantlyDashboard() {
         setLastSynced(new Date(overviewData[0].synced_at).toLocaleString())
       }
     } catch (error) {
-      console.error('Error loading Instantly dashboard data:', error)
+      console.error('Error loading analytics dashboard data:', error)
       toast.error('Failed to load analytics')
     } finally {
       setLoading(false)
@@ -314,7 +314,7 @@ export default function InstantlyDashboard() {
       if (response.ok && result.success) {
         setLastSynced(new Date(result.timestamp || Date.now()).toLocaleString())
         await loadDashboardData()
-        toast.success('Instantly data synced')
+        toast.success('Analytics data synced')
       } else {
         toast.error(typeof result.error === 'string' ? result.error : 'Sync failed')
       }
@@ -379,7 +379,7 @@ export default function InstantlyDashboard() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold tracking-tight text-slate-800">Analytics</h2>
-          <p className="mt-1 text-sm text-slate-400">Data is read from Supabase only.</p>
+          <p className="mt-1 text-sm text-slate-400">Data is read from the analytics database only.</p>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-4">
           {lastSynced ? <span className="text-sm text-slate-400">Last synced: {lastSynced}</span> : null}
@@ -548,7 +548,7 @@ export default function InstantlyDashboard() {
             ) : (
               <div className="flex h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-50/50 text-sm text-slate-500">
                 <div>No campaign engagement data available.</div>
-                <div className="mt-2 text-xs text-slate-400">Sync Instantly data to populate this chart.</div>
+                <div className="mt-2 text-xs text-slate-400">Sync analytics data to populate this chart.</div>
               </div>
             )}
             <div className="mt-4 flex flex-wrap gap-3 text-xs text-slate-500">
