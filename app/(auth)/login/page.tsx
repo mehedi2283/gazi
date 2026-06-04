@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -61,6 +62,12 @@ export default function LoginPage() {
             required
           />
           {error ? <p className="text-sm text-red-600 font-semibold">{error}</p> : null}
+          <div className="flex items-center justify-between text-sm font-medium text-slate-500">
+            <span>Need to reset your password?</span>
+            <Link href="/reset-password" className="font-bold text-indigo-600 hover:text-indigo-500 transition">
+              Reset it
+            </Link>
+          </div>
           <button
             disabled={submitting}
             className="w-full rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 py-2.5 font-bold text-white shadow-md shadow-indigo-600/10 hover:opacity-95 hover:shadow-indigo-600/20 disabled:opacity-60 transition flex items-center justify-center gap-2"

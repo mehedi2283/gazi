@@ -28,7 +28,8 @@ type NavItem = {
 const NAV: NavItem[] = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/leads', label: 'Leads', icon: Users },
-  { href: '/dashboard/campaigns', label: 'Campaigns', icon: Megaphone }
+  { href: '/dashboard/campaigns', label: 'Campaigns', icon: Megaphone },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings }
 ]
 
 function isActive(pathname: string, href: string, exact?: boolean) {
