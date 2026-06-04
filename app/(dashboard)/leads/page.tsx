@@ -131,6 +131,7 @@ export default function LeadsPage() {
   const [deleteModalFor, setDeleteModalFor] = useState<{ id: string; label: string } | null>(null)
   const [deletingFromModal, setDeletingFromModal] = useState(false)
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
+  const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
   const [expandedLeadId, setExpandedLeadId] = useState<string | null>(null)
   const [openCampaignDropdownForLead, setOpenCampaignDropdownForLead] = useState<string | null>(null)
 
@@ -151,6 +152,7 @@ export default function LeadsPage() {
       if (target) {
         if (!target.closest('[data-lead-actions]')) {
           setOpenMenuFor(null)
+          setMenuAboveFor(null)
         }
         if (!target.closest('[data-campaign-overflow]')) {
           setOpenCampaignDropdownForLead(null)
@@ -193,7 +195,7 @@ export default function LeadsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
           <div>
             <h2 className="text-base font-semibold text-slate-800">All leads</h2>
-            <p className="text-sm text-slate-400">{totalLeads} leads in Supabase</p>
+            <p className="text-sm text-slate-400">{totalLeads} leads in database</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <input
@@ -258,7 +260,7 @@ export default function LeadsPage() {
           <div className="p-6 text-sm text-red-500">Failed to load leads.</div>
         ) : leads?.length ? (
           <>
-          <div className="overflow-x-auto min-h-[240px]">
+          <div className="overflow-x-auto overflow-y-visible min-h-[240px]">
             <table className="min-w-full divide-y divide-slate-100 text-left text-sm">
               <thead className="bg-slate-50/70 text-xs uppercase tracking-wider text-slate-550">
                 <tr>
@@ -336,7 +338,7 @@ export default function LeadsPage() {
                                 ))}
 
                                 {overflow > 0 ? (
-                                  <div className="relative inline-block text-left" data-campaign-overflow>
+                                  <div className="relative z-50 inline-block text-left" data-campaign-overflow>
                                     <button
                                       type="button"
                                       onClick={(e) => {
@@ -350,7 +352,7 @@ export default function LeadsPage() {
                                       +{overflow}
                                     </button>
                                     {openCampaignDropdownForLead === lead.id && (
-                                      <div className="absolute left-0 mt-1 z-30 w-48 rounded-md border border-slate-200 bg-white/95 py-1 shadow-lg backdrop-blur-sm max-h-48 overflow-y-auto">
+                                      <div className="absolute left-0 mt-1 z-[60] w-48 rounded-md border border-slate-200 bg-white/95 py-1 shadow-lg backdrop-blur-sm max-h-48 overflow-y-auto">
                                         {ids.slice(maxVisible).map((id: string) => (
                                           <Link
                                             key={id}
@@ -387,7 +389,13 @@ export default function LeadsPage() {
                             <div className="relative inline-block text-left">
                               <button
                                 type="button"
-                                onClick={() => setOpenMenuFor((current) => current === leadId ? null : leadId)}
+                                onClick={(event) => {
+                                  const btn = event.currentTarget as HTMLElement
+                                  const rect = btn.getBoundingClientRect()
+                                  const needAbove = window.innerHeight - rect.bottom < 260
+                                  setOpenMenuFor((current) => (current === leadId ? null : leadId))
+                                  setMenuAboveFor(needAbove ? leadId : null)
+                                }}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
                                 aria-label="Open lead actions"
                               >
@@ -395,13 +403,18 @@ export default function LeadsPage() {
                               </button>
 
                               {openMenuFor === leadId ? (
-                                <div className="absolute right-0 z-20 mt-1 w-36 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg">
+                                <div
+                                  className={`absolute right-0 z-[200] w-36 overflow-hidden rounded-md border border-slate-200 bg-white py-1 shadow-lg ${
+                                    menuAboveFor === leadId ? 'bottom-10' : 'top-full mt-1'
+                                  }`}
+                                >
                                   <button
                                     type="button"
                                     className="flex w-full items-center px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-50"
                                     onClick={() => {
                                       setExpandedLeadId((current) => (current === leadId ? null : leadId))
                                       setOpenMenuFor(null)
+                                      setMenuAboveFor(null)
                                     }}
                                   >
                                     {isExpanded ? 'Hide details' : 'View details'}
@@ -412,6 +425,7 @@ export default function LeadsPage() {
                                     onClick={() => {
                                       setDeleteModalFor({ id: String(lead.id), label: lead.email || formatName(lead) })
                                       setOpenMenuFor(null)
+                                      setMenuAboveFor(null)
                                     }}
                                   >
                                     Delete

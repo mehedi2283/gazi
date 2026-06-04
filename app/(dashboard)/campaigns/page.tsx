@@ -55,6 +55,7 @@ export default function CampaignsPage() {
   const [deletingCampaign, setDeletingCampaign] = useState(false)
   const [activatingCampaignId, setActivatingCampaignId] = useState('')
   const [pausingCampaignId, setPausingCampaignId] = useState('')
+  const [sendingWeeklyReportCampaignId, setSendingWeeklyReportCampaignId] = useState('')
   useEffect(() => {
     function onClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement | null
@@ -203,7 +204,7 @@ export default function CampaignsPage() {
           </div>
         ) : filteredCampaigns.length ? (
           <>
-          <div className="overflow-x-auto min-h-[240px]">
+          <div className="overflow-x-auto overflow-y-visible min-h-[240px]">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-100 bg-slate-50/70">
                 <tr>
@@ -219,6 +220,7 @@ export default function CampaignsPage() {
                   const currentStatus = String(campaign.status || 'draft')
                   const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
                   const canPause = currentStatus === 'active'
+                  const canSendWeeklyReport = isAdmin && currentStatus !== 'draft'
 
                   return (
                     <tr key={campaign.id} className="group transition-colors hover:bg-slate-50/50">
@@ -283,7 +285,7 @@ export default function CampaignsPage() {
                                 event.stopPropagation()
                                 const btn = event.currentTarget as HTMLElement
                                 const rect = btn.getBoundingClientRect()
-                                const needAbove = window.innerHeight - rect.bottom < 220
+                                const needAbove = window.innerHeight - rect.bottom < 260
                                 setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)
                                 setMenuAboveFor(needAbove ? campaign.id : null)
                               }}
@@ -355,6 +357,35 @@ export default function CampaignsPage() {
                                       <Pause className="h-4 w-4" />
                                     )}
                                     {pausingCampaignId === campaign.id ? 'Pausing...' : 'Pause'}
+                                  </button>
+                                ) : null}
+
+                                {canSendWeeklyReport ? (
+                                  <button
+                                    type="button"
+                                    disabled={sendingWeeklyReportCampaignId === campaign.id || !campaign.instantly_campaign_id}
+                                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-750 transition hover:bg-slate-50 disabled:opacity-50"
+                                    onClick={async () => {
+                                      setSendingWeeklyReportCampaignId(campaign.id)
+                                      try {
+                                        const resp = await fetch(`/api/campaigns/${campaign.id}/weekly-report`, { method: 'POST' })
+                                        const json = await resp.json()
+                                        if (!resp.ok || json.error) throw new Error(json.error || 'Weekly report failed')
+                                        setOpenMenuFor(null)
+                                        toast.success('Weekly report sent')
+                                      } catch (e) {
+                                        toast.error(String(e))
+                                      } finally {
+                                        setSendingWeeklyReportCampaignId('')
+                                      }
+                                    }}
+                                  >
+                                    {sendingWeeklyReportCampaignId === campaign.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Calendar className="h-4 w-4" />
+                                    )}
+                                    {sendingWeeklyReportCampaignId === campaign.id ? 'Sending report...' : 'Send weekly report'}
                                   </button>
                                 ) : null}
 

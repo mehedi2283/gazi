@@ -458,7 +458,7 @@ export default function CampaignDetailPage({ params }: { params: { id: string } 
           </div>
         ) : campaignLeads.length ? (
           <>
-          <div className="overflow-x-auto min-h-[240px]">
+          <div className="overflow-x-auto overflow-y-visible min-h-[240px]">
             <table className="min-w-full text-left text-sm">
               <thead className="border-b border-slate-200 bg-slate-50/50">
                 <tr>
