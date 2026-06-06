@@ -387,22 +387,19 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     setAddingEmail(true)
     try {
-      // Sync with the sending provider first to make sure we check against the latest accounts
-      const resp = await fetch('/api/email-accounts/sync', { method: 'POST' })
+      // Ask Instantly for this mailbox directly instead of syncing every account.
+      const resp = await fetch(`/api/email-accounts/sync?search=${encodeURIComponent(email)}`, { method: 'POST' })
       const json = await resp.json()
       if (!resp.ok || json.error) throw new Error(json.error || 'Sync failed')
 
-      // Fetch the latest email accounts list
-      const r2 = await fetch('/api/email-accounts')
-      const j2 = await r2.json()
-      let accounts: EmailAccount[] = []
-      if (Array.isArray(j2.data)) {
-        accounts = j2.data
-        setEmailAccounts(j2.data)
-      }
+      const accounts: EmailAccount[] = Array.isArray(json.data?.local) ? json.data.local : []
 
       const match = accounts.find((acc) => acc.email_address.toLowerCase() === email)
       if (match) {
+        setEmailAccounts((prev) => {
+          const withoutMatch = prev.filter((acc) => acc.email_address.toLowerCase() !== email)
+          return [...withoutMatch, match].sort((left, right) => left.email_address.localeCompare(right.email_address))
+        })
         setSelectedEmails((prev) => [...prev, email])
         setError('')
         setEmailInput('')

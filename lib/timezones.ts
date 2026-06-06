@@ -1,4 +1,4 @@
-export const DEFAULT_TIMEZONE = 'Etc/GMT+12'
+export const DEFAULT_TIMEZONE = 'America/Chicago'
 
 export const INSTANTLY_TIMEZONES = [
   'Etc/GMT+12',

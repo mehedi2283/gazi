@@ -180,25 +180,42 @@ function mapDays(days: any) {
     // If it's an array, assume it's ordered from monday to sunday
     const [monday, tuesday, wednesday, thursday, friday, saturday, sunday] = days
     return {
-      "0": Boolean(monday),
-      "1": Boolean(tuesday),
-      "2": Boolean(wednesday),
-      "3": Boolean(thursday),
-      "4": Boolean(friday),
-      "5": Boolean(saturday),
-      "6": Boolean(sunday)
+      "0": Boolean(sunday),
+      "1": Boolean(monday),
+      "2": Boolean(tuesday),
+      "3": Boolean(wednesday),
+      "4": Boolean(thursday),
+      "5": Boolean(friday),
+      "6": Boolean(saturday)
     }
   }
 
   return {
-    "0": Boolean(days?.monday),
-    "1": Boolean(days?.tuesday),
-    "2": Boolean(days?.wednesday),
-    "3": Boolean(days?.thursday),
-    "4": Boolean(days?.friday),
-    "5": Boolean(days?.saturday),
-    "6": Boolean(days?.sunday)
+    "0": Boolean(days?.sunday),
+    "1": Boolean(days?.monday),
+    "2": Boolean(days?.tuesday),
+    "3": Boolean(days?.wednesday),
+    "4": Boolean(days?.thursday),
+    "5": Boolean(days?.friday),
+    "6": Boolean(days?.saturday)
   }
+}
+
+function getInstantlyAccounts(response: any): any[] {
+  if (Array.isArray(response?.data)) return response.data
+  if (Array.isArray(response?.data?.items)) return response.data.items
+  if (Array.isArray(response?.items)) return response.items
+  return []
+}
+
+function getInstantlyAccountEmail(account: any) {
+  return String(account?.email || account?.email_address || '').trim().toLowerCase()
+}
+
+async function findInstantlyAccountByEmail(email: string) {
+  const accountsRes = await listAccounts({ limit: 100, search: email })
+  const accounts = getInstantlyAccounts(accountsRes)
+  return accounts.find((account: any) => getInstantlyAccountEmail(account) === email) || null
 }
 
 function getSubjectVariable(stepNumber: number) {
@@ -704,19 +721,8 @@ export async function POST(req: Request) {
 
     if (emailsToValidate.length > 0) {
       try {
-        const accountsRes = await listAccounts()
-        let accounts: any[] = []
-
-        if (Array.isArray(accountsRes?.data)) {
-          accounts = accountsRes.data
-        } else if (Array.isArray(accountsRes?.data?.items)) {
-          accounts = accountsRes.data.items
-        } else if (Array.isArray(accountsRes?.items)) {
-          accounts = accountsRes.items
-        }
-
         for (const email of emailsToValidate) {
-          const found = accounts.find((a: any) => String((a.email || a.email_address || '')).toLowerCase() === email)
+          const found = await findInstantlyAccountByEmail(email)
           if (!found) {
             return NextResponse.json({ data: null, error: `The sending email ${email} is not present in your Instantly account. Please add it there or sync accounts.` }, { status: 400 })
           }
