@@ -88,8 +88,15 @@ type CampaignFormProps = {
   subtitle: string
   submitLabel: string
   mode: 'create' | 'edit'
+  channel?: 'email' | 'both'
+  hideSubmit?: boolean
   initialData?: CampaignInitialData | null
   onSubmit: (payload: any) => Promise<void>
+}
+
+export type CampaignFormHandle = {
+  validate: () => boolean
+  submit: () => Promise<void>
 }
 
 const LEAD_MODE_OPTIONS: Array<{ value: LeadCreationMode; label: string; description: string }> = [
@@ -216,10 +223,18 @@ function LockedLabel({ children }: { children: React.ReactNode }) {
 }
 
 const TABS = ['Basics', 'Campaign Owner', 'Schedule', 'Sender Profile', 'Sequences', 'Leads'] as const
-type Tab = typeof TABS[number]
+type Tab = typeof TABS[number] | 'LinkedIn'
 
-export default function CampaignForm({ title, subtitle, submitLabel, mode, initialData, onSubmit }: CampaignFormProps) {
+type CombinedLinkedInStep = {
+  day_delay: number
+}
+
+const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(function CampaignForm({ title, subtitle, submitLabel, mode, channel = 'email', hideSubmit = false, initialData, onSubmit }, ref) {
+  const isCombinedChannel = channel === 'both'
   const [activeTab, setActiveTab] = useState<Tab>('Basics')
+  const visibleTabs = useMemo(() => (
+    isCombinedChannel ? [...TABS, 'LinkedIn'] as Tab[] : [...TABS] as Tab[]
+  ), [isCombinedChannel])
   const [submitting, setSubmitting] = useState(false)
   const [verifyingToken, setVerifyingToken] = useState(false)
   const [error, setError] = useState('')
@@ -262,7 +277,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     address: initialData?.sender_address || '',
     booking_calendar_link: initialData?.booking_calendar_link || '',
     signature: initialData?.signature || '',
-    signature_url: initialData?.signature_url || ''
+    signature_url: initialData?.signature_url || '',
+    linkedin_profile_url: ''
   })
   const [reportEmail, setReportEmail] = useState(initialData?.report_email || '')
   const [calendlyToken, setCalendlyToken] = useState(initialData?.calendly_token || '')
@@ -301,6 +317,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
     return initialSteps
   })
+  const [combinedLinkedInActionGap, setCombinedLinkedInActionGap] = useState(String(initialData?.email_gap ?? 10))
+  const [combinedLinkedInSteps, setCombinedLinkedInSteps] = useState<CombinedLinkedInStep[]>([{ day_delay: 0 }])
 
   // Fetch email accounts from Supabase
   useEffect(() => {
@@ -445,6 +463,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         : [{ delay_days: 0 }]
     )
     setTargetLeadCount(String(initialData?.target_lead_count ?? 100))
+    setCombinedLinkedInActionGap(String(initialData?.email_gap ?? 10))
+    setCombinedLinkedInSteps([{ day_delay: 0 }])
     setAttachmentUrl(initialData?.attachment_url || '')
     setSenderInfo((prev) => ({
       ...prev,
@@ -456,7 +476,8 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       address: initialData?.sender_address || '',
       signature: initialData?.signature || '',
       booking_calendar_link: initialData?.booking_calendar_link || '',
-      signature_url: initialData?.signature_url || ''
+      signature_url: initialData?.signature_url || '',
+      linkedin_profile_url: ''
     }))
     setReportEmail(initialData?.report_email || '')
     setCalendlyToken(initialData?.calendly_token || '')
@@ -496,6 +517,11 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
   }, [clientEmail])
 
   const sequenceError = useMemo(() => getSequenceError(steps), [steps])
+  const combinedLinkedInSequenceError = useMemo(() => (
+    isCombinedChannel
+      ? getSequenceError(combinedLinkedInSteps.map((step) => ({ delay_days: step.day_delay })))
+      : ''
+  ), [combinedLinkedInSteps, isCombinedChannel])
   const selectedEmailAccount = useMemo(() => {
     return emailAccounts.find((account) => account.email_address.toLowerCase() === selectedEmail.toLowerCase()) || null
   }, [emailAccounts, selectedEmail])
@@ -571,6 +597,33 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
 
       return {
         delay_days: Number.isFinite(nextValue) ? Math.max(minimum, nextValue) : minimum
+      }
+    }))
+  }
+
+  function addCombinedLinkedInStep() {
+    setCombinedLinkedInSteps((current) => [
+      ...current,
+      { day_delay: (current[current.length - 1]?.day_delay ?? 0) + 1 }
+    ])
+  }
+
+  function removeCombinedLinkedInStep(index: number) {
+    setCombinedLinkedInSteps((current) => (
+      current.length <= 1 ? current : current.filter((_, stepIndex) => stepIndex !== index)
+    ))
+  }
+
+  function updateCombinedLinkedInDelay(index: number, value: string) {
+    setCombinedLinkedInSteps((current) => current.map((step, stepIndex) => {
+      if (stepIndex !== index) return step
+      if (stepIndex === 0) return { day_delay: 0 }
+
+      const minimum = (current[stepIndex - 1]?.day_delay ?? 0) + 1
+      const nextValue = Number(value)
+
+      return {
+        day_delay: Number.isFinite(nextValue) ? Math.max(minimum, nextValue) : minimum
       }
     }))
   }
@@ -698,14 +751,67 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
     }
   }
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    setSubmitting(true)
+  function validateForm() {
     setError('')
 
     const validationError = getSequenceError(steps)
     if (validationError) {
       setError(validationError)
+      return false
+    }
+
+    if (combinedLinkedInSequenceError) {
+      setError(combinedLinkedInSequenceError)
+      return false
+    }
+
+    if (!name.trim()) {
+      setError('Campaign name is required')
+      return false
+    }
+
+    if (!campaignOwner.company_name.trim() || !campaignOwner.created_from_company.trim()) {
+      setError('Campaign owner details are required')
+      return false
+    }
+
+    if (selectedEmails.length === 0) {
+      setError('Sending email is required')
+      return false
+    }
+
+    if (leadMode === 'apollo' && (!apolloLead.market_name.trim() || !apolloLead.product_name.trim())) {
+      setError('Country and product name are required for External lead creation')
+      return false
+    }
+
+    if (leadMode === 'import' && !leadRows.length) {
+      setError('Upload a CSV or spreadsheet before creating imported leads')
+      return false
+    }
+
+    if (
+      !senderInfo.name.trim() ||
+      !senderInfo.company.trim() ||
+      !senderInfo.location.trim() ||
+      !senderInfo.address.trim() ||
+      !senderInfo.booking_calendar_link.trim() ||
+      !calendlyToken.trim() ||
+      !clientEmail.trim() ||
+      (isCombinedChannel && !senderInfo.linkedin_profile_url.trim())
+    ) {
+      setError(isCombinedChannel ? 'Complete sender information is required (including LinkedIn Profile URL, Calendly Token, and Client Email)' : 'Complete sender information is required (including Calendly Token and Client Email)')
+      return false
+    }
+
+    return true
+  }
+
+  async function submitForm(throwErrors = false) {
+    setSubmitting(true)
+    setError('')
+
+    if (!validateForm()) {
       setSubmitting(false)
       return
     }
@@ -786,9 +892,10 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       !senderInfo.address.trim() ||
       !senderInfo.booking_calendar_link.trim() ||
       !calendlyToken.trim() ||
-      !clientEmail.trim()
+      !clientEmail.trim() ||
+      (isCombinedChannel && !senderInfo.linkedin_profile_url.trim())
     ) {
-      setError('Complete sender information is required (including Calendly Token and Client Email)')
+      setError(isCombinedChannel ? 'Complete sender information is required (including LinkedIn Profile URL, Calendly Token, and Client Email)' : 'Complete sender information is required (including Calendly Token and Client Email)')
       setSubmitting(false)
       return
     }
@@ -844,8 +951,22 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           booking_calendar_link: senderInfo.booking_calendar_link.trim(),
           attachment_url: attachmentUrl.trim(),
           signature: senderInfo.signature.trim(),
-          signature_url: senderInfo.signature_url
+          signature_url: senderInfo.signature_url,
+          ...(isCombinedChannel ? { linkedin_profile_url: senderInfo.linkedin_profile_url.trim() } : {})
         },
+        ...(isCombinedChannel ? {
+          channel: 'both',
+          combined_linkedin: {
+            action_gap_mins: Number(combinedLinkedInActionGap || emailGap || 0),
+            linkedin_profile_url: senderInfo.linkedin_profile_url.trim(),
+            sequences: combinedLinkedInSteps.map((step, index) => ({
+              step: index + 1,
+              step_type: index === 0 ? 'connection_request' : 'follow_up_message',
+              message: getBodyVariable(index + 1),
+              day_delay: index === 0 ? 0 : step.day_delay
+            }))
+          }
+        } : {}),
         lead_creation: leadCreation,
         lead_creation_mode: leadMode,
         target_lead_count: Number(targetLeadCount || 0),
@@ -857,10 +978,21 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       })
     } catch (err: any) {
       setError(err?.message || 'Unable to save campaign')
+      if (throwErrors) throw err
     } finally {
       setSubmitting(false)
     }
   }
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    await submitForm()
+  }
+
+  React.useImperativeHandle(ref, () => ({
+    validate: validateForm,
+    submit: () => submitForm(true)
+  }))
 
   return (
     <div className="space-y-6">
@@ -869,39 +1001,43 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
         <p className="mt-1 text-zinc-500">{subtitle}</p>
       </div>
 
-      <div className="flex items-center gap-2 overflow-x-auto border-b border-white/10 pb-4">
-        {(
-          [
-            { id: 'Basics', icon: Settings },
-            { id: 'Campaign Owner', icon: Building2 },
-            { id: 'Schedule', icon: Calendar },
-            { id: 'Sender Profile', icon: UserCircle },
-            { id: 'Sequences', icon: ListOrdered },
-            { id: 'Leads', icon: Users }
-          ] as const
-        ).map((tab) => (
+      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white/80 p-2 shadow-sm backdrop-blur">
+        {visibleTabs.map((tabId) => {
+          const icons: Record<Tab, typeof Settings> = {
+            Basics: Settings,
+            'Campaign Owner': Building2,
+            Schedule: Calendar,
+            'Sender Profile': UserCircle,
+            Sequences: ListOrdered,
+            Leads: Users,
+            LinkedIn: Users
+          }
+          const Icon = icons[tabId]
+
+          return (
           <button
-            key={tab.id}
+            key={tabId}
             type="button"
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setActiveTab(tabId)}
             className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
-              activeTab === tab.id
+              activeTab === tabId
                 ? 'text-indigo-600 bg-indigo-50 font-bold border border-indigo-100 shadow-sm'
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-850'
             }`}
           >
             <span
               className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
-                activeTab === tab.id
+                activeTab === tabId
                   ? 'bg-gradient-to-br from-indigo-500 to-sky-600 text-white shadow-md shadow-indigo-500/25'
                   : 'bg-slate-100 text-slate-400 group-hover:text-slate-650'
               }`}
             >
-              <tab.icon className="h-4 w-4" aria-hidden />
+              <Icon className="h-4 w-4" aria-hidden />
             </span>
-            <span className="relative z-10 whitespace-nowrap">{tab.id}</span>
+            <span className="relative z-10 whitespace-nowrap">{tabId}</span>
           </button>
-        ))}
+          )
+        })}
       </div>
 
       <form
@@ -1734,6 +1870,110 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
               </div>
             </div>
           )}
+
+          {isCombinedChannel && activeTab === 'LinkedIn' && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-slate-800">LinkedIn Outreach</h2>
+                  <p className="text-sm text-slate-400 font-medium">Configure the LinkedIn-specific data for this combined campaign.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={addCombinedLinkedInStep}
+                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Follow-up
+                </button>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Sender LinkedIn Profile</span>
+                  <input
+                    value={senderInfo.linkedin_profile_url}
+                    onChange={(event) => setSenderInfo((current) => ({ ...current, linkedin_profile_url: event.target.value }))}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    placeholder="https://linkedin.com/in/yourprofile"
+                    required
+                  />
+                  <p className="text-xs text-slate-400 font-medium">The LinkedIn account that will be used for outreach.</p>
+                </label>
+
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">LinkedIn Action Gap (mins)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={combinedLinkedInActionGap}
+                    onChange={(event) => setCombinedLinkedInActionGap(event.target.value)}
+                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-4">
+                {combinedLinkedInSteps.map((step, index) => {
+                  const isConnectionRequest = index === 0
+                  const stepLabel = isConnectionRequest ? 'Connection Request' : 'Follow-up Message'
+
+                  return (
+                    <div key={`combined-linkedin-step-${index}`} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                      <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">LinkedIn Step {index + 1}</h3>
+                        {!isConnectionRequest && (
+                          <button
+                            type="button"
+                            onClick={() => removeCombinedLinkedInStep(index)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid gap-4 md:grid-cols-[220px_1fr_180px]">
+                        <div className="space-y-2">
+                          <span className="text-sm font-semibold text-slate-700">Step Type</span>
+                          <span className="inline-flex min-h-10 w-full items-center rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 shadow-sm">
+                            {stepLabel}
+                          </span>
+                        </div>
+
+                        <div className="space-y-2">
+                          <span className="text-sm font-semibold text-slate-700">Message</span>
+                          <div className="min-h-24 rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold leading-relaxed text-slate-600 shadow-inner">
+                            {isConnectionRequest
+                              ? 'AI will automatically generate a personalized connection request for each lead.'
+                              : 'AI will automatically generate a personalized follow-up message for each lead.'}
+                          </div>
+                        </div>
+
+                        <label className="space-y-2">
+                          <span className="text-sm font-semibold text-slate-700">Day Delay</span>
+                          <input
+                            type="number"
+                            min={isConnectionRequest ? 0 : (combinedLinkedInSteps[index - 1]?.day_delay ?? 0) + 1}
+                            value={isConnectionRequest ? 0 : step.day_delay}
+                            disabled={isConnectionRequest}
+                            onChange={(event) => updateCombinedLinkedInDelay(index, event.target.value)}
+                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400"
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {combinedLinkedInSequenceError ? (
+                <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-250 font-semibold shadow-sm">
+                  {combinedLinkedInSequenceError}
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {verifyingToken && (
@@ -1757,7 +1997,7 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
             {activeTab !== 'Basics' && (
               <button
                 type="button"
-                onClick={() => setActiveTab(TABS[Math.max(0, TABS.indexOf(activeTab) - 1)])}
+                onClick={() => setActiveTab(visibleTabs[Math.max(0, visibleTabs.indexOf(activeTab) - 1)])}
                 className="rounded-lg bg-white border border-slate-200 px-5 py-2.5 font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
               >
                 Previous
@@ -1766,18 +2006,18 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
           </div>
           
           <div className="flex items-center gap-3">
-            {activeTab !== 'Leads' ? (
+            {activeTab !== visibleTabs[visibleTabs.length - 1] ? (
               <button
                 type="button"
-                onClick={() => setActiveTab(TABS[Math.min(TABS.length - 1, TABS.indexOf(activeTab) + 1)])}
+                onClick={() => setActiveTab(visibleTabs[Math.min(visibleTabs.length - 1, visibleTabs.indexOf(activeTab) + 1)])}
                 className="rounded-lg bg-white border border-slate-200 px-6 py-2.5 font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
               >
                 Next Step
               </button>
-            ) : (
+            ) : hideSubmit ? null : (
               <button
                 type="submit"
-                disabled={submitting || verifyingToken || Boolean(sequenceError)}
+                disabled={submitting || verifyingToken || Boolean(sequenceError) || Boolean(combinedLinkedInSequenceError)}
                 className="rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-8 py-2.5 font-extrabold text-white shadow-md shadow-indigo-600/10 transition hover:opacity-95 hover:shadow-indigo-600/20 disabled:opacity-60"
               >
                 {verifyingToken ? 'Verifying Token...' : submitting ? 'Launching...' : submitLabel}
@@ -1788,4 +2028,6 @@ export default function CampaignForm({ title, subtitle, submitLabel, mode, initi
       </form>
     </div>
   )
-}
+})
+
+export default CampaignForm

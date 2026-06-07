@@ -7,7 +7,7 @@ import toast from 'react-hot-toast'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
 import DateRangePicker from '../../../components/ui/DateRangePicker'
-import { Calendar, Pause, Play, MoreVertical, Trash, Users, Loader2 } from 'lucide-react'
+import { Calendar, ChevronDown, Layers3, Loader2, Mail, MoreVertical, Pause, Play, Trash, Users } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
 import useCurrentUser from '../../../hooks/useCurrentUser'
@@ -38,6 +38,44 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+
+function LinkedInIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 382 382"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        fill="#4f46e5"
+        d="M347.445,0H34.555C15.471,0,0,15.471,0,34.555v312.889C0,366.529,15.471,382,34.555,382h312.889 C366.529,382,382,366.529,382,347.444V34.555C382,15.471,366.529,0,347.445,0z M118.207,329.844c0,5.554-4.502,10.056-10.056,10.056 H65.345c-5.554,0-10.056-4.502-10.056-10.056V150.403c0-5.554,4.502-10.056,10.056-10.056h42.806 c5.554,0,10.056,4.502,10.056,10.056V329.844z M86.748,123.432c-22.459,0-40.666-18.207-40.666-40.666S64.289,42.1,86.748,42.1 s40.666,18.207,40.666,40.666S109.208,123.432,86.748,123.432z M341.91,330.654c0,5.106-4.14,9.246-9.246,9.246H286.73 c-5.106,0-9.246-4.14-9.246-9.246v-84.168c0-12.556,3.683-55.021-32.813-55.021c-28.309,0-34.051,29.066-35.204,42.11v97.079 c0,5.106-4.139,9.246-9.246,9.246h-44.426c-5.106,0-9.246-4.14-9.246-9.246V149.593c0-5.106,4.14-9.246,9.246-9.246h44.426 c5.106,0,9.246,4.14,9.246,9.246v15.655c10.497-15.753,26.097-27.912,59.312-27.912c73.552,0,73.131,68.716,73.131,106.472 L341.91,330.654L341.91,330.654z"
+      />
+    </svg>
+  )
+}
+
+const CREATE_CAMPAIGN_OPTIONS = [
+  {
+    href: '/dashboard/campaigns/new?channel=email',
+    label: 'Email outreach',
+    description: 'Current email outreach',
+    icon: Mail
+  },
+  {
+    href: '/dashboard/campaigns/new?channel=linkedin',
+    label: 'LinkedIn campaign',
+    description: 'LinkedIn outreach',
+    icon: LinkedInIcon
+  },
+  {
+    href: '/dashboard/campaigns/new?channel=both',
+    label: 'Email + LinkedIn',
+    description: 'Combined campaign',
+    icon: Layers3
+  }
+]
 
 export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -88,12 +126,37 @@ export default function CampaignsPage() {
     <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
       {/* Action Bar */}
       <div className="flex justify-end">
-        <Link
-          href="/dashboard/campaigns/new"
-          className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-indigo-600/10 transition hover:opacity-95 hover:shadow-indigo-600/20"
-        >
-          New campaign
-        </Link>
+        <div className="group relative inline-flex" data-campaign-create-menu>
+          <Link
+            href="/dashboard/campaigns/new?channel=email"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-5 text-sm font-semibold text-white shadow-md shadow-indigo-600/10 transition hover:opacity-95 hover:shadow-indigo-600/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+          >
+            Create campaign
+            <ChevronDown className="h-4 w-4 text-white/85 transition group-hover:rotate-180" />
+          </Link>
+
+          <div className="invisible absolute right-0 top-full z-30 mt-2 w-64 translate-y-1 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 opacity-0 shadow-xl transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
+            {CREATE_CAMPAIGN_OPTIONS.map((option) => {
+              const Icon = option.icon
+
+              return (
+                <Link
+                  key={option.href}
+                  href={option.href}
+                  className="flex items-center gap-3 px-3 py-2.5 text-left transition hover:bg-slate-50 focus:bg-slate-50 focus:outline-none"
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-indigo-600">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-bold text-slate-800">{option.label}</span>
+                    <span className="block truncate text-xs font-medium text-slate-500">{option.description}</span>
+                  </span>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
       </div>
 
       <Modal open={Boolean(deleteModalFor)} title="Delete campaign" onClose={() => setDeleteModalFor(null)}>

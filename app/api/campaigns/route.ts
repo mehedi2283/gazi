@@ -134,6 +134,8 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
 
   return {
     source: 'campaign_launch',
+    channel: 'email_outreach',
+    campaign_type: 'email_outreach',
     campaign_id: campaign?.id || null,
     campaign_name: campaign?.name || body?.name || null,
     organization_id: campaign?.organization_id || null,

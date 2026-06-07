@@ -1,5 +1,7 @@
 const DEFAULT_LEAD_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/88e7c5d9-6015-4ade-86af-03fc2b7b1c90'
+const DEFAULT_LINKEDIN_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/82832488-69e1-4511-bda8-04832c03be10'
 const LEAD_WEBHOOK_URL = process.env.LEADS_WEBHOOK_URL || DEFAULT_LEAD_WEBHOOK_URL
+const LINKEDIN_WEBHOOK_URL = process.env.LINKEDIN_WEBHOOK_URL || DEFAULT_LINKEDIN_WEBHOOK_URL
 const IMPORT_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/22d3c430-9fa6-4c17-893b-a2e2a6d4e090'
 
 type LeadPayload = {
@@ -32,6 +34,26 @@ export async function sendLeadsToWebhook(payload: unknown) {
   return response
 }
 
+export async function sendLinkedInLeadsToWebhook(payload: unknown) {
+  const response = await fetch(LINKEDIN_WEBHOOK_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
+    },
+    body: JSON.stringify(payload)
+  })
+
+  if (!response.ok) {
+    const responseText = await response.text().catch(() => '')
+    throw new Error(
+      `LinkedIn webhook request failed with status ${response.status}${responseText ? `: ${responseText}` : ''}`
+    )
+  }
+
+  return response
+}
+
 export async function sendImportedLeadsToWebhook(
   leads: LeadPayload[],
   campaignName: string,
@@ -50,6 +72,8 @@ export async function sendImportedLeadsToWebhook(
 ) {
   const payload = {
     source: 'lead_import',
+    channel: 'email_outreach',
+    campaign_type: 'email_outreach',
     campaign_id: campaignId,
     campaign_name: campaignName,
     sender_info: options.sender_info || null,
