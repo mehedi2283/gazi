@@ -18,6 +18,12 @@ type SequenceStep = {
   message: string
 }
 
+type HeyReachAccount = {
+  id: string
+  name: string
+  email: string
+}
+
 type LinkedCampaignProps = {
   hideSubmit?: boolean
   onSuccess?: () => void
@@ -88,9 +94,11 @@ function getMessageVariable(stepNumber: number) {
 }
 
 function getSequenceError(steps: SequenceStep[]) {
+  if (steps.length < 2) return 'Step 1 and Step 2 are required.'
   if (steps[0]?.day_delay !== 0) return 'Step 1 day must be 0.'
+  if (steps[1]?.day_delay !== 0) return 'Step 2 day must be 0.'
 
-  for (let index = 1; index < steps.length; index += 1) {
+  for (let index = 2; index < steps.length; index += 1) {
     const current = steps[index]?.day_delay
     const previous = steps[index - 1]?.day_delay
 
@@ -146,12 +154,16 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
   const [loadingTokens, setLoadingTokens] = useState(false)
   const [useExistingToken, setUseExistingToken] = useState(false)
   const [steps, setSteps] = useState<SequenceStep[]>([
-    { day_delay: 0, step_type: 'connection_request', message: '' }
+    { day_delay: 0, step_type: 'connection_request', message: '' },
+    { day_delay: 0, step_type: 'follow_up_message', message: getMessageVariable(2) }
   ])
   const [leadMode, setLeadMode] = useState<LeadSource>('external')
   const [leadRows, setLeadRows] = useState<Record<string, any>[]>([])
   const [leadFileName, setLeadFileName] = useState('')
   const [leadFileError, setLeadFileError] = useState('')
+  const [heyReachAccountIdInput, setHeyReachAccountIdInput] = useState('')
+  const [addingHeyReachAccount, setAddingHeyReachAccount] = useState(false)
+  const [selectedHeyReachAccount, setSelectedHeyReachAccount] = useState<HeyReachAccount | null>(null)
   const [externalLead, setExternalLead] = useState({ market_name: '', product_name: '' })
   const [countryOpen, setCountryOpen] = useState(false)
   const [countryHighlight, setCountryHighlight] = useState(0)
@@ -221,7 +233,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     setSteps((current) => [
       ...current,
       {
-        day_delay: (current[current.length - 1]?.day_delay ?? 0) + 1,
+        day_delay: Math.max(1, (current[current.length - 1]?.day_delay ?? 0) + 1),
         step_type: 'follow_up_message',
         message: getMessageVariable(current.length + 1)
       }
@@ -229,14 +241,14 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
   }
 
   function removeStep(index: number) {
-    setSteps((current) => current.length <= 1 ? current : current.filter((_, stepIndex) => stepIndex !== index))
+    setSteps((current) => index <= 1 ? current : current.filter((_, stepIndex) => stepIndex !== index))
   }
 
   function updateStep(index: number, patch: Partial<SequenceStep>) {
     setSteps((current) => current.map((step, stepIndex) => {
       if (stepIndex !== index) return step
       const next = { ...step, ...patch }
-      if (stepIndex === 0) next.day_delay = 0
+      if (stepIndex <= 1) next.day_delay = 0
       return next
     }))
   }
@@ -244,11 +256,57 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
   function updateDelay(index: number, value: string) {
     setSteps((current) => current.map((step, stepIndex) => {
       if (stepIndex !== index) return step
-      if (stepIndex === 0) return { ...step, day_delay: 0 }
+      if (stepIndex <= 1) return { ...step, day_delay: 0 }
       const minimum = (current[stepIndex - 1]?.day_delay ?? 0) + 1
       const parsed = Number(value)
       return { ...step, day_delay: Number.isFinite(parsed) ? Math.max(minimum, parsed) : minimum }
     }))
+  }
+
+  async function handleAddHeyReachAccount() {
+    const accountId = heyReachAccountIdInput.trim()
+    if (!accountId) return
+
+    if (!/^\d+$/.test(accountId)) {
+      toast.error('Please enter a numeric HeyReach account ID')
+      return
+    }
+
+    setAddingHeyReachAccount(true)
+    try {
+      const lookupUrl = `/api/heyreach/accounts?accountId=${encodeURIComponent(accountId)}`
+      let res = await fetch(lookupUrl, { credentials: 'same-origin' })
+
+      if (res.status === 401) {
+        const refreshRes = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          credentials: 'same-origin'
+        })
+
+        if (refreshRes.ok) {
+          res = await fetch(lookupUrl, { credentials: 'same-origin' })
+        }
+      }
+
+      const json = await res.json()
+
+      if (!res.ok || json.error || !json.data) {
+        throw new Error(json.error || 'HeyReach account was not found')
+      }
+
+      setSelectedHeyReachAccount({
+        id: String(json.data.id || accountId),
+        name: String(json.data.name || `Account ${accountId}`),
+        email: String(json.data.email || '')
+      })
+      setHeyReachAccountIdInput('')
+      setError('')
+      toast.success('HeyReach account added')
+    } catch (err: any) {
+      toast.error(err?.message || 'Unable to verify HeyReach account')
+    } finally {
+      setAddingHeyReachAccount(false)
+    }
   }
 
   function handleLeadFileChange(event: React.ChangeEvent<HTMLInputElement>) {
@@ -306,6 +364,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
       !name.trim() ? 'Campaign name is required' :
       !campaignOwner.company_name.trim() || !campaignOwner.created_from_company.trim() ? 'Campaign owner details are required' :
       !senderInfo.name.trim() || !senderInfo.company.trim() || !senderInfo.location.trim() || !senderInfo.client_email.trim() || !senderInfo.calendly_token.trim() || !senderInfo.booking_calendar_link.trim() || !senderInfo.linkedin_profile_url.trim() ? 'Complete sender profile details are required' :
+      !selectedHeyReachAccount ? 'Add a verified HeyReach account before launching' :
       leadMode === 'external' && (!externalLead.market_name.trim() || !externalLead.product_name.trim()) ? 'Country and product name are required for External lead creation' :
       leadMode === 'import' && !leadRows.length ? 'Upload a CSV or spreadsheet before launching imported LinkedIn leads' :
       sequenceError
@@ -348,11 +407,13 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
       booking_calendar_link: senderInfo.booking_calendar_link.trim(),
       company_details: senderInfo.company_details.trim(),
       linkedin_profile_url: senderInfo.linkedin_profile_url.trim(),
+      heyreach_account_id: selectedHeyReachAccount?.id || null,
+      heyreach_account: selectedHeyReachAccount,
       sequences: steps.map((step, index) => ({
         step: index + 1,
         step_type: index === 0 ? 'connection_request' : 'follow_up_message',
         message: getMessageVariable(index + 1),
-        day_delay: index === 0 ? 0 : step.day_delay
+        day_delay: index <= 1 ? 0 : step.day_delay
       })),
       lead_source: leadMode,
       lead_request: leadMode === 'external'
@@ -671,12 +732,13 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                 {steps.map((step, index) => {
                   const stepNumber = index + 1
                   const isConnectionRequest = index === 0
+                  const isRequiredZeroDelayStep = index <= 1
                   const stepLabel = isConnectionRequest ? 'Connection Request' : 'Follow-up Message'
                   return (
                     <div key={stepNumber} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="mb-4 flex items-center justify-between">
                         <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">Step {stepNumber}</h3>
-                        {!isConnectionRequest && (
+                        {index > 1 && (
                           <button type="button" onClick={() => removeStep(index)} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -699,7 +761,14 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                         </div>
                         <label className="space-y-2">
                           <span className="text-sm font-semibold text-slate-700">Day Delay</span>
-                          <input type="number" min={index === 0 ? 0 : (steps[index - 1]?.day_delay ?? 0) + 1} value={index === 0 ? 0 : step.day_delay} disabled={index === 0} onChange={(event) => updateDelay(index, event.target.value)} className={fieldClass('disabled:bg-slate-50 disabled:text-slate-400')} />
+                          <input
+                            type="number"
+                            min={isRequiredZeroDelayStep ? 0 : (steps[index - 1]?.day_delay ?? 0) + 1}
+                            value={isRequiredZeroDelayStep ? 0 : step.day_delay}
+                            disabled={isRequiredZeroDelayStep}
+                            onChange={(event) => updateDelay(index, event.target.value)}
+                            className={fieldClass('disabled:bg-slate-50 disabled:text-slate-400')}
+                          />
                         </label>
                       </div>
                     </div>
@@ -726,7 +795,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                         <tr key={`preview-${index}`} className="hover:bg-slate-50/50 transition">
                           <td className="px-4 py-2.5 font-semibold text-slate-700">Step {index + 1}</td>
                           <td className="px-4 py-2.5 text-slate-600 font-medium">{index === 0 ? 'Connection Request' : 'Follow-up Message'}</td>
-                          <td className="px-4 py-2.5 text-indigo-650 font-bold font-mono">{index === 0 ? 0 : step.day_delay}</td>
+                          <td className="px-4 py-2.5 text-indigo-650 font-bold font-mono">{index <= 1 ? 0 : step.day_delay}</td>
                           <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{index === 0 ? 'AI-generated personalized connection request' : 'AI-generated personalized follow-up message'}</td>
                         </tr>
                       ))}
@@ -742,6 +811,59 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
               <div>
                 <h2 className="text-lg font-bold text-slate-800">Leads</h2>
                 <p className="text-sm text-slate-400 font-medium">Configure how LinkedIn prospects are added to this campaign.</p>
+              </div>
+
+              <div className="space-y-3">
+                <span className="text-sm font-semibold text-slate-700">HeyReach Account</span>
+                <div className="flex flex-col gap-3">
+                  <div className="flex max-w-md gap-3">
+                    <input
+                      type="number"
+                      min={1}
+                      value={heyReachAccountIdInput}
+                      onChange={(event) => setHeyReachAccountIdInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault()
+                          handleAddHeyReachAccount()
+                        }
+                      }}
+                      placeholder="Enter HeyReach account ID"
+                      className={fieldClass()}
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddHeyReachAccount}
+                      disabled={addingHeyReachAccount || !heyReachAccountIdInput.trim()}
+                      className="inline-flex h-10 min-w-[72px] items-center justify-center rounded-md bg-indigo-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {addingHeyReachAccount ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-white" />
+                      ) : (
+                        'Add'
+                      )}
+                    </button>
+                  </div>
+
+                  {selectedHeyReachAccount ? (
+                    <div className="flex flex-wrap gap-2 max-w-2xl pt-1">
+                      <span className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 border border-indigo-200 py-1 pl-3 pr-2 text-xs font-semibold text-indigo-700 shadow-sm">
+                        <span className="truncate max-w-[320px]" title={`${selectedHeyReachAccount.name}${selectedHeyReachAccount.email ? ` - ${selectedHeyReachAccount.email}` : ''}`}>
+                          {selectedHeyReachAccount.name}
+                          {selectedHeyReachAccount.email ? ` - ${selectedHeyReachAccount.email}` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHeyReachAccount(null)}
+                          className="rounded-full p-0.5 transition hover:bg-indigo-100 hover:text-indigo-900"
+                          aria-label="Remove HeyReach account"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
               </div>
 
               <div className="pt-4 border-t border-slate-200">

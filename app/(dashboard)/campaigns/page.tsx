@@ -281,6 +281,8 @@ export default function CampaignsPage() {
               <tbody className="divide-y divide-slate-100">
                 {paginatedCampaigns.map((campaign: any) => {
                   const currentStatus = String(campaign.status || 'draft')
+                  const channel = String(campaign.channel || campaign.campaign_type || 'email_outreach')
+                  const isLinkedInCampaign = channel === 'linkedin_outreach' || channel === 'linkedin'
                   const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
                   const canPause = currentStatus === 'active'
                   const canSendWeeklyReport = isAdmin && currentStatus !== 'draft'
@@ -289,7 +291,16 @@ export default function CampaignsPage() {
                     <tr key={campaign.id} className="group transition-colors hover:bg-slate-50/50">
                       <td className="px-6 py-5">
                         <div className="flex flex-col">
-                          <span className="font-bold text-slate-800 text-base">{campaign.name}</span>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-slate-800 text-base">{campaign.name}</span>
+                            <span className={`inline-flex rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                              isLinkedInCampaign
+                                ? 'border-indigo-500/20 bg-indigo-50 text-indigo-700'
+                                : 'border-slate-300 bg-slate-100 text-slate-600'
+                            }`}>
+                              {isLinkedInCampaign ? 'LinkedIn' : 'Email'}
+                            </span>
+                          </div>
                           <div className="mt-1 flex flex-col sm:flex-row sm:items-center sm:gap-2">
                             <div className="text-xs text-slate-400">Created {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '—'}</div>
                             {campaign.instantly_campaign_id && (
