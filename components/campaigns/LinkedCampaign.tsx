@@ -94,9 +94,11 @@ function getMessageVariable(stepNumber: number) {
 }
 
 function getSequenceError(steps: SequenceStep[]) {
-  if (steps.length < 2) return 'Step 1 and Step 2 are required.'
-  if (steps[0]?.day_delay !== 0) return 'Step 1 day must be 0.'
-  if (steps[1]?.day_delay !== 0) return 'Step 2 day must be 0.'
+  if (steps.length < 2) return 'One connection request and one follow-up message are required.'
+  if (steps[0]?.step_type !== 'connection_request') return 'The first sequence step must be a connection request.'
+  if (steps[1]?.step_type !== 'follow_up_message') return 'The second sequence step must be a follow-up message.'
+  if (steps[0]?.day_delay !== 0) return 'Connection request day delay must be 0.'
+  if (steps[1]?.day_delay !== 0) return 'First follow-up day delay must be 0.'
 
   for (let index = 2; index < steps.length; index += 1) {
     const current = steps[index]?.day_delay
@@ -144,15 +146,10 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     report_email: '',
     company: '',
     location: '',
-    client_email: '',
-    calendly_token: '',
     booking_calendar_link: '',
     company_details: '',
     linkedin_profile_url: ''
   })
-  const [existingTokens, setExistingTokens] = useState<Array<{ token: string; campaign_name: string }>>([])
-  const [loadingTokens, setLoadingTokens] = useState(false)
-  const [useExistingToken, setUseExistingToken] = useState(false)
   const [steps, setSteps] = useState<SequenceStep[]>([
     { day_delay: 0, step_type: 'connection_request', message: '' },
     { day_delay: 0, step_type: 'follow_up_message', message: getMessageVariable(2) }
@@ -197,29 +194,6 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     document.addEventListener('mousedown', onClickOutside)
     return () => document.removeEventListener('mousedown', onClickOutside)
   }, [])
-
-  useEffect(() => {
-    const email = senderInfo.client_email.trim().toLowerCase()
-    if (!email || !email.includes('@')) {
-      setExistingTokens([])
-      return
-    }
-
-    const timeout = setTimeout(async () => {
-      setLoadingTokens(true)
-      try {
-        const res = await fetch(`/api/campaigns/tokens?client_email=${encodeURIComponent(email)}`)
-        const json = await res.json()
-        setExistingTokens(Array.isArray(json.data) ? json.data : [])
-      } catch {
-        setExistingTokens([])
-      } finally {
-        setLoadingTokens(false)
-      }
-    }, 400)
-
-    return () => clearTimeout(timeout)
-  }, [senderInfo.client_email])
 
   function setSenderField(field: keyof typeof senderInfo, value: string) {
     setSenderInfo((current) => ({ ...current, [field]: value }))
@@ -363,7 +337,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     const requiredError =
       !name.trim() ? 'Campaign name is required' :
       !campaignOwner.company_name.trim() || !campaignOwner.created_from_company.trim() ? 'Campaign owner details are required' :
-      !senderInfo.name.trim() || !senderInfo.company.trim() || !senderInfo.location.trim() || !senderInfo.client_email.trim() || !senderInfo.calendly_token.trim() || !senderInfo.booking_calendar_link.trim() || !senderInfo.linkedin_profile_url.trim() ? 'Complete sender profile details are required' :
+      !senderInfo.name.trim() || !senderInfo.company.trim() || !senderInfo.location.trim() || !senderInfo.booking_calendar_link.trim() || !senderInfo.linkedin_profile_url.trim() ? 'Complete sender profile details are required' :
       !selectedHeyReachAccount ? 'Add a verified HeyReach account before launching' :
       leadMode === 'external' && (!externalLead.market_name.trim() || !externalLead.product_name.trim()) ? 'Country and product name are required for External lead creation' :
       leadMode === 'import' && !leadRows.length ? 'Upload a CSV or spreadsheet before launching imported LinkedIn leads' :
@@ -402,8 +376,8 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
       report_email: senderInfo.report_email.trim(),
       company: senderInfo.company.trim(),
       location: senderInfo.location.trim(),
-      client_email: senderInfo.client_email.trim(),
-      calendly_token: senderInfo.calendly_token.trim(),
+      client_email: null,
+      calendly_token: null,
       booking_calendar_link: senderInfo.booking_calendar_link.trim(),
       company_details: senderInfo.company_details.trim(),
       linkedin_profile_url: senderInfo.linkedin_profile_url.trim(),
@@ -662,43 +636,6 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                   <input value={senderInfo.location} onChange={(event) => setSenderField('location', event.target.value)} className={fieldClass()} placeholder="City, Country" />
                 </label>
                 <label className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Client Email</span>
-                  <input type="email" value={senderInfo.client_email} onChange={(event) => { setSenderField('client_email', event.target.value); setUseExistingToken(false) }} className={fieldClass()} placeholder="client@email.com" />
-                </label>
-                <div className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Calendly Token</span>
-                  {loadingTokens ? (
-                    <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Looking up existing tokens...
-                    </div>
-                  ) : existingTokens.length > 0 && !useExistingToken ? (
-                    <select value={senderInfo.calendly_token} onChange={(event) => {
-                      if (event.target.value === '__new__') {
-                        setSenderField('calendly_token', '')
-                        setUseExistingToken(true)
-                      } else {
-                        setSenderField('calendly_token', event.target.value)
-                      }
-                    }} className={fieldClass()}>
-                      <option value="">Select an existing token</option>
-                      {existingTokens.map((item, index) => (
-                        <option key={`${item.token}-${index}`} value={item.token}>{item.token.slice(0, 20)}... from "{item.campaign_name}"</option>
-                      ))}
-                      <option value="__new__">Enter a new token</option>
-                    </select>
-                  ) : (
-                    <div className="space-y-1.5">
-                      <input value={senderInfo.calendly_token} onChange={(event) => setSenderField('calendly_token', event.target.value)} className={fieldClass()} placeholder="Enter Calendly Token" />
-                      {existingTokens.length > 0 && useExistingToken && (
-                        <button type="button" onClick={() => { setUseExistingToken(false); setSenderField('calendly_token', '') }} className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors">
-                          Back to existing tokens
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-                <label className="space-y-2">
                   <span className="text-sm font-semibold text-slate-700">Booking Calendar Link</span>
                   <input value={senderInfo.booking_calendar_link} onChange={(event) => setSenderField('booking_calendar_link', event.target.value)} className={fieldClass()} placeholder="https://cal.com/..." />
                 </label>
@@ -734,10 +671,18 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                   const isConnectionRequest = index === 0
                   const isRequiredZeroDelayStep = index <= 1
                   const stepLabel = isConnectionRequest ? 'Connection Request' : 'Follow-up Message'
+                  const stepTitle = isConnectionRequest ? 'Connection Request' : `Follow-up ${index}`
                   return (
                     <div key={stepNumber} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">Step {stepNumber}</h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">{stepTitle}</h3>
+                          {isRequiredZeroDelayStep && (
+                            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold uppercase text-indigo-600">
+                              Required
+                            </span>
+                          )}
+                        </div>
                         {index > 1 && (
                           <button type="button" onClick={() => removeStep(index)} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">
                             <Trash2 className="h-4 w-4" />
@@ -793,7 +738,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                     <tbody className="divide-y divide-slate-100">
                       {steps.map((step, index) => (
                         <tr key={`preview-${index}`} className="hover:bg-slate-50/50 transition">
-                          <td className="px-4 py-2.5 font-semibold text-slate-700">Step {index + 1}</td>
+                          <td className="px-4 py-2.5 font-semibold text-slate-700">{index === 0 ? 'Connection Request' : `Follow-up ${index}`}</td>
                           <td className="px-4 py-2.5 text-slate-600 font-medium">{index === 0 ? 'Connection Request' : 'Follow-up Message'}</td>
                           <td className="px-4 py-2.5 text-indigo-650 font-bold font-mono">{index <= 1 ? 0 : step.day_delay}</td>
                           <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{index === 0 ? 'AI-generated personalized connection request' : 'AI-generated personalized follow-up message'}</td>

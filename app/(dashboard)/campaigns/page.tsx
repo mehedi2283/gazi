@@ -127,13 +127,14 @@ export default function CampaignsPage() {
       {/* Action Bar */}
       <div className="flex justify-end">
         <div className="group relative inline-flex" data-campaign-create-menu>
-          <Link
-            href="/dashboard/campaigns/new?channel=email"
+          <button
+            type="button"
+            aria-haspopup="menu"
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-5 text-sm font-semibold text-white shadow-md shadow-indigo-600/10 transition hover:opacity-95 hover:shadow-indigo-600/20 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
           >
             Create campaign
             <ChevronDown className="h-4 w-4 text-white/85 transition group-hover:rotate-180" />
-          </Link>
+          </button>
 
           <div className="invisible absolute right-0 top-full z-30 mt-2 w-64 translate-y-1 overflow-hidden rounded-lg border border-slate-200 bg-white py-1 opacity-0 shadow-xl transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100">
             {CREATE_CAMPAIGN_OPTIONS.map((option) => {
