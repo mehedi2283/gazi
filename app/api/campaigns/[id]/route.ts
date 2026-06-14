@@ -130,6 +130,11 @@ function applyCampaignScope(query: any, auth: { userId: string; organizationId: 
   return query.eq('created_by', auth.userId)
 }
 
+function isInstantlyNotFoundError(error: any) {
+  const message = String(error?.message || error?.data?.message || error?.data?.error || '')
+  return error?.status === 404 || message.toLowerCase().includes('not found')
+}
+
 export async function GET(req: Request, { params }: { params: { id: string } }) {
   try {
     const auth = await requireApiAuth(req)
@@ -309,16 +314,31 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
         .select('id, instantly_campaign_id')
         .eq('id', params.id),
       auth
-    ).single()
+    ).maybeSingle()
 
-    if (existingError) return NextResponse.json({ data: null, error: existingError.message })
+    if (existingError) {
+      return NextResponse.json({ data: null, error: existingError.message }, { status: 500 })
+    }
+
+    if (!existingCampaign) {
+      return NextResponse.json({ data: null, error: 'Campaign not found' }, { status: 404 })
+    }
 
     const instantlyCampaignId = existingCampaign?.instantly_campaign_id || null
 
     if (instantlyCampaignId) {
-      const instantlyDeleteResponse = await deleteInstantlyCampaign(instantlyCampaignId)
-      if (!instantlyDeleteResponse) {
-        return NextResponse.json({ data: null, error: 'Failed to delete campaign in Instantly.' }, { status: 500 })
+      try {
+        const instantlyDeleteResponse = await deleteInstantlyCampaign(instantlyCampaignId)
+        if (!instantlyDeleteResponse) {
+          return NextResponse.json({ data: null, error: 'Failed to delete campaign in Instantly.' }, { status: 502 })
+        }
+      } catch (error: any) {
+        if (!isInstantlyNotFoundError(error)) {
+          return NextResponse.json(
+            { data: null, error: error?.message || 'Failed to delete campaign in Instantly.' },
+            { status: 502 }
+          )
+        }
       }
     }
 
@@ -328,7 +348,9 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       .select('id, campaign_id, campaign_ids')
       .or(`campaign_id.eq.${params.id},campaign_ids.cs.{${params.id}}`)
 
-    if (leadsFetchError) return NextResponse.json({ data: null, error: leadsFetchError.message })
+    if (leadsFetchError) {
+      return NextResponse.json({ data: null, error: leadsFetchError.message }, { status: 500 })
+    }
 
     if (leadsToUpdate && leadsToUpdate.length > 0) {
       const updatePromises = leadsToUpdate.map((lead: any) => {
@@ -348,19 +370,30 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
 
       const results = await Promise.all(updatePromises)
       const firstError = results.find(r => r.error)?.error
-      if (firstError) return NextResponse.json({ data: null, error: firstError.message })
+      if (firstError) {
+        return NextResponse.json({ data: null, error: firstError.message }, { status: 500 })
+      }
     }
 
     const { error: sequencesDeleteError } = await supabase.from('sequences').delete().eq('campaign_id', params.id)
-    if (sequencesDeleteError) return NextResponse.json({ data: null, error: sequencesDeleteError.message })
+    if (sequencesDeleteError) {
+      return NextResponse.json({ data: null, error: sequencesDeleteError.message }, { status: 500 })
+    }
 
     const { data, error } = await applyCampaignScope(
       supabase.from('campaigns').delete().eq('id', params.id),
       auth
     ).select()
-    if (error) return NextResponse.json({ data: null, error: error.message })
+    if (error) {
+      return NextResponse.json({ data: null, error: error.message }, { status: 500 })
+    }
+
+    if (!data?.[0]) {
+      return NextResponse.json({ data: null, error: 'Campaign not found' }, { status: 404 })
+    }
+
     return NextResponse.json({ data: data?.[0], error: null })
   } catch (err: any) {
-    return NextResponse.json({ data: null, error: err.message || String(err) })
+    return NextResponse.json({ data: null, error: err.message || String(err) }, { status: 500 })
   }
 }
