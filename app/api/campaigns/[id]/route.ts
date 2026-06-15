@@ -13,6 +13,13 @@ type NormalizedSequence = {
   body: string
 }
 
+type SafeCampaignDeleteResult = {
+  deleted_campaign: any | null
+  detached_leads_count: number
+  deleted_sequences_count: number
+  deleted_message_threads_count: number
+}
+
 function mapDays(days: any) {
   if (Array.isArray(days)) {
     const [sunday, monday, tuesday, wednesday, thursday, friday, saturday] = days
@@ -321,7 +328,19 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
     }
 
     if (!existingCampaign) {
-      return NextResponse.json({ data: null, error: 'Campaign not found' }, { status: 404 })
+      return NextResponse.json({
+        data: {
+          id: params.id,
+          deleted: true,
+          already_deleted: true,
+          delete_result: {
+            detached_leads_count: 0,
+            deleted_sequences_count: 0,
+            deleted_message_threads_count: 0
+          }
+        },
+        error: null
+      })
     }
 
     const instantlyCampaignId = existingCampaign?.instantly_campaign_id || null
@@ -342,57 +361,49 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
       }
     }
 
-    // Detach leads instead of deleting them
-    const { data: leadsToUpdate, error: leadsFetchError } = await supabase
-      .from('leads')
-      .select('id, campaign_id, campaign_ids')
-      .or(`campaign_id.eq.${params.id},campaign_ids.cs.{${params.id}}`)
-
-    if (leadsFetchError) {
-      return NextResponse.json({ data: null, error: leadsFetchError.message }, { status: 500 })
-    }
-
-    if (leadsToUpdate && leadsToUpdate.length > 0) {
-      const updatePromises = leadsToUpdate.map((lead: any) => {
-        const updatedCampaignIds = (lead.campaign_ids || []).filter((id: string) => id !== params.id)
-        const updatedCampaignId = lead.campaign_id === params.id ? null : lead.campaign_id
-        const isNowEmpty = updatedCampaignIds.length === 0
-        
-        return supabase
-          .from('leads')
-          .update({
-            campaign_id: updatedCampaignId,
-            campaign_ids: updatedCampaignIds,
-            ...(isNowEmpty ? { status: 'unassigned' } : {})
-          })
-          .eq('id', lead.id)
+    const { data: rawDeleteResult, error: deleteError } = await supabase
+      .rpc('delete_campaign_safely', {
+        p_campaign_id: params.id,
+        p_organization_id: auth.organizationId,
+        p_user_id: auth.userId
       })
+      .single()
 
-      const results = await Promise.all(updatePromises)
-      const firstError = results.find(r => r.error)?.error
-      if (firstError) {
-        return NextResponse.json({ data: null, error: firstError.message }, { status: 500 })
-      }
+    if (deleteError) {
+      return NextResponse.json({ data: null, error: deleteError.message }, { status: 500 })
     }
 
-    const { error: sequencesDeleteError } = await supabase.from('sequences').delete().eq('campaign_id', params.id)
-    if (sequencesDeleteError) {
-      return NextResponse.json({ data: null, error: sequencesDeleteError.message }, { status: 500 })
+    const deleteResult = rawDeleteResult as SafeCampaignDeleteResult | null
+    const deletedCampaign = deleteResult?.deleted_campaign
+
+    if (!deletedCampaign) {
+      return NextResponse.json({
+        data: {
+          id: params.id,
+          deleted: true,
+          already_deleted: true,
+          delete_result: {
+            detached_leads_count: deleteResult?.detached_leads_count ?? 0,
+            deleted_sequences_count: deleteResult?.deleted_sequences_count ?? 0,
+            deleted_message_threads_count: deleteResult?.deleted_message_threads_count ?? 0
+          }
+        },
+        error: null
+      })
     }
 
-    const { data, error } = await applyCampaignScope(
-      supabase.from('campaigns').delete().eq('id', params.id),
-      auth
-    ).select()
-    if (error) {
-      return NextResponse.json({ data: null, error: error.message }, { status: 500 })
-    }
-
-    if (!data?.[0]) {
-      return NextResponse.json({ data: null, error: 'Campaign not found' }, { status: 404 })
-    }
-
-    return NextResponse.json({ data: data?.[0], error: null })
+    return NextResponse.json({
+      data: {
+        ...deletedCampaign,
+        deleted: true,
+        delete_result: {
+          detached_leads_count: deleteResult.detached_leads_count,
+          deleted_sequences_count: deleteResult.deleted_sequences_count,
+          deleted_message_threads_count: deleteResult.deleted_message_threads_count
+        }
+      },
+      error: null
+    })
   } catch (err: any) {
     return NextResponse.json({ data: null, error: err.message || String(err) }, { status: 500 })
   }
