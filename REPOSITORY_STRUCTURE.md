@@ -15,7 +15,7 @@ These folders existed on `D:\Work\Web App` when this note was created:
 | Folder | Git status | Purpose |
 | --- | --- | --- |
 | `Gazi_main_push_delete_update` | Git repo on `main` | Clean main worktree used for production fixes and pushes. |
-| `Gazi_push_tmp` | Git repo on `feature/linkedin-outreach` | Milestone 2 / LinkedIn outreach worktree. It may contain local uncommitted changes. |
+| `Gazi_push_tmp` | Git repo on `feature/linkedin-outreach` | Milestone 2 / LinkedIn outreach worktree. Clean and up to date with `origin/feature/linkedin-outreach` after the June 15, 2026 sync. |
 | `Gazi` | Not a git repo | Loose app folder used during local work. Do not treat it as the source of truth for branch state. |
 
 ## Current Branch Meaning
@@ -46,9 +46,9 @@ Use this branch for Milestone 2 / LinkedIn outreach work.
 
 Known pushed milestone commits:
 
-- `8709999 Add LinkedIn outreach campaign flow`
-- `68153d8 Add HeyReach account tracking for LinkedIn campaigns`
 - `db8db3f Polish LinkedIn campaign creation flow`
+- `68153d8 Add HeyReach account tracking for LinkedIn campaigns`
+- `8709999 Add LinkedIn outreach campaign flow`
 
 Before working on this branch, run:
 
@@ -57,7 +57,7 @@ git fetch origin
 git status --short --branch
 ```
 
-If the branch is behind remote, pull/rebase only after preserving or reviewing any local changes.
+As of the June 15, 2026 sync, the local `Gazi_push_tmp` worktree is clean and aligned with `origin/feature/linkedin-outreach`.
 
 ## Database Notes
 
