@@ -35,6 +35,7 @@ create table if not exists campaigns (
   company_name text,
   created_from_company text,
   status text default 'draft',
+  upload_status text,
   instantly_campaign_id text,
   total_leads int default 0,
   emails_sent int default 0,

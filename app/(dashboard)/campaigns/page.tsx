@@ -7,10 +7,11 @@ import toast from 'react-hot-toast'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
 import DateRangePicker from '../../../components/ui/DateRangePicker'
-import { Calendar, CheckCircle2, Pause, Play, MoreVertical, Trash, Users, Loader2 } from 'lucide-react'
+import { Calendar, CheckCircle2, Loader2, MoreVertical, Pause, Play, Trash, Users } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
 import useCurrentUser from '../../../hooks/useCurrentUser'
+import supabase from '../../../lib/supabase/client'
 
 function statusStyles(status: string) {
   const norm = status ? status.toLowerCase() : 'draft'
@@ -37,6 +38,18 @@ function downloadCsv(filename: string, rows: Record<string, any>[]) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
+}
+
+function normalizeUploadStatus(status: unknown) {
+  return String(status || '').trim().toLowerCase()
+}
+
+function isLeadUploading(status: unknown) {
+  return ['lead_uploading', 'uploading', 'leads_uploading'].includes(normalizeUploadStatus(status))
+}
+
+function isLeadUploadFinished(status: unknown) {
+  return ['upload_finished', 'lead_upload_finished', 'leads_uploaded', 'uploaded', 'finished', 'complete', 'completed'].includes(normalizeUploadStatus(status))
 }
 
 async function fetchJsonWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 30000) {
@@ -70,6 +83,16 @@ export default function CampaignsPage() {
   const [deleteModalFor, setDeleteModalFor] = useState<any | null>(null)
   const [deletingCampaignIds, setDeletingCampaignIds] = useState<string[]>([])
   const [deletedCampaignIds, setDeletedCampaignIds] = useState<string[]>([])
+  const [uploadPillExpanded, setUploadPillExpanded] = useState(false)
+  const [uploadTextVisible, setUploadTextVisible] = useState(false)
+  const [finishedPillExpanded, setFinishedPillExpanded] = useState(false)
+  const [finishedTextVisible, setFinishedTextVisible] = useState(false)
+  const [uploadFinishedCampaignIds, setUploadFinishedCampaignIds] = useState<string[]>([])
+  const previousUploadStatusesRef = useRef<Record<string, string>>({})
+  const uploadStatusesHydratedRef = useRef(false)
+  const uploadFinishedTimeoutsRef = useRef<Record<string, number>>({})
+  const uploadAnimationTimeoutsRef = useRef<number[]>([])
+  const finishedAnimationTimeoutsRef = useRef<number[]>([])
   const [activatingCampaignId, setActivatingCampaignId] = useState('')
   const [pausingCampaignId, setPausingCampaignId] = useState('')
   const [sendingWeeklyReportCampaignId, setSendingWeeklyReportCampaignId] = useState('')
@@ -91,6 +114,7 @@ export default function CampaignsPage() {
   const totalCampaigns = meta?.total ?? filteredCampaigns.length
   const totalPages = Math.max(1, Math.ceil(totalCampaigns / perPage))
   const paginatedCampaigns = filteredCampaigns
+  const hasUploadingCampaign = paginatedCampaigns.some((campaign: any) => isLeadUploading(campaign.upload_status))
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -100,6 +124,138 @@ export default function CampaignsPage() {
   useEffect(() => {
     setPage(1)
   }, [startDate, endDate])
+
+  useEffect(() => {
+    function clearUploadAnimationTimeouts() {
+      uploadAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+      uploadAnimationTimeoutsRef.current = []
+    }
+
+    if (!hasUploadingCampaign) {
+      clearUploadAnimationTimeouts()
+      setUploadPillExpanded(false)
+      setUploadTextVisible(false)
+      return
+    }
+
+    function queueTimeout(callback: () => void, delay: number) {
+      const timeout = window.setTimeout(callback, delay)
+      uploadAnimationTimeoutsRef.current.push(timeout)
+      return timeout
+    }
+
+    function runUploadPillCycle() {
+      setUploadPillExpanded(true)
+      queueTimeout(() => setUploadTextVisible(true), 300)
+      queueTimeout(() => setUploadTextVisible(false), 4600)
+      queueTimeout(() => setUploadPillExpanded(false), 5350)
+    }
+
+    setUploadPillExpanded(false)
+    setUploadTextVisible(false)
+    queueTimeout(runUploadPillCycle, 2800)
+
+    const interval = window.setInterval(runUploadPillCycle, 10000)
+
+    return () => {
+      window.clearInterval(interval)
+      clearUploadAnimationTimeouts()
+    }
+  }, [hasUploadingCampaign])
+
+  useEffect(() => {
+    if (!hasUploadingCampaign) return
+
+    const interval = window.setInterval(() => {
+      qc.invalidateQueries({ queryKey: ['campaigns'] })
+    }, 8000)
+
+    return () => window.clearInterval(interval)
+  }, [paginatedCampaigns, qc])
+
+  useEffect(() => {
+    const nextStatuses: Record<string, string> = {}
+
+    function queueFinishedAnimationTimeout(callback: () => void, delay: number) {
+      const timeout = window.setTimeout(callback, delay)
+      finishedAnimationTimeoutsRef.current.push(timeout)
+      return timeout
+    }
+
+    function clearFinishedAnimationTimeouts() {
+      finishedAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+      finishedAnimationTimeoutsRef.current = []
+    }
+
+    function runFinishedPillCycle() {
+      clearFinishedAnimationTimeouts()
+      setFinishedPillExpanded(false)
+      setFinishedTextVisible(false)
+      queueFinishedAnimationTimeout(() => setFinishedPillExpanded(true), 120)
+      queueFinishedAnimationTimeout(() => setFinishedTextVisible(true), 450)
+      queueFinishedAnimationTimeout(() => setFinishedTextVisible(false), 3600)
+      queueFinishedAnimationTimeout(() => setFinishedPillExpanded(false), 4350)
+    }
+
+    paginatedCampaigns.forEach((campaign: any) => {
+      const campaignId = String(campaign.id)
+      const status = normalizeUploadStatus(campaign.upload_status)
+      const previousStatus = previousUploadStatusesRef.current[campaignId]
+
+      nextStatuses[campaignId] = status
+
+      if (isLeadUploading(status)) {
+        setUploadFinishedCampaignIds((current) => current.filter((id) => id !== campaignId))
+        if (uploadFinishedTimeoutsRef.current[campaignId]) {
+          window.clearTimeout(uploadFinishedTimeoutsRef.current[campaignId])
+          delete uploadFinishedTimeoutsRef.current[campaignId]
+        }
+      }
+
+      if (uploadStatusesHydratedRef.current && isLeadUploadFinished(status) && isLeadUploading(previousStatus)) {
+        setUploadFinishedCampaignIds((current) => (
+          current.includes(campaignId) ? current : [...current, campaignId]
+        ))
+        runFinishedPillCycle()
+
+        if (uploadFinishedTimeoutsRef.current[campaignId]) {
+          window.clearTimeout(uploadFinishedTimeoutsRef.current[campaignId])
+        }
+
+        uploadFinishedTimeoutsRef.current[campaignId] = window.setTimeout(() => {
+          setUploadFinishedCampaignIds((current) => current.filter((id) => id !== campaignId))
+          delete uploadFinishedTimeoutsRef.current[campaignId]
+        }, 5000)
+      }
+    })
+
+    previousUploadStatusesRef.current = nextStatuses
+    uploadStatusesHydratedRef.current = true
+  }, [paginatedCampaigns])
+
+  useEffect(() => {
+    const invalidateCampaigns = () => {
+      qc.invalidateQueries({ queryKey: ['campaigns'] })
+    }
+
+    const channel = supabase
+      .channel('campaign-upload-progress')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, invalidateCampaigns)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, invalidateCampaigns)
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [qc])
+
+  useEffect(() => {
+    return () => {
+      Object.values(uploadFinishedTimeoutsRef.current).forEach((timeout) => window.clearTimeout(timeout))
+      uploadAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+      finishedAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+    }
+  }, [])
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
@@ -255,6 +411,14 @@ export default function CampaignsPage() {
                   const isDeletingThisCampaign = deletingCampaignIds.includes(campaign.id)
                   const isDeletedThisCampaign = deletedCampaignIds.includes(campaign.id)
                   const isDeleteBusy = isDeletingThisCampaign || isDeletedThisCampaign
+                  const uploadStatus = campaign.upload_status
+                  const isUploadingLeads = isLeadUploading(uploadStatus)
+                  const isUploadFinishedVisible = uploadFinishedCampaignIds.includes(campaign.id)
+                  const leadCount = Number(campaign.total_leads || 0)
+                  const shouldExpandUploadPill = isUploadingLeads && uploadPillExpanded
+                  const shouldShowUploadText = isUploadingLeads && uploadTextVisible
+                  const shouldExpandFinishedPill = isUploadFinishedVisible && finishedPillExpanded
+                  const shouldShowFinishedText = isUploadFinishedVisible && finishedTextVisible
                   const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
                   const canPause = currentStatus === 'active'
                   const canSendWeeklyReport = isAdmin && currentStatus !== 'draft'
@@ -302,14 +466,63 @@ export default function CampaignsPage() {
                       <td className="px-6 py-5 text-right">
                         <div className="flex items-center justify-end gap-3" data-campaign-actions>
                           <div className="flex items-center gap-3">
-                              {/* Lead Count Badge */}
-                              <span 
-                                title={`${campaign.total_leads || 0} total leads`}
-                                className="flex h-7 px-2.5 flex-none items-center justify-center rounded-full bg-indigo-500/10 text-[11px] font-bold text-indigo-600 ring-1 ring-indigo-500/20 gap-1"
-                              >
-                                <Users className="h-3.5 w-3.5" />
-                                <span>{campaign.total_leads || 0}</span>
-                              </span>
+                              <div className="flex w-[132px] justify-end">
+                                <span
+                                  title={isUploadingLeads ? `${leadCount} leads uploaded so far` : `${leadCount} total leads`}
+                                  className={`flex h-7 flex-none items-center justify-center overflow-hidden rounded-full px-2.5 text-[11px] font-bold ring-1 transition-all duration-700 ease-in-out ${
+                                    isUploadFinishedVisible
+                                      ? `${shouldExpandFinishedPill ? 'w-[128px]' : 'w-[64px]'} bg-emerald-500/10 text-emerald-700 ring-emerald-500/20`
+                                      : isUploadingLeads
+                                        ? `${shouldExpandUploadPill ? 'w-[104px]' : 'w-[64px]'} bg-indigo-500/10 text-indigo-600 ring-indigo-500/20`
+                                        : 'w-[64px] gap-1 bg-indigo-500/10 text-indigo-600 ring-indigo-500/20'
+                                  }`}
+                                >
+                                  {isUploadFinishedVisible ? (
+                                    <span className="relative flex h-full w-full items-center justify-center overflow-hidden">
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1 transition-all duration-700 ease-out ${
+                                          shouldShowFinishedText ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+                                        }`}
+                                      >
+                                        <Users className="h-3.5 w-3.5 shrink-0" />
+                                        <span>{leadCount}</span>
+                                      </span>
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-700 ease-out ${
+                                          shouldShowFinishedText ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
+                                        }`}
+                                      >
+                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                        <span className="whitespace-nowrap">Upload finished</span>
+                                      </span>
+                                    </span>
+                                  ) : isUploadingLeads ? (
+                                    <span className="relative flex h-full w-full items-center justify-center overflow-hidden">
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1 transition-all duration-700 ease-out ${
+                                          shouldShowUploadText ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+                                        }`}
+                                      >
+                                        <Users className="h-3.5 w-3.5 shrink-0" />
+                                        <span>{leadCount}</span>
+                                      </span>
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1 transition-all duration-700 ease-out ${
+                                          shouldShowUploadText ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
+                                        }`}
+                                      >
+                                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                                        <span className="whitespace-nowrap">Uploading</span>
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <Users className="h-3.5 w-3.5 shrink-0" />
+                                      <span>{leadCount}</span>
+                                    </>
+                                  )}
+                                </span>
+                              </div>
 
                               {/* Booking Count Badge */}
                               <span 

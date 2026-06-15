@@ -134,6 +134,8 @@ function buildWebhookPayload(campaign: any, body: any, instantlyCampaignId: stri
 
   return {
     source: 'campaign_launch',
+    channel: 'email_outreach',
+    campaign_type: 'email_outreach',
     campaign_id: campaign?.id || null,
     campaign_name: campaign?.name || body?.name || null,
     organization_id: campaign?.organization_id || null,
@@ -852,6 +854,16 @@ export async function POST(req: Request) {
       }
 
       const webhookErrors: string[] = []
+      const shouldUploadLeads =
+        body?.lead_creation?.mode === 'apollo' ||
+        (body?.lead_creation?.mode === 'import' && Array.isArray(body?.lead_creation?.leads))
+
+      if (shouldUploadLeads) {
+        await supabase
+          .from('campaigns')
+          .update({ upload_status: 'lead_uploading', updated_at: new Date().toISOString() })
+          .eq('id', campaign.id)
+      }
 
       if (body?.lead_creation?.mode === 'apollo') {
         try {
@@ -898,8 +910,21 @@ export async function POST(req: Request) {
       }
 
       const webhookError = webhookErrors.length > 0 ? webhookErrors.join(' | ') : null
+      const responseCampaign = {
+        ...updatedCampaign,
+        upload_status: shouldUploadLeads && !webhookError ? 'lead_uploading' : updatedCampaign?.upload_status
+      }
 
-      return NextResponse.json({ data: updatedCampaign, error: null, webhookError })
+      if (webhookError && shouldUploadLeads) {
+        await supabase
+          .from('campaigns')
+          .update({ upload_status: 'upload_failed', updated_at: new Date().toISOString() })
+          .eq('id', campaign.id)
+
+        responseCampaign.upload_status = 'upload_failed'
+      }
+
+      return NextResponse.json({ data: responseCampaign, error: null, webhookError })
     } catch (instantlyError: any) {
       await supabase
         .from('campaigns')
