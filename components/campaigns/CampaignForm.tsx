@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import Papa from 'papaparse'
 import * as XLSX from 'xlsx'
 import toast from 'react-hot-toast'
-import { ChevronDown, Lock, Plus, Trash2, Paperclip, Loader2, X, Settings, Calendar, UserCircle, ListOrdered, Users, Building2 } from 'lucide-react'
+import { ChevronDown, Lock, Plus, Trash2, Paperclip, Loader2, X, Settings, Calendar, UserCircle, ListOrdered, Users, Building2, Mail, UploadCloud, FileSpreadsheet, CheckCircle2, Search } from 'lucide-react'
 import { DEFAULT_TIMEZONE, INSTANTLY_TIMEZONES } from '../../lib/timezones'
 import { supabase } from '../../lib/supabase/client'
 
@@ -204,6 +204,11 @@ function getSequenceError(steps: SequenceStep[]) {
   return ''
 }
 
+const FIELD_CLASS = 'h-12 w-full rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 disabled:bg-slate-50 disabled:text-slate-400'
+const TEXTAREA_CLASS = 'min-h-28 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold leading-6 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10'
+const SELECT_TRIGGER_CLASS = 'flex h-12 w-full cursor-pointer items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 text-left text-sm font-semibold text-slate-900 shadow-sm outline-none transition hover:border-slate-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10'
+const READONLY_FIELD_CLASS = 'h-12 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-500 shadow-inner'
+
 function LockedLabel({ children }: { children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
@@ -212,10 +217,10 @@ function LockedLabel({ children }: { children: React.ReactNode }) {
         <Lock className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 transition-colors" aria-hidden="true" />
         <span
           role="tooltip"
-          className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2.5 hidden w-64 -translate-x-1/2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl transition-all animate-in fade-in slide-in-from-bottom-1 duration-200 group-hover:block group-focus:block"
+          className="pointer-events-none absolute bottom-full left-0 z-30 mb-2.5 hidden w-[min(16rem,calc(100vw-2rem))] rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-600 shadow-xl transition-all animate-in fade-in slide-in-from-bottom-1 duration-200 group-hover:block group-focus:block"
         >
           {CONTENT_LOCK_TOOLTIP}
-          <span className="absolute left-1/2 top-full h-1.5 w-1.5 -translate-x-1/2 -translate-y-[3px] rotate-45 border-r border-b border-slate-200 bg-white" />
+          <span className="absolute left-2 top-full h-1.5 w-1.5 -translate-y-[3px] rotate-45 border-r border-b border-slate-200 bg-white" />
         </span>
       </span>
     </span>
@@ -1001,7 +1006,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
         <p className="mt-1 text-zinc-500">{subtitle}</p>
       </div>
 
-      <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white/80 p-2 shadow-sm backdrop-blur">
+      <div className="flex min-h-[70px] flex-wrap items-center gap-2 rounded-3xl border border-slate-200/80 bg-white/85 p-2 shadow-glass backdrop-blur-xl">
         {visibleTabs.map((tabId) => {
           const icons: Record<Tab, typeof Settings> = {
             Basics: Settings,
@@ -1019,17 +1024,17 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
             key={tabId}
             type="button"
             onClick={() => setActiveTab(tabId)}
-            className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-colors ${
+            className={`group relative flex h-12 items-center gap-3 rounded-2xl border px-3 text-sm font-bold transition-colors ${
               activeTab === tabId
-                ? 'text-indigo-600 bg-indigo-50 font-bold border border-indigo-100 shadow-sm'
-                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-850'
+                ? 'border-indigo-100 bg-white text-indigo-700 shadow-md shadow-indigo-500/10'
+                : 'border-transparent text-slate-500 shadow-none hover:border-slate-200 hover:bg-white hover:text-slate-900'
             }`}
           >
             <span
-              className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-md transition-colors ${
+              className={`relative z-10 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
                 activeTab === tabId
                   ? 'bg-gradient-to-br from-indigo-500 to-sky-600 text-white shadow-md shadow-indigo-500/25'
-                  : 'bg-slate-100 text-slate-400 group-hover:text-slate-650'
+                  : 'bg-slate-100 text-slate-400 group-hover:bg-slate-200 group-hover:text-slate-700'
               }`}
             >
               <Icon className="h-4 w-4" aria-hidden />
@@ -1042,52 +1047,61 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
 
       <form
         onSubmit={handleSubmit}
-        className="rounded-xl border border-slate-200 bg-white/70 p-6 shadow-glass backdrop-blur-xl"
+        className="rounded-3xl border border-slate-200/80 bg-white/85 p-6 shadow-glass backdrop-blur-xl md:p-7"
       >
         <div className="min-h-[400px]">
           {activeTab === 'Basics' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Basic Configuration</h2>
-                <p className="text-sm text-slate-400 font-medium">Configure the primary settings and limits for this campaign.</p>
+                <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Basic Configuration</h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">Configure the primary settings and limits for this campaign.</p>
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
                 <label className="space-y-2 md:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">Campaign Name</span>
-                  <input name="name" value={name} onChange={(event) => setName(event.target.value)} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" placeholder="GaziAI Buyer Discovery 1" />
+                  <input name="name" value={name} onChange={(event) => setName(event.target.value)} className={FIELD_CLASS} placeholder="GaziAI Buyer Discovery 1" />
                 </label>
                 
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-slate-700">Target Lead Count</span>
-                  <input name="target_lead_count" type="number" min={0} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={targetLeadCount} onChange={(event) => setTargetLeadCount(event.target.value)} placeholder="100" />
+                  <input name="target_lead_count" type="number" min={0} className={FIELD_CLASS} value={targetLeadCount} onChange={(event) => setTargetLeadCount(event.target.value)} placeholder="100" />
                   <p className="text-xs text-slate-400 font-medium">Total number of leads to fetch</p>
                 </label>
                 
                 <div className="grid grid-cols-2 gap-4">
                   <label className="space-y-2">
                     <span className="text-sm font-semibold text-slate-700">Daily Limit</span>
-                    <input name="daily_limit" type="number" min={1} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)} />
+                    <input name="daily_limit" type="number" min={1} className={FIELD_CLASS} value={dailyLimit} onChange={(event) => setDailyLimit(event.target.value)} />
                   </label>
                   <label className="space-y-2">
                     <span className="text-sm font-semibold text-slate-700">Email Gap (mins)</span>
-                    <input name="email_gap" type="number" min={0} className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium" value={emailGap} onChange={(event) => setEmailGap(event.target.value)} />
+                    <input name="email_gap" type="number" min={0} className={FIELD_CLASS} value={emailGap} onChange={(event) => setEmailGap(event.target.value)} />
                   </label>
                 </div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-750 transition hover:bg-slate-50 cursor-pointer shadow-sm">
-                  <input type="checkbox" name="stop_on_reply" checked={stopOnReply} onChange={(event) => setStopOnReply(event.target.checked)} className="h-4 w-4 rounded border-slate-350 bg-transparent text-indigo-650 focus:ring-indigo-500/20" />
-                  <span className="text-sm font-bold">Stop On Reply</span>
+                <label className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-4 transition-all ${stopOnReply ? 'border-indigo-200 bg-indigo-50 text-indigo-700 shadow-sm ring-4 ring-indigo-500/10' : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300'}`}>
+                  <input type="checkbox" name="stop_on_reply" checked={stopOnReply} onChange={(event) => setStopOnReply(event.target.checked)} className="sr-only" />
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${stopOnReply ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                    <CheckCircle2 className="h-4 w-4" />
+                  </span>
+                  <span className="text-sm font-extrabold">Stop On Reply</span>
                 </label>
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-750 transition hover:bg-slate-50 cursor-pointer shadow-sm">
-                  <input type="checkbox" name="open_tracking" checked={openTracking} onChange={(event) => setOpenTracking(event.target.checked)} className="h-4 w-4 rounded border-slate-350 bg-transparent text-indigo-650 focus:ring-indigo-500/20" />
-                  <span className="text-sm font-bold">Open Tracking</span>
+                <label className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-4 transition-all ${openTracking ? 'border-sky-200 bg-sky-50 text-sky-700 shadow-sm ring-4 ring-sky-500/10' : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300'}`}>
+                  <input type="checkbox" name="open_tracking" checked={openTracking} onChange={(event) => setOpenTracking(event.target.checked)} className="sr-only" />
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${openTracking ? 'bg-sky-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                    <CheckCircle2 className="h-4 w-4" />
+                  </span>
+                  <span className="text-sm font-extrabold">Open Tracking</span>
                 </label>
-                <label className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 text-slate-750 transition hover:bg-slate-50 cursor-pointer shadow-sm">
-                  <input type="checkbox" name="link_tracking" checked={linkTracking} onChange={(event) => setLinkTracking(event.target.checked)} className="h-4 w-4 rounded border-slate-350 bg-transparent text-indigo-650 focus:ring-indigo-500/20" />
-                  <span className="text-sm font-bold">Link Tracking</span>
+                <label className={`flex cursor-pointer items-center gap-3 rounded-2xl border px-4 py-4 transition-all ${linkTracking ? 'border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm ring-4 ring-emerald-500/10' : 'border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300'}`}>
+                  <input type="checkbox" name="link_tracking" checked={linkTracking} onChange={(event) => setLinkTracking(event.target.checked)} className="sr-only" />
+                  <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${linkTracking ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                    <CheckCircle2 className="h-4 w-4" />
+                  </span>
+                  <span className="text-sm font-extrabold">Link Tracking</span>
                 </label>
               </div>
             </div>
@@ -1096,8 +1110,8 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
           {activeTab === 'Campaign Owner' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Campaign Owner</h2>
-                <p className="text-sm font-medium text-slate-400">These fields are required and identify the company behind this campaign.</p>
+                <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Campaign Owner</h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">These fields are required and identify the company behind this campaign.</p>
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
@@ -1106,7 +1120,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <input
                     value={campaignOwner.company_name}
                     onChange={(event) => setCampaignOwner((current) => ({ ...current, company_name: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="Acme Inc."
                     required
                   />
@@ -1117,7 +1131,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <input
                     value={campaignOwner.created_from_company}
                     onChange={(event) => setCampaignOwner((current) => ({ ...current, created_from_company: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="Creator name"
                     required
                   />
@@ -1129,8 +1143,8 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
           {activeTab === 'Schedule' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Sending Schedule</h2>
-                <p className="text-sm text-slate-400 font-medium">Define the timezone, window, and days for sending emails.</p>
+                <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Sending Schedule</h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">Define the timezone, window, and days for sending emails.</p>
               </div>
 
               <div className="grid gap-6 md:grid-cols-3">
@@ -1143,20 +1157,20 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                         setTimezoneOpen((current) => !current)
                         setTimezoneSearch('')
                       }}
-                      className="flex w-full cursor-pointer items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-slate-850 shadow-sm outline-none transition hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 font-medium"
+                      className={SELECT_TRIGGER_CLASS}
                     >
                       <span className="truncate cursor-pointer">{timezone}</span>
                       <ChevronDown className="h-4 w-4 cursor-pointer text-slate-400" aria-hidden="true" />
                     </button>
 
                     {timezoneOpen ? (
-                      <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+                      <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                         <div className="border-b border-slate-100 px-3 py-2">
                           <input
                             autoFocus
                             value={timezoneSearch}
                             onChange={(event) => setTimezoneSearch(event.target.value)}
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20"
+                            className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                             placeholder="Search timezone..."
                           />
                         </div>
@@ -1192,14 +1206,14 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                       <button
                         type="button"
                         onClick={() => setTimePickerOpen((current) => (current === 'from' ? null : 'from'))}
-                        className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-slate-850 shadow-sm outline-none transition hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 font-medium"
+                        className={SELECT_TRIGGER_CLASS}
                       >
                         <span>{formatTimeLabel(fromTime)}</span>
                         <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
                       </button>
 
                       {timePickerOpen === 'from' ? (
-                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                           <div className="max-h-64 overflow-auto py-1">
                             {TIME_OPTIONS_WITH_2359.filter(o => o.value !== '00:00').map((option) => (
                               <button
@@ -1226,14 +1240,14 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                       <button
                         type="button"
                         onClick={() => setTimePickerOpen((current) => (current === 'to' ? null : 'to'))}
-                        className="flex w-full items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-left text-slate-850 shadow-sm outline-none transition hover:border-indigo-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 font-medium"
+                        className={SELECT_TRIGGER_CLASS}
                       >
                         <span>{formatTimeLabel(toTime)}</span>
                         <ChevronDown className="h-4 w-4 text-slate-400" aria-hidden="true" />
                       </button>
 
                       {timePickerOpen === 'to' ? (
-                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
+                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
                           <div className="max-h-64 overflow-auto py-1">
                             {TIME_OPTIONS_WITH_2359.filter(o => o.value !== '00:00' && o.value !== '00:30').map((option) => (
                               <button
@@ -1257,10 +1271,10 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               </div>
 
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-slate-700">Sending Days</h3>
+                <h3 className="text-sm font-extrabold text-slate-900">Sending Days</h3>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
                   {(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const).map((day) => (
-                    <label key={day} className={`flex cursor-pointer flex-col items-center gap-2 rounded-lg border p-3 text-sm capitalize transition-all ${days[day] ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-1 ring-indigo-500/20 font-bold shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-350 shadow-sm font-semibold'}`}>
+                    <label key={day} className={`flex min-h-[76px] cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border p-3 text-sm capitalize transition-all ${days[day] ? 'border-indigo-500 bg-indigo-50 text-indigo-700 ring-4 ring-indigo-500/10 font-bold shadow-sm' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50 shadow-sm font-semibold'}`}>
                       <input
                         type="checkbox"
                         name={day}
@@ -1268,7 +1282,8 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                         onChange={(event) => setDays((current) => ({ ...current, [day]: event.target.checked }))}
                         className="sr-only"
                       />
-                      <span className="font-semibold">{day.slice(0, 3)}</span>
+                      <span className={`h-2 w-2 rounded-full ${days[day] ? 'bg-indigo-600' : 'bg-slate-300'}`} />
+                      <span className="font-extrabold">{day.slice(0, 3)}</span>
                     </label>
                   ))}
                 </div>
@@ -1279,8 +1294,8 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
           {activeTab === 'Sender Profile' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
               <div>
-                <h2 className="text-lg font-bold text-slate-800">Sender Information</h2>
-                <p className="text-sm text-slate-400 font-medium">Details sent with the campaign webhook for AI personalization and reporting.</p>
+                <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Sender Information</h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">Details sent with the campaign webhook for AI personalization and reporting.</p>
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
@@ -1289,7 +1304,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <input
                     value={senderInfo.name}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, name: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="John Doe"
                     required
                   />
@@ -1300,7 +1315,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                     type="email"
                     value={reportEmail}
                     onChange={(event) => setReportEmail(event.target.value)}
-                    className="w-full rounded-md border border-indigo-200 bg-indigo-50/50 px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className="h-12 w-full rounded-2xl border border-indigo-200 bg-indigo-50/50 px-4 text-sm font-bold text-slate-900 shadow-sm outline-none transition placeholder:text-indigo-300 hover:border-indigo-300 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10"
                     placeholder="reports@client.com"
                     required
                   />
@@ -1312,7 +1327,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <input
                     value={senderInfo.company}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, company: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="Company name"
                     required
                   />
@@ -1322,7 +1337,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <input
                     value={senderInfo.location}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, location: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="City, Country"
                     required
                   />
@@ -1333,7 +1348,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <input
                     value={senderInfo.address}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, address: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="Street address"
                     required
                   />
@@ -1343,7 +1358,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <input
                     value={senderInfo.booking_calendar_link}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, booking_calendar_link: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="https://cal.com/..."
                     required
                   />
@@ -1357,7 +1372,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                       setClientEmail(event.target.value)
                       setUseExistingToken(false)
                     }}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={FIELD_CLASS}
                     placeholder="client@email.com"
                     required
                   />
@@ -1365,7 +1380,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                 <div className="space-y-2">
                   <span className="text-sm font-semibold text-slate-700">Calendly Token</span>
                   {loadingTokens ? (
-                    <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-400">
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Looking up existing tokens…
                     </div>
@@ -1380,7 +1395,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                             setUseExistingToken(true)
                           }
                         }}
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                        className={FIELD_CLASS}
                         required
                       >
                         <option value="">Select an existing token</option>
@@ -1397,7 +1412,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                       <input
                         value={calendlyToken}
                         onChange={(event) => setCalendlyToken(event.target.value)}
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                        className={FIELD_CLASS}
                         placeholder="Enter Calendly Token"
                         required
                       />
@@ -1419,7 +1434,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <textarea
                     value={senderInfo.company_details}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, company_details: event.target.value }))}
-                    className="min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={TEXTAREA_CLASS}
                     placeholder="Share the company summary, positioning, or offer context"
                   />
                 </label>
@@ -1429,7 +1444,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <textarea
                     value={senderInfo.long_message}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, long_message: event.target.value }))}
-                    className="min-h-24 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={TEXTAREA_CLASS}
                     placeholder="Paste the long-form sender note or outreach message"
                   />
                 </label>
@@ -1439,7 +1454,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <textarea
                     value={senderInfo.signature}
                     onChange={(event) => setSenderInfo((current) => ({ ...current, signature: event.target.value }))}
-                    className="min-h-20 w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                    className={TEXTAREA_CLASS}
                     placeholder="Best regards, ... "
                   />
                 </label>
@@ -1448,7 +1463,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <span className="text-sm font-semibold text-slate-700">Attachment (Optional)</span>
                   <div className="flex items-center gap-3">
                     {attachmentUrl ? (
-                      <div className="flex flex-1 items-center justify-between rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm">
+                      <div className="flex flex-1 items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2 overflow-hidden">
                           <Paperclip className="h-4 w-4 shrink-0 text-indigo-500" />
                           <span className="truncate text-sm text-indigo-700 font-semibold">{attachmentUrl.split('/').pop()}</span>
@@ -1462,7 +1477,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                         </button>
                       </div>
                     ) : (
-                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-6 transition hover:border-indigo-500 hover:bg-indigo-50/20 shadow-sm">
+                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 min-h-[132px] rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-6 transition hover:border-indigo-400 hover:bg-indigo-50/40 shadow-sm">
                         {uploadingAttachment ? (
                           <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
                         ) : (
@@ -1486,7 +1501,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   <span className="text-sm font-semibold text-slate-700">Signature Image (Optional)</span>
                   <div className="flex items-center gap-3">
                     {senderInfo.signature_url ? (
-                      <div className="flex flex-1 items-center justify-between rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 shadow-sm">
+                      <div className="flex flex-1 items-center justify-between rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-3 overflow-hidden">
                           <img src={senderInfo.signature_url} alt="Signature" className="h-10 w-auto rounded border border-slate-200 bg-white" />
                           <span className="truncate text-xs text-indigo-700 font-semibold">Signature uploaded</span>
@@ -1500,7 +1515,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                         </button>
                       </div>
                     ) : (
-                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 bg-white px-3 py-4 transition hover:border-indigo-500 hover:bg-indigo-50/20 shadow-sm">
+                      <label className="flex flex-1 cursor-pointer items-center justify-center gap-2 min-h-[132px] rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-6 transition hover:border-indigo-400 hover:bg-indigo-50/40 shadow-sm">
                         {uploadingSignature ? (
                           <Loader2 className="h-5 w-5 animate-spin text-indigo-600" />
                         ) : (
@@ -1526,17 +1541,17 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
 
           {activeTab === 'Sequences' && (
             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-800">Sequence Setup</h2>
-                  <p className="text-sm text-slate-400 font-medium">Configure delays for your automated email steps.</p>
+                  <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Sequence Setup</h2>
+                  <p className="mt-1 text-sm font-medium text-slate-500">Configure delays for your automated email steps.</p>
                 </div>
                 <button
                   type="button"
                   onClick={addStep}
-                  className="inline-flex items-center gap-2 rounded-md bg-white border border-slate-200 hover:bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors"
+                  className="inline-flex h-11 items-center gap-2 rounded-2xl bg-slate-900 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
                 >
-                  <Plus className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                  <Plus className="h-4 w-4" aria-hidden="true" />
                   Add Step
                 </button>
               </div>
@@ -1547,18 +1562,18 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                   const minimumDelay = index === 0 ? 0 : (steps[index - 1]?.delay_days ?? 0) + 1
 
                   return (
-                    <div key={stepNumber} className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm relative group">
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500 rounded-l-xl" />
+                    <div key={stepNumber} className="group relative rounded-3xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/70 p-5 shadow-sm">
+                      <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-indigo-500 to-sky-500" />
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-50 text-xs text-indigo-650 font-bold">{stepNumber}</span>
+                        <h3 className="flex items-center gap-2 text-base font-extrabold text-slate-900">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-50 text-xs font-extrabold text-indigo-700 ring-1 ring-indigo-100">{stepNumber}</span>
                           Step {stepNumber}
                         </h3>
                         {index > 0 ? (
                           <button
                             type="button"
                             onClick={() => removeStep(index)}
-                            className="inline-flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
+                            className="inline-flex h-9 items-center gap-2 rounded-xl border border-red-200 bg-white px-3 text-xs font-bold text-red-600 transition hover:bg-red-50"
                           >
                             <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             Remove
@@ -1573,7 +1588,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                             value={getSubjectVariable(stepNumber)}
                             disabled
                             readOnly
-                            className="w-full rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-slate-400 font-medium"
+                            className={READONLY_FIELD_CLASS}
                           />
                         </label>
 
@@ -1583,7 +1598,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                             value={getBodyVariable(stepNumber)}
                             disabled
                             readOnly
-                            className="w-full rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-slate-400 font-medium"
+                            className={READONLY_FIELD_CLASS}
                           />
                         </label>
 
@@ -1595,7 +1610,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                             value={index === 0 ? 0 : step.delay_days}
                             disabled={index === 0}
                             onChange={(event) => updateDelay(index, event.target.value)}
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400"
+                            className={FIELD_CLASS}
                           />
                         </label>
                       </div>
@@ -1605,14 +1620,14 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               </div>
 
               {sequenceError ? (
-                <div className="rounded-md bg-red-50 px-4 py-3 text-sm text-red-700 border border-red-250 font-semibold shadow-sm">
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 shadow-sm">
                   {sequenceError}
                 </div>
               ) : null}
               
-              <div className="mt-8 rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-inner">
-                <h3 className="text-sm font-bold text-slate-800 mb-3">Launch Preview</h3>
-                <div className="overflow-x-auto rounded-md border border-slate-200 bg-white shadow-sm">
+              <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50/80 p-4 shadow-inner">
+                <h3 className="mb-3 text-sm font-extrabold text-slate-900">Launch Preview</h3>
+                <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
                   <table className="min-w-full text-left text-sm">
                     <thead className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-400 font-bold bg-slate-50/70">
                       <tr>
@@ -1628,7 +1643,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                         return (
                           <tr key={`preview-${stepNumber}`} className="hover:bg-slate-50/50 transition">
                             <td className="px-4 py-2.5 font-semibold text-slate-700">Step {stepNumber}</td>
-                            <td className="px-4 py-2.5 text-indigo-650 font-bold font-mono">{index === 0 ? 0 : step.delay_days}</td>
+                            <td className="px-4 py-2.5 text-indigo-600 font-bold font-mono">{index === 0 ? 0 : step.delay_days}</td>
                             <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{getSubjectVariable(stepNumber)}</td>
                             <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{getBodyVariable(stepNumber)}</td>
                           </tr>
@@ -1642,100 +1657,159 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
           )}
 
           {activeTab === 'Leads' && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-8">
-              <div>
-                <h2 className="text-lg font-bold text-slate-800">Leads & Account</h2>
-                <p className="text-sm text-slate-400 font-medium">Configure how leads are added to this campaign and what account sends them.</p>
-              </div>
-
-              <div className="space-y-3">
-                <span className="text-sm font-semibold text-slate-700">Sending Email Account</span>
-                <div className="flex flex-col gap-3">
-                  <div className="flex max-w-md gap-3">
-                    <input
-                      type="email"
-                      value={emailInput}
-                      onChange={(e) => setEmailInput(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          handleAddEmail()
-                        }
-                      }}
-                      placeholder="Enter sending email (e.g. sender@company.com)"
-                      className="w-full rounded-md border border-slate-200 bg-white px-3.5 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddEmail}
-                      disabled={addingEmail || !emailInput.trim()}
-                      className="inline-flex h-10 items-center justify-center rounded-md bg-indigo-600 hover:bg-indigo-700 px-5 text-sm font-semibold text-white transition shadow-sm disabled:opacity-50 min-w-[72px]"
-                    >
-                      {addingEmail ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-white" />
-                      ) : (
-                        'Add'
-                      )}
-                    </button>
-                  </div>
-
-                  {/* Selected emails tag list */}
-                  {selectedEmails.length > 0 && (
-                    <div className="flex flex-wrap gap-2 max-w-2xl pt-1">
-                      {selectedEmails.map((email) => {
-                        const account = emailAccounts.find(acc => acc.email_address.toLowerCase() === email.toLowerCase())
-                        const displayName = account ? (account.account_name || account.email_address) : email
-                        return (
-                          <span
-                            key={email}
-                            className="inline-flex items-center gap-1.5 rounded-md bg-indigo-50 border border-indigo-200 pl-3 pr-2 py-1 text-xs font-semibold text-indigo-700 shadow-sm animate-in fade-in zoom-in duration-200"
-                          >
-                            <span className="truncate max-w-[280px]" title={email}>
-                              {displayName}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedEmails(prev => prev.filter(e => e.toLowerCase() !== email.toLowerCase()))}
-                              className="rounded-full p-0.5 hover:bg-indigo-100 hover:text-indigo-900 transition"
-                              aria-label={`Remove ${email}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </span>
-                        )
-                      })}
-                    </div>
-                  )}
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-7">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-extrabold tracking-tight text-slate-900">Leads & Account</h2>
+                  <p className="mt-1 text-sm font-medium text-slate-500">Choose the sender and how leads enter this campaign.</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 shadow-sm">
+                    <Mail className="h-3.5 w-3.5 text-sky-500" />
+                    {selectedEmails.length || 0} sender{selectedEmails.length === 1 ? '' : 's'}
+                  </span>
+                  <span className="inline-flex h-8 items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50 px-3 text-xs font-bold text-indigo-700 shadow-sm">
+                    <Users className="h-3.5 w-3.5" />
+                    {leadMode === 'import' ? `${leadRows.length} imported` : 'External source'}
+                  </span>
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-slate-200">
-                <h3 className="text-sm font-bold text-slate-700 mb-4">Lead Source</h3>
-                <div className="grid gap-4 md:grid-cols-2 mb-6">
-                  {LEAD_MODE_OPTIONS.map((option) => (
-                    <label key={option.value} className={`relative flex cursor-pointer rounded-xl border p-4 transition-all ${leadMode === option.value ? 'border-indigo-500 bg-indigo-50/50 ring-1 ring-indigo-500/20 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-350 shadow-sm'}`}>
-                      <input
-                        type="radio"
-                        name="lead_mode"
-                        className="sr-only"
-                        checked={leadMode === option.value}
-                        onChange={() => setLeadMode(option.value)}
-                      />
-                      <div className="flex w-full items-start gap-4">
-                        <div className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${leadMode === option.value ? 'border-indigo-600 bg-indigo-600' : 'border-slate-300 bg-transparent'}`}>
-                          {leadMode === option.value && <div className="h-2 w-2 rounded-full bg-white" />}
-                        </div>
-                        <div>
-                          <div className="font-bold text-slate-800">{option.label}</div>
-                          <div className="mt-1 text-sm text-slate-500 font-medium">{option.description}</div>
-                        </div>
+              <section className="rounded-2xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/70 p-5 shadow-sm">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600 ring-1 ring-sky-100">
+                        <Mail className="h-5 w-5" />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-extrabold text-slate-900">Sending Email Account</h3>
+                        <p className="mt-0.5 text-xs font-semibold text-slate-400">Add one or more connected senders.</p>
                       </div>
-                    </label>
-                  ))}
+                    </div>
+                  </div>
+
+                  <div className="w-full max-w-2xl space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                      <div className="relative flex-1">
+                        <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                        <input
+                          type="email"
+                          value={emailInput}
+                          onChange={(e) => setEmailInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault()
+                              handleAddEmail()
+                            }
+                          }}
+                          placeholder="sender@company.com"
+                          className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-semibold text-slate-800 shadow-sm outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleAddEmail}
+                        disabled={addingEmail || !emailInput.trim()}
+                        className="inline-flex h-11 min-w-[92px] items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {addingEmail ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-white" />
+                        ) : (
+                          <>
+                            <Plus className="h-4 w-4" />
+                            Add
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    {selectedEmails.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedEmails.map((email) => {
+                          const account = emailAccounts.find(acc => acc.email_address.toLowerCase() === email.toLowerCase())
+                          const displayName = account ? (account.account_name || account.email_address) : email
+                          return (
+                            <span
+                              key={email}
+                              className="inline-flex max-w-full items-center gap-2 rounded-full border border-sky-100 bg-white py-1.5 pl-3 pr-1.5 text-xs font-bold text-slate-700 shadow-sm ring-1 ring-sky-50 animate-in fade-in zoom-in duration-200"
+                            >
+                              <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" />
+                              <span className="max-w-[280px] truncate" title={email}>
+                                {displayName}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedEmails(prev => prev.filter(e => e.toLowerCase() !== email.toLowerCase()))}
+                                className="inline-flex h-5 w-5 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                                aria-label={`Remove ${email}`}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs font-semibold text-slate-400">No sender selected yet.</p>
+                    )}
+                  </div>
+                </div>
+              </section>
+
+              <section className="space-y-5">
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">Lead Source</h3>
+                  <p className="mt-1 text-xs font-semibold text-slate-400">Import a file now or let Buyer Discovery build the list.</p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  {LEAD_MODE_OPTIONS.map((option) => {
+                    const selected = leadMode === option.value
+                    const SourceIcon = option.value === 'apollo' ? Search : UploadCloud
+                    return (
+                      <label
+                        key={option.value}
+                        className={`group relative cursor-pointer overflow-hidden rounded-2xl border p-5 transition-all ${
+                          selected
+                            ? 'border-indigo-500 bg-indigo-50 shadow-sm ring-4 ring-indigo-500/10'
+                            : 'border-slate-200 bg-white shadow-sm hover:border-slate-300 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="lead_mode"
+                          className="sr-only"
+                          checked={selected}
+                          onChange={() => setLeadMode(option.value)}
+                        />
+                        <div className="flex items-start gap-4">
+                          <span className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl transition ${
+                            selected
+                              ? 'bg-gradient-to-br from-indigo-500 to-sky-600 text-white shadow-lg shadow-indigo-500/20'
+                              : 'bg-slate-100 text-slate-500 group-hover:bg-white'
+                          }`}>
+                            <SourceIcon className="h-5 w-5" />
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="font-extrabold text-slate-900">{option.label}</div>
+                              <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition ${
+                                selected ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300 bg-white text-transparent'
+                              }`}>
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                              </span>
+                            </div>
+                            <div className="mt-1 text-sm font-medium leading-6 text-slate-500">{option.description}</div>
+                          </div>
+                        </div>
+                      </label>
+                    )
+                  })}
                 </div>
 
                 {leadMode === 'apollo' && (
-                  <div className="grid gap-6 md:grid-cols-2 animate-in fade-in duration-300 p-5 rounded-xl border border-slate-200 bg-slate-50/50 shadow-sm">
+                  <div className="grid gap-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-in fade-in duration-300 md:grid-cols-2">
                     <label className="space-y-2">
                       <span className="text-sm font-semibold text-slate-700">Target Country</span>
                       <div ref={countryRef} className="relative">
@@ -1776,11 +1850,11 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                               }
                             }
                           }}
-                          className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                          className={FIELD_CLASS}
                           placeholder="e.g. United States"
                         />
                         {countryOpen && filteredCountries.length > 0 && (
-                          <ul className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-md border border-slate-200 bg-white py-1 shadow-xl">
+                          <ul className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-2xl border border-slate-200 bg-white py-1 shadow-xl">
                             {filteredCountries.slice(0, 100).map((country, index) => (
                               <li
                                 key={country}
@@ -1790,7 +1864,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                                   setApolloLead((current) => ({ ...current, market_name: country }))
                                   setCountryOpen(false)
                                 }}
-                                className={`cursor-pointer px-3 py-2 text-sm font-medium ${index === countryHighlight ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-650 hover:bg-slate-50'}`}
+                                className={`cursor-pointer px-3 py-2 text-sm font-medium ${index === countryHighlight ? 'bg-indigo-50 text-indigo-700 font-bold' : 'text-slate-600 hover:bg-slate-50'}`}
                               >
                                 {country}
                               </li>
@@ -1804,7 +1878,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                       <input
                         value={apolloLead.product_name}
                         onChange={(event) => setApolloLead((current) => ({ ...current, product_name: event.target.value }))}
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
+                        className={FIELD_CLASS}
                         placeholder="e.g. AI CRM Automation"
                       />
                     </label>
@@ -1812,22 +1886,30 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                 )}
 
                 {leadMode === 'import' && (
-                  <div className="space-y-4 animate-in fade-in duration-300 p-5 rounded-xl border border-slate-200 bg-slate-50/50 shadow-sm">
-                    <label className="space-y-2 block">
-                      <span className="text-sm font-semibold text-slate-700">Upload CSV or Spreadsheet</span>
+                  <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm animate-in fade-in duration-300">
+                    <label className="group flex min-h-[172px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-6 py-7 text-center transition hover:border-indigo-400 hover:bg-indigo-50/40">
                       <input
                         type="file"
                         accept=".csv,.txt,.xlsx,.xls"
                         onChange={handleLeadFileChange}
-                        className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-800 placeholder:text-slate-400 outline-none focus:border-indigo-500 shadow-sm font-medium"
+                        className="sr-only"
                       />
+                      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-indigo-600 shadow-sm ring-1 ring-slate-200 transition group-hover:scale-105 group-hover:ring-indigo-200">
+                        <UploadCloud className="h-6 w-6" />
+                      </span>
+                      <span className="mt-4 text-sm font-extrabold text-slate-900">
+                        {leadFileName || 'Choose CSV or spreadsheet'}
+                      </span>
+                      <span className="mt-1 max-w-lg text-xs font-semibold leading-5 text-slate-500">
+                        Supports CSV, TXT, XLS, and XLSX files with the required lead columns.
+                      </span>
                     </label>
 
                     {leadFileError.length > 0 && (
-                      <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
+                      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 shadow-sm">
                         <div className="flex items-center gap-2 text-sm font-bold text-red-700 mb-2">
                           <X className="h-4 w-4 text-red-500 shrink-0" />
-                          File validation failed — {leadFileError.length} column(s) missing
+                          File validation failed - {leadFileError.length} column(s) missing
                         </div>
                         <p className="text-xs text-slate-500 font-medium mb-3">Click a <span className="text-red-600 font-bold">red</span> column name to copy it to your clipboard.</p>
                         <div className="flex flex-wrap gap-1.5">
@@ -1860,14 +1942,24 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                     )}
 
                     {leadFileName && leadFileError.length === 0 && (
-                      <div className="flex items-center gap-3 rounded-md border border-emerald-500/20 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 font-bold shadow-sm">
-                        <span className="font-semibold">{leadFileName}</span>
-                        <span className="text-emerald-600/80">• {leadRows.length} rows loaded</span>
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700 shadow-sm">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-emerald-600 ring-1 ring-emerald-100">
+                            <FileSpreadsheet className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate font-extrabold">{leadFileName}</span>
+                            <span className="block text-xs font-semibold text-emerald-600/80">Ready for launch</span>
+                          </span>
+                        </div>
+                        <span className="inline-flex h-8 items-center rounded-full bg-white px-3 text-xs font-extrabold text-emerald-700 ring-1 ring-emerald-100">
+                          {leadRows.length} rows loaded
+                        </span>
                       </div>
                     )}
                   </div>
                 )}
-              </div>
+              </section>
             </div>
           )}
 
@@ -1977,7 +2069,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
         </div>
 
         {verifyingToken && (
-          <div className="mt-6 rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-750 border border-indigo-200 flex items-center gap-2 font-semibold shadow-sm animate-pulse">
+          <div className="mt-6 flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 shadow-sm animate-pulse">
             <span className="relative flex h-3 w-3">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
@@ -1987,7 +2079,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
         )}
 
         {error && (
-          <div className="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-750 border border-red-200 flex items-center gap-2 font-semibold shadow-sm animate-bounce">
+          <div className="mt-6 flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700 shadow-sm animate-bounce">
             <span className="font-extrabold text-red-800">Error:</span> {error}
           </div>
         )}
@@ -1998,7 +2090,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               <button
                 type="button"
                 onClick={() => setActiveTab(visibleTabs[Math.max(0, visibleTabs.indexOf(activeTab) - 1)])}
-                className="rounded-lg bg-white border border-slate-200 px-5 py-2.5 font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-5 font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Previous
               </button>
@@ -2010,7 +2102,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               <button
                 type="button"
                 onClick={() => setActiveTab(visibleTabs[Math.min(visibleTabs.length - 1, visibleTabs.indexOf(activeTab) + 1)])}
-                className="rounded-lg bg-white border border-slate-200 px-6 py-2.5 font-bold text-slate-700 transition hover:bg-slate-50 shadow-sm"
+                className="h-12 rounded-2xl border border-slate-200 bg-white px-6 font-bold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50"
               >
                 Next Step
               </button>
@@ -2018,7 +2110,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               <button
                 type="submit"
                 disabled={submitting || verifyingToken || Boolean(sequenceError) || Boolean(combinedLinkedInSequenceError)}
-                className="rounded-lg bg-gradient-to-r from-indigo-600 to-sky-600 px-8 py-2.5 font-extrabold text-white shadow-md shadow-indigo-600/10 transition hover:opacity-95 hover:shadow-indigo-600/20 disabled:opacity-60"
+                className="h-12 rounded-2xl bg-gradient-to-r from-indigo-600 to-sky-600 px-8 font-extrabold text-white shadow-lg shadow-indigo-600/20 transition hover:shadow-indigo-600/30 disabled:opacity-60"
               >
                 {verifyingToken ? 'Verifying Token...' : submitting ? 'Launching...' : submitLabel}
               </button>

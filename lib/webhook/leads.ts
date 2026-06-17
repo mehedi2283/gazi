@@ -3,6 +3,7 @@ const DEFAULT_LINKEDIN_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/82832
 const LEAD_WEBHOOK_URL = process.env.LEADS_WEBHOOK_URL || DEFAULT_LEAD_WEBHOOK_URL
 const LINKEDIN_WEBHOOK_URL = process.env.LINKEDIN_WEBHOOK_URL || DEFAULT_LINKEDIN_WEBHOOK_URL
 const IMPORT_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/22d3c430-9fa6-4c17-893b-a2e2a6d4e090'
+const WEBHOOK_ACK_TIMEOUT_MS = 15000
 
 type LeadPayload = {
   campaign_id?: string | null
@@ -14,24 +15,43 @@ type CampaignWebhookMeta = {
   sequence_count: number
 }
 
-export async function sendLeadsToWebhook(payload: unknown) {
-  const response = await fetch(LEAD_WEBHOOK_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  })
+async function postWebhook(url: string, payload: unknown, label: string) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), WEBHOOK_ACK_TIMEOUT_MS)
 
-  if (!response.ok) {
-    const responseText = await response.text().catch(() => '')
-    throw new Error(
-      `Webhook request failed with status ${response.status}${responseText ? `: ${responseText}` : ''}`
-    )
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    })
+
+    if (!response.ok) {
+      const responseText = await response.text().catch(() => '')
+      throw new Error(
+        `${label} request failed with status ${response.status}${responseText ? `: ${responseText}` : ''}`
+      )
+    }
+
+    return response
+  } catch (error: any) {
+    if (error?.name === 'AbortError') {
+      console.warn(`${label} did not acknowledge within ${WEBHOOK_ACK_TIMEOUT_MS}ms; continuing while the workflow runs.`)
+      return null
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeout)
   }
+}
 
-  return response
+export async function sendLeadsToWebhook(payload: unknown) {
+  return postWebhook(LEAD_WEBHOOK_URL, payload, 'Webhook')
 }
 
 export async function sendLinkedInLeadsToWebhook(payload: unknown) {
@@ -90,19 +110,7 @@ export async function sendImportedLeadsToWebhook(
     leads: leads
   }
 
-  const response = await fetch(IMPORT_WEBHOOK_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    },
-    body: JSON.stringify(payload)
-  })
-
-  if (!response.ok) {
-    const responseText = await response.text().catch(() => '')
-    console.error(`Import webhook request failed: ${response.status}${responseText ? `: ${responseText}` : ''}`)
-  }
+  const response = await postWebhook(IMPORT_WEBHOOK_URL, payload, 'Import webhook')
 
   return response
 }

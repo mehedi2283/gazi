@@ -7,10 +7,11 @@ import toast from 'react-hot-toast'
 import useCampaigns from '../../../hooks/useCampaigns'
 import { useQueryClient } from '@tanstack/react-query'
 import DateRangePicker from '../../../components/ui/DateRangePicker'
-import { Calendar, ChevronDown, Layers3, Loader2, Mail, MoreVertical, Pause, Play, Trash, Users } from 'lucide-react'
+import { Calendar, ChevronDown, Layers3, Loader2, Mail, MoreVertical, Pause, Play, Trash, Users, CheckCircle2 } from 'lucide-react'
 import Modal from '../../../components/ui/Modal'
 import { TableRowSkeleton } from '../../../components/ui/Skeleton'
 import useCurrentUser from '../../../hooks/useCurrentUser'
+import supabase from '../../../lib/supabase/client'
 
 function statusStyles(status: string) {
   const norm = status ? status.toLowerCase() : 'draft'
@@ -77,6 +78,34 @@ const CREATE_CAMPAIGN_OPTIONS = [
   }
 ]
 
+function normalizeUploadStatus(status: unknown) {
+  return String(status || '').trim().toLowerCase()
+}
+
+function isLeadUploading(status: unknown) {
+  return ['lead_uploading', 'uploading', 'leads_uploading'].includes(normalizeUploadStatus(status))
+}
+
+function isLeadUploadFinished(status: unknown) {
+  return ['upload_finished', 'lead_upload_finished', 'leads_uploaded', 'uploaded', 'finished', 'complete', 'completed'].includes(normalizeUploadStatus(status))
+}
+
+async function fetchJsonWithTimeout(url: string, init: RequestInit = {}, timeoutMs = 30000) {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+
+  try {
+    const response = await fetch(url, {
+      ...init,
+      signal: controller.signal
+    })
+    const json = await response.json().catch(() => null)
+    return { response, json }
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
 export default function CampaignsPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [startDate, setStartDate] = useState('')
@@ -90,7 +119,18 @@ export default function CampaignsPage() {
   const [openMenuFor, setOpenMenuFor] = useState<string | null>(null)
   const [menuAboveFor, setMenuAboveFor] = useState<string | null>(null)
   const [deleteModalFor, setDeleteModalFor] = useState<any | null>(null)
-  const [deletingCampaign, setDeletingCampaign] = useState(false)
+  const [deletingCampaignIds, setDeletingCampaignIds] = useState<string[]>([])
+  const [deletedCampaignIds, setDeletedCampaignIds] = useState<string[]>([])
+  const [uploadPillExpanded, setUploadPillExpanded] = useState(false)
+  const [uploadTextVisible, setUploadTextVisible] = useState(false)
+  const [finishedPillExpanded, setFinishedPillExpanded] = useState(false)
+  const [finishedTextVisible, setFinishedTextVisible] = useState(false)
+  const [uploadFinishedCampaignIds, setUploadFinishedCampaignIds] = useState<string[]>([])
+  const previousUploadStatusesRef = useRef<Record<string, string>>({})
+  const uploadStatusesHydratedRef = useRef(false)
+  const uploadFinishedTimeoutsRef = useRef<Record<string, number>>({})
+  const uploadAnimationTimeoutsRef = useRef<number[]>([])
+  const finishedAnimationTimeoutsRef = useRef<number[]>([])
   const [activatingCampaignId, setActivatingCampaignId] = useState('')
   const [pausingCampaignId, setPausingCampaignId] = useState('')
   const [sendingWeeklyReportCampaignId, setSendingWeeklyReportCampaignId] = useState('')
@@ -112,6 +152,7 @@ export default function CampaignsPage() {
   const totalCampaigns = meta?.total ?? filteredCampaigns.length
   const totalPages = Math.max(1, Math.ceil(totalCampaigns / perPage))
   const paginatedCampaigns = filteredCampaigns
+  const hasUploadingCampaign = paginatedCampaigns.some((campaign: any) => isLeadUploading(campaign.upload_status))
 
   // Reset to page 1 when search changes
   useEffect(() => {
@@ -121,6 +162,138 @@ export default function CampaignsPage() {
   useEffect(() => {
     setPage(1)
   }, [startDate, endDate])
+
+  useEffect(() => {
+    function clearUploadAnimationTimeouts() {
+      uploadAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+      uploadAnimationTimeoutsRef.current = []
+    }
+
+    if (!hasUploadingCampaign) {
+      clearUploadAnimationTimeouts()
+      setUploadPillExpanded(false)
+      setUploadTextVisible(false)
+      return
+    }
+
+    function queueTimeout(callback: () => void, delay: number) {
+      const timeout = window.setTimeout(callback, delay)
+      uploadAnimationTimeoutsRef.current.push(timeout)
+      return timeout
+    }
+
+    function runUploadPillCycle() {
+      setUploadPillExpanded(true)
+      queueTimeout(() => setUploadTextVisible(true), 300)
+      queueTimeout(() => setUploadTextVisible(false), 4600)
+      queueTimeout(() => setUploadPillExpanded(false), 5350)
+    }
+
+    setUploadPillExpanded(false)
+    setUploadTextVisible(false)
+    queueTimeout(runUploadPillCycle, 2800)
+
+    const interval = window.setInterval(runUploadPillCycle, 10000)
+
+    return () => {
+      window.clearInterval(interval)
+      clearUploadAnimationTimeouts()
+    }
+  }, [hasUploadingCampaign])
+
+  useEffect(() => {
+    if (!hasUploadingCampaign) return
+
+    const interval = window.setInterval(() => {
+      qc.invalidateQueries({ queryKey: ['campaigns'] })
+    }, 8000)
+
+    return () => window.clearInterval(interval)
+  }, [paginatedCampaigns, qc])
+
+  useEffect(() => {
+    const nextStatuses: Record<string, string> = {}
+
+    function queueFinishedAnimationTimeout(callback: () => void, delay: number) {
+      const timeout = window.setTimeout(callback, delay)
+      finishedAnimationTimeoutsRef.current.push(timeout)
+      return timeout
+    }
+
+    function clearFinishedAnimationTimeouts() {
+      finishedAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+      finishedAnimationTimeoutsRef.current = []
+    }
+
+    function runFinishedPillCycle() {
+      clearFinishedAnimationTimeouts()
+      setFinishedPillExpanded(false)
+      setFinishedTextVisible(false)
+      queueFinishedAnimationTimeout(() => setFinishedPillExpanded(true), 120)
+      queueFinishedAnimationTimeout(() => setFinishedTextVisible(true), 450)
+      queueFinishedAnimationTimeout(() => setFinishedTextVisible(false), 3600)
+      queueFinishedAnimationTimeout(() => setFinishedPillExpanded(false), 4350)
+    }
+
+    paginatedCampaigns.forEach((campaign: any) => {
+      const campaignId = String(campaign.id)
+      const status = normalizeUploadStatus(campaign.upload_status)
+      const previousStatus = previousUploadStatusesRef.current[campaignId]
+
+      nextStatuses[campaignId] = status
+
+      if (isLeadUploading(status)) {
+        setUploadFinishedCampaignIds((current) => current.filter((id) => id !== campaignId))
+        if (uploadFinishedTimeoutsRef.current[campaignId]) {
+          window.clearTimeout(uploadFinishedTimeoutsRef.current[campaignId])
+          delete uploadFinishedTimeoutsRef.current[campaignId]
+        }
+      }
+
+      if (uploadStatusesHydratedRef.current && isLeadUploadFinished(status) && isLeadUploading(previousStatus)) {
+        setUploadFinishedCampaignIds((current) => (
+          current.includes(campaignId) ? current : [...current, campaignId]
+        ))
+        runFinishedPillCycle()
+
+        if (uploadFinishedTimeoutsRef.current[campaignId]) {
+          window.clearTimeout(uploadFinishedTimeoutsRef.current[campaignId])
+        }
+
+        uploadFinishedTimeoutsRef.current[campaignId] = window.setTimeout(() => {
+          setUploadFinishedCampaignIds((current) => current.filter((id) => id !== campaignId))
+          delete uploadFinishedTimeoutsRef.current[campaignId]
+        }, 5000)
+      }
+    })
+
+    previousUploadStatusesRef.current = nextStatuses
+    uploadStatusesHydratedRef.current = true
+  }, [paginatedCampaigns])
+
+  useEffect(() => {
+    const invalidateCampaigns = () => {
+      qc.invalidateQueries({ queryKey: ['campaigns'] })
+    }
+
+    const channel = supabase
+      .channel('campaign-upload-progress')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'campaigns' }, invalidateCampaigns)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'leads' }, invalidateCampaigns)
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [qc])
+
+  useEffect(() => {
+    return () => {
+      Object.values(uploadFinishedTimeoutsRef.current).forEach((timeout) => window.clearTimeout(timeout))
+      uploadAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+      finishedAnimationTimeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout))
+    }
+  }, [])
 
   return (
     <div className="max-w-[1600px] mx-auto space-y-6 animate-in fade-in duration-500">
@@ -169,7 +342,7 @@ export default function CampaignsPage() {
           <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              disabled={deletingCampaign}
+              disabled={deleteModalFor ? deletingCampaignIds.includes(deleteModalFor.id) || deletedCampaignIds.includes(deleteModalFor.id) : false}
               className="rounded-md border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
               onClick={() => setDeleteModalFor(null)}
             >
@@ -177,44 +350,61 @@ export default function CampaignsPage() {
             </button>
             <button
               type="button"
-              disabled={deletingCampaign}
+              disabled={deleteModalFor ? deletingCampaignIds.includes(deleteModalFor.id) || deletedCampaignIds.includes(deleteModalFor.id) : false}
               className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
               onClick={async () => {
-                setDeletingCampaign(true)
+                const campaignToDelete = deleteModalFor
+                if (!campaignToDelete?.id || deletingCampaignIds.includes(campaignToDelete.id) || deletedCampaignIds.includes(campaignToDelete.id)) return
+
+                setDeleteModalFor(null)
+                setOpenMenuFor(null)
+                setDeletingCampaignIds((current) => (
+                  current.includes(campaignToDelete.id) ? current : [...current, campaignToDelete.id]
+                ))
                 try {
-                  const leadsResponse = await fetch(`/api/leads?campaign_id=${deleteModalFor.id}&export=1`)
-                  const leadsJson = await leadsResponse.json()
+                  let exportSkipped = false
 
-                  if (!leadsResponse.ok || leadsJson.error) {
-                    throw new Error(leadsJson.error?.message || leadsJson.error || 'Failed to load related leads')
+                  try {
+                    const { response: leadsResponse, json: leadsJson } = await fetchJsonWithTimeout(
+                      `/api/leads?campaign_id=${campaignToDelete.id}&export=1`,
+                      {},
+                      15000
+                    )
+
+                    if (!leadsResponse.ok || leadsJson?.error) {
+                      throw new Error(leadsJson.error?.message || leadsJson.error || 'Failed to load related leads')
+                    }
+
+                    const relatedLeads = Array.isArray(leadsJson?.data) ? leadsJson.data : []
+                    if (relatedLeads.length > 0) {
+                      downloadCsv(`campaign-${campaignToDelete.id}-leads.csv`, relatedLeads)
+                    }
+                  } catch {
+                    exportSkipped = true
                   }
 
-                  const relatedLeads = Array.isArray(leadsJson.data) ? leadsJson.data : []
-                  if (relatedLeads.length > 0) {
-                    downloadCsv(`campaign-${deleteModalFor.id}-leads.csv`, relatedLeads)
-                  }
-
-                  const resp = await fetch(`/api/campaigns/${deleteModalFor.id}`, { method: 'DELETE' })
-                  const json = await resp.json()
-                  if (!resp.ok || json.error) throw new Error(json.error || 'Delete failed')
-                  qc.invalidateQueries({ queryKey: ['campaigns'] })
-                  setDeleteModalFor(null)
-                  toast.success('Campaign deleted')
+                  const { response: resp, json } = await fetchJsonWithTimeout(
+                    `/api/campaigns/${campaignToDelete.id}`,
+                    { method: 'DELETE' },
+                    45000
+                  )
+                  if (!resp.ok || json?.error) throw new Error(json?.error || 'Delete failed')
+                  setDeletingCampaignIds((current) => current.filter((id) => id !== campaignToDelete.id))
+                  setDeletedCampaignIds((current) => (
+                    current.includes(campaignToDelete.id) ? current : [...current, campaignToDelete.id]
+                  ))
+                  toast.success(exportSkipped ? 'Campaign deleted. Lead export was skipped.' : 'Campaign deleted')
+                  window.setTimeout(() => {
+                    qc.invalidateQueries({ queryKey: ['campaigns'] })
+                    setDeletedCampaignIds((current) => current.filter((id) => id !== campaignToDelete.id))
+                  }, 3000)
                 } catch (err) {
                   toast.error(String(err))
-                } finally {
-                  setDeletingCampaign(false)
+                  setDeletingCampaignIds((current) => current.filter((id) => id !== campaignToDelete.id))
                 }
               }}
             >
-              {deletingCampaign ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
+              Delete
             </button>
           </div>
         </div>
@@ -284,12 +474,23 @@ export default function CampaignsPage() {
                   const currentStatus = String(campaign.status || 'draft')
                   const channel = String(campaign.channel || campaign.campaign_type || 'email_outreach')
                   const isLinkedInCampaign = channel === 'linkedin_outreach' || channel === 'linkedin'
+                  const isDeletingThisCampaign = deletingCampaignIds.includes(campaign.id)
+                  const isDeletedThisCampaign = deletedCampaignIds.includes(campaign.id)
+                  const isDeleteBusy = isDeletingThisCampaign || isDeletedThisCampaign
+                  const uploadStatus = campaign.upload_status
+                  const isUploadingLeads = isLeadUploading(uploadStatus)
+                  const isUploadFinishedVisible = uploadFinishedCampaignIds.includes(campaign.id)
+                  const leadCount = Number(campaign.total_leads || 0)
+                  const shouldExpandUploadPill = isUploadingLeads && uploadPillExpanded
+                  const shouldShowUploadText = isUploadingLeads && uploadTextVisible
+                  const shouldExpandFinishedPill = isUploadFinishedVisible && finishedPillExpanded
+                  const shouldShowFinishedText = isUploadFinishedVisible && finishedTextVisible
                   const canActivate = currentStatus === 'draft' || currentStatus === 'paused' || currentStatus === 'error'
                   const canPause = currentStatus === 'active'
                   const canSendWeeklyReport = isAdmin && currentStatus !== 'draft'
 
                   return (
-                    <tr key={campaign.id} className="group transition-colors hover:bg-slate-50/50">
+                    <tr key={campaign.id} className={`group transition-colors ${isDeletedThisCampaign ? 'bg-emerald-50/70 opacity-75' : isDeletingThisCampaign ? 'bg-red-50/60 opacity-75' : 'hover:bg-slate-50/50'}`}>
                       <td className="px-6 py-5">
                         <div className="flex flex-col">
                           <div className="flex flex-wrap items-center gap-2">
@@ -301,6 +502,17 @@ export default function CampaignsPage() {
                             }`}>
                               {isLinkedInCampaign ? 'LinkedIn' : 'Email'}
                             </span>
+                            {isDeletedThisCampaign ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Delete complete
+                              </span>
+                            ) : isDeletingThisCampaign ? (
+                              <span className="inline-flex items-center gap-1.5 rounded-md border border-red-200 bg-red-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-red-700">
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                                Deleting...
+                              </span>
+                            ) : null}
                           </div>
                           <div className="mt-1 flex flex-col sm:flex-row sm:items-center sm:gap-2">
                             <div className="text-xs text-slate-400">Created {campaign.created_at ? new Date(campaign.created_at).toLocaleDateString() : '—'}</div>
@@ -327,14 +539,63 @@ export default function CampaignsPage() {
                       <td className="px-6 py-5 text-right">
                         <div className="flex items-center justify-end gap-3" data-campaign-actions>
                           <div className="flex items-center gap-3">
-                              {/* Lead Count Badge */}
-                              <span 
-                                title={`${campaign.total_leads || 0} total leads`}
-                                className="flex h-7 px-2.5 flex-none items-center justify-center rounded-full bg-indigo-500/10 text-[11px] font-bold text-indigo-600 ring-1 ring-indigo-500/20 gap-1"
-                              >
-                                <Users className="h-3.5 w-3.5" />
-                                <span>{campaign.total_leads || 0}</span>
-                              </span>
+                              <div className="flex w-[132px] justify-end">
+                                <span
+                                  title={isUploadingLeads ? `${leadCount} leads uploaded so far` : `${leadCount} total leads`}
+                                  className={`flex h-7 flex-none items-center justify-center overflow-hidden rounded-full px-2.5 text-[11px] font-bold ring-1 transition-all duration-700 ease-in-out ${
+                                    isUploadFinishedVisible
+                                      ? `${shouldExpandFinishedPill ? 'w-[128px]' : 'w-[64px]'} bg-emerald-500/10 text-emerald-700 ring-emerald-500/20`
+                                      : isUploadingLeads
+                                        ? `${shouldExpandUploadPill ? 'w-[104px]' : 'w-[64px]'} bg-indigo-500/10 text-indigo-600 ring-indigo-500/20`
+                                        : 'w-[64px] gap-1 bg-indigo-500/10 text-indigo-600 ring-indigo-500/20'
+                                  }`}
+                                >
+                                  {isUploadFinishedVisible ? (
+                                    <span className="relative flex h-full w-full items-center justify-center overflow-hidden">
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1 transition-all duration-700 ease-out ${
+                                          shouldShowFinishedText ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+                                        }`}
+                                      >
+                                        <Users className="h-3.5 w-3.5 shrink-0" />
+                                        <span>{leadCount}</span>
+                                      </span>
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-700 ease-out ${
+                                          shouldShowFinishedText ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
+                                        }`}
+                                      >
+                                        <CheckCircle2 className="h-3.5 w-3.5 shrink-0" />
+                                        <span className="whitespace-nowrap">Upload finished</span>
+                                      </span>
+                                    </span>
+                                  ) : isUploadingLeads ? (
+                                    <span className="relative flex h-full w-full items-center justify-center overflow-hidden">
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1 transition-all duration-700 ease-out ${
+                                          shouldShowUploadText ? '-translate-y-full opacity-0' : 'translate-y-0 opacity-100'
+                                        }`}
+                                      >
+                                        <Users className="h-3.5 w-3.5 shrink-0" />
+                                        <span>{leadCount}</span>
+                                      </span>
+                                      <span
+                                        className={`absolute inset-0 flex items-center justify-center gap-1 transition-all duration-700 ease-out ${
+                                          shouldShowUploadText ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'
+                                        }`}
+                                      >
+                                        <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin" />
+                                        <span className="whitespace-nowrap">Uploading</span>
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <Users className="h-3.5 w-3.5 shrink-0" />
+                                      <span>{leadCount}</span>
+                                    </>
+                                  )}
+                                </span>
+                              </div>
 
                               {/* Booking Count Badge */}
                               <span 
@@ -347,7 +608,16 @@ export default function CampaignsPage() {
 
                               <Link
                                 href={`/dashboard/campaigns/${campaign.id}`}
-                                className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm"
+                                prefetch={false}
+                                aria-disabled={isDeleteBusy}
+                                onClick={(event) => {
+                                  if (isDeleteBusy) {
+                                    event.preventDefault()
+                                  }
+                                }}
+                                className={`inline-flex items-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 shadow-sm ${
+                                  isDeleteBusy ? 'pointer-events-none opacity-50' : ''
+                                }`}
                               >
                                 View leads
                               </Link>
@@ -356,6 +626,7 @@ export default function CampaignsPage() {
                           <div className="relative inline-block text-left">
                             <button
                               type="button"
+                              disabled={isDeleteBusy}
                               onClick={(event) => {
                                 event.stopPropagation()
                                 const btn = event.currentTarget as HTMLElement
@@ -364,7 +635,7 @@ export default function CampaignsPage() {
                                 setOpenMenuFor(openMenuFor === campaign.id ? null : campaign.id)
                                 setMenuAboveFor(needAbove ? campaign.id : null)
                               }}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-750 shadow-sm"
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:bg-slate-50 hover:text-slate-750 disabled:cursor-not-allowed disabled:opacity-50 shadow-sm"
                             >
                               <MoreVertical className="h-4 w-4" />
                             </button>

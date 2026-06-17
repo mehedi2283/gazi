@@ -1,6 +1,7 @@
 import axios from 'axios'
 
 const BASE = 'https://api.instantly.ai/api/v2'
+const REQUEST_TIMEOUT_MS = 20000
 
 type ListCampaignsParams = {
   limit?: number
@@ -43,7 +44,7 @@ function getAxiosError(err: any) {
 
 export async function createCampaign(data: any) {
   try {
-    return await retryRequest(() => axios.post(`${BASE}/campaigns`, data, { headers: getAuthHeaders() }))
+    return await retryRequest(() => axios.post(`${BASE}/campaigns`, data, { headers: getAuthHeaders(), timeout: REQUEST_TIMEOUT_MS }))
   } catch (err: any) {
     throw getAxiosError(err)
   }
@@ -51,7 +52,7 @@ export async function createCampaign(data: any) {
 
 export async function updateCampaign(id: string, data: any) {
   try {
-    return await retryRequest(() => axios.patch(`${BASE}/campaigns/${id}`, data, { headers: getAuthHeaders() }))
+    return await retryRequest(() => axios.patch(`${BASE}/campaigns/${id}`, data, { headers: getAuthHeaders(), timeout: REQUEST_TIMEOUT_MS }))
   } catch (err: any) {
     throw getAxiosError(err)
   }
@@ -61,7 +62,8 @@ export async function listCampaigns(params: ListCampaignsParams = {}) {
   try {
     return await retryRequest(() => axios.get(`${BASE}/campaigns`, {
       headers: getAuthHeaders(),
-      params
+      params,
+      timeout: REQUEST_TIMEOUT_MS
     }))
   } catch (err: any) {
     throw getAxiosError(err)
@@ -70,7 +72,7 @@ export async function listCampaigns(params: ListCampaignsParams = {}) {
 
 export async function listAccounts(params: Record<string, any> = {}) {
   try {
-    return await retryRequest(() => axios.get(`${BASE}/accounts`, { headers: getAuthHeaders(), params }))
+    return await retryRequest(() => axios.get(`${BASE}/accounts`, { headers: getAuthHeaders(), params, timeout: REQUEST_TIMEOUT_MS }))
   } catch (err: any) {
     throw getAxiosError(err)
   }
@@ -98,7 +100,7 @@ export async function listAllCampaigns(params: Omit<ListCampaignsParams, 'starti
 
 export async function activateCampaign(id: string) {
   try {
-    return await retryRequest(() => axios.post(`${BASE}/campaigns/${id}/activate`, {}, { headers: getAuthHeaders() }))
+    return await retryRequest(() => axios.post(`${BASE}/campaigns/${id}/activate`, {}, { headers: getAuthHeaders(), timeout: REQUEST_TIMEOUT_MS }))
   } catch (err: any) {
     throw getAxiosError(err)
   }
@@ -106,7 +108,7 @@ export async function activateCampaign(id: string) {
 
 export async function pauseCampaign(id: string) {
   try {
-    return await retryRequest(() => axios.post(`${BASE}/campaigns/${id}/pause`, {}, { headers: getAuthHeaders() }))
+    return await retryRequest(() => axios.post(`${BASE}/campaigns/${id}/pause`, {}, { headers: getAuthHeaders(), timeout: REQUEST_TIMEOUT_MS }))
   } catch (err: any) {
     throw getAxiosError(err)
   }
@@ -114,14 +116,14 @@ export async function pauseCampaign(id: string) {
 
 export async function deleteCampaign(id: string) {
   try {
-    return await retryRequest(() => axios.delete(`${BASE}/campaigns/${id}`, { headers: getAuthHeaders() }))
+    return await retryRequest(() => axios.delete(`${BASE}/campaigns/${id}`, { headers: getAuthHeaders(), timeout: REQUEST_TIMEOUT_MS }))
   } catch (err: any) {
     throw getAxiosError(err)
   }
 }
 
 export async function getCampaignAnalytics(id: string) {
-  return axios.get(`${BASE}/campaigns/${id}/analytics/overview/summary`, { headers: getAuthHeaders() })
+  return axios.get(`${BASE}/campaigns/${id}/analytics/overview/summary`, { headers: getAuthHeaders(), timeout: REQUEST_TIMEOUT_MS })
 }
 
 export default { createCampaign, updateCampaign, listCampaigns, listAllCampaigns, activateCampaign, pauseCampaign, deleteCampaign, getCampaignAnalytics }

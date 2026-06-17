@@ -38,6 +38,7 @@ create table if not exists campaigns (
   channel text not null default 'email_outreach',
   campaign_type text not null default 'email_outreach',
   channel_metadata jsonb not null default '{}'::jsonb,
+  upload_status text,
   instantly_campaign_id text,
   total_leads int default 0,
   emails_sent int default 0,
