@@ -51,6 +51,7 @@ async function saveLinkedInCampaign(payload: any, auth: { userId: string; organi
       company_name: payload.company_name || null,
       created_from_company: payload.creator || null,
       status: 'draft',
+      upload_status: 'lead_uploading',
       channel: 'linkedin_outreach',
       campaign_type: 'linkedin_outreach',
       channel_metadata: getChannelMetadata(payload),
@@ -144,7 +145,7 @@ export async function POST(req: Request) {
     } catch (webhookError: any) {
       await supabase
         .from('campaigns')
-        .update({ status: 'error', updated_at: new Date().toISOString() })
+        .update({ status: 'error', upload_status: 'upload_failed', updated_at: new Date().toISOString() })
         .eq('id', campaign.id)
 
       return NextResponse.json(

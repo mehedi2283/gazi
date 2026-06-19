@@ -81,6 +81,11 @@ type CampaignInitialData = {
   long_message?: string | null
   location?: string | null
   sender_address?: string | null
+  combined_linkedin?: {
+    sequences?: Array<{
+      day_delay?: number | null
+    }>
+  } | null
 }
 
 type CampaignFormProps = {
@@ -199,6 +204,22 @@ function getSequenceError(steps: SequenceStep[]) {
     if (current <= previous) {
       return `Step ${index + 1} day must be greater than Step ${index}.`
     }
+  }
+
+  return ''
+}
+
+function getLinkedInSequenceError(steps: CombinedLinkedInStep[]) {
+  if (steps.length !== 5) return 'LinkedIn sequence must have exactly 1 connection request and 4 follow-up messages.'
+  if (steps[0]?.day_delay !== 0) return 'LinkedIn connection request day delay must be 0.'
+  if (steps[1]?.day_delay !== 0) return 'LinkedIn first follow-up day delay must be 0.'
+
+  for (let index = 2; index < steps.length; index += 1) {
+    const current = steps[index]?.day_delay
+    const previous = steps[index - 1]?.day_delay
+
+    if (!Number.isFinite(current) || current < 0) return `LinkedIn Step ${index + 1} day must be 0 or greater.`
+    if (current <= previous) return `LinkedIn Step ${index + 1} day must be greater than Step ${index}.`
   }
 
   return ''
@@ -323,7 +344,13 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
     return initialSteps
   })
   const [combinedLinkedInActionGap, setCombinedLinkedInActionGap] = useState(String(initialData?.email_gap ?? 10))
-  const [combinedLinkedInSteps, setCombinedLinkedInSteps] = useState<CombinedLinkedInStep[]>([{ day_delay: 0 }])
+  const [combinedLinkedInSteps, setCombinedLinkedInSteps] = useState<CombinedLinkedInStep[]>([
+    { day_delay: 0 },
+    { day_delay: 0 },
+    { day_delay: 1 },
+    { day_delay: 2 },
+    { day_delay: 3 }
+  ])
 
   // Fetch email accounts from Supabase
   useEffect(() => {
@@ -469,7 +496,21 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
     )
     setTargetLeadCount(String(initialData?.target_lead_count ?? 100))
     setCombinedLinkedInActionGap(String(initialData?.email_gap ?? 10))
-    setCombinedLinkedInSteps([{ day_delay: 0 }])
+    if (initialData?.combined_linkedin?.sequences?.length) {
+      setCombinedLinkedInSteps(
+        initialData.combined_linkedin.sequences.map((sequence: any, index: number) => ({
+          day_delay: index <= 1 ? 0 : Number(sequence.day_delay ?? index)
+        }))
+      )
+    } else {
+      setCombinedLinkedInSteps([
+        { day_delay: 0 },
+        { day_delay: 0 },
+        { day_delay: 1 },
+        { day_delay: 2 },
+        { day_delay: 3 }
+      ])
+    }
     setAttachmentUrl(initialData?.attachment_url || '')
     setSenderInfo((prev) => ({
       ...prev,
@@ -524,7 +565,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
   const sequenceError = useMemo(() => getSequenceError(steps), [steps])
   const combinedLinkedInSequenceError = useMemo(() => (
     isCombinedChannel
-      ? getSequenceError(combinedLinkedInSteps.map((step) => ({ delay_days: step.day_delay })))
+      ? getLinkedInSequenceError(combinedLinkedInSteps)
       : ''
   ), [combinedLinkedInSteps, isCombinedChannel])
   const selectedEmailAccount = useMemo(() => {
@@ -802,10 +843,9 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
       !senderInfo.address.trim() ||
       !senderInfo.booking_calendar_link.trim() ||
       !calendlyToken.trim() ||
-      !clientEmail.trim() ||
-      (isCombinedChannel && !senderInfo.linkedin_profile_url.trim())
+      !clientEmail.trim()
     ) {
-      setError(isCombinedChannel ? 'Complete sender information is required (including LinkedIn Profile URL, Calendly Token, and Client Email)' : 'Complete sender information is required (including Calendly Token and Client Email)')
+      setError('Complete sender information is required (including Calendly Token and Client Email)')
       return false
     }
 
@@ -897,10 +937,9 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
       !senderInfo.address.trim() ||
       !senderInfo.booking_calendar_link.trim() ||
       !calendlyToken.trim() ||
-      !clientEmail.trim() ||
-      (isCombinedChannel && !senderInfo.linkedin_profile_url.trim())
+      !clientEmail.trim()
     ) {
-      setError(isCombinedChannel ? 'Complete sender information is required (including LinkedIn Profile URL, Calendly Token, and Client Email)' : 'Complete sender information is required (including Calendly Token and Client Email)')
+      setError('Complete sender information is required (including Calendly Token and Client Email)')
       setSubmitting(false)
       return
     }
@@ -957,18 +996,20 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
           attachment_url: attachmentUrl.trim(),
           signature: senderInfo.signature.trim(),
           signature_url: senderInfo.signature_url,
-          ...(isCombinedChannel ? { linkedin_profile_url: senderInfo.linkedin_profile_url.trim() } : {})
+          ...(isCombinedChannel ? { linkedin_profile_url: '' } : {})
         },
         ...(isCombinedChannel ? {
           channel: 'both',
           combined_linkedin: {
             action_gap_mins: Number(combinedLinkedInActionGap || emailGap || 0),
-            linkedin_profile_url: senderInfo.linkedin_profile_url.trim(),
+            linkedin_profile_url: '',
             sequences: combinedLinkedInSteps.map((step, index) => ({
               step: index + 1,
               step_type: index === 0 ? 'connection_request' : 'follow_up_message',
               message: getBodyVariable(index + 1),
-              day_delay: index === 0 ? 0 : step.day_delay
+              day_delay: index === 1 ? 0 : (index === 0 ? 0 : step.day_delay),
+              delay: index === 1 ? 3 : (index === 0 ? 0 : step.day_delay),
+              delay_unit: index === 1 ? 'hours' : 'days'
             }))
           }
         } : {}),
@@ -1174,7 +1215,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                             placeholder="Search timezone..."
                           />
                         </div>
-                        <div className="max-h-64 overflow-auto py-1">
+                        <div className="max-h-44 overflow-auto py-0.5">
                           {filteredTimezones.length ? (
                             filteredTimezones.map((tz) => (
                               <button
@@ -1185,13 +1226,13 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                                   setTimezoneOpen(false)
                                   setTimezoneSearch('')
                                 }}
-                                className={`flex w-full items-center px-4 py-2 text-left text-sm transition hover:bg-slate-50 ${timezone === tz ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700'}`}
+                                className={`flex w-full items-center px-3 py-1.5 text-left text-xs transition hover:bg-slate-50 ${timezone === tz ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-600'}`}
                               >
                                 {tz}
                               </button>
                             ))
                           ) : (
-                            <div className="px-4 py-3 text-sm text-slate-400">No timezones found.</div>
+                            <div className="px-3 py-2 text-xs text-slate-400">No timezones found.</div>
                           )}
                         </div>
                       </div>
@@ -1213,8 +1254,8 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                       </button>
 
                       {timePickerOpen === 'from' ? (
-                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                          <div className="max-h-64 overflow-auto py-1">
+                        <div className="absolute left-0 top-full z-30 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                          <div className="max-h-44 overflow-auto py-0.5">
                             {TIME_OPTIONS_WITH_2359.filter(o => o.value !== '00:00').map((option) => (
                               <button
                                 key={option.value}
@@ -1223,7 +1264,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                                   setFromTime(option.value)
                                   setTimePickerOpen(null)
                                 }}
-                                className={`flex w-full items-center px-4 py-2 text-left text-sm transition hover:bg-slate-50 ${fromTime === option.value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700'}`}
+                                className={`flex w-full items-center px-3 py-1.5 text-left text-xs transition hover:bg-slate-50 ${fromTime === option.value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-600'}`}
                               >
                                 {option.label}
                               </button>
@@ -1247,8 +1288,8 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                       </button>
 
                       {timePickerOpen === 'to' ? (
-                        <div className="absolute left-0 top-full z-30 mt-2 w-full overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
-                          <div className="max-h-64 overflow-auto py-1">
+                        <div className="absolute left-0 top-full z-30 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+                          <div className="max-h-44 overflow-auto py-0.5">
                             {TIME_OPTIONS_WITH_2359.filter(o => o.value !== '00:00' && o.value !== '00:30').map((option) => (
                               <button
                                 key={option.value}
@@ -1257,7 +1298,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                                   setToTime(option.value)
                                   setTimePickerOpen(null)
                                 }}
-                                className={`flex w-full items-center px-4 py-2 text-left text-sm transition hover:bg-slate-50 ${toTime === option.value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700'}`}
+                                className={`flex w-full items-center px-3 py-1.5 text-left text-xs transition hover:bg-slate-50 ${toTime === option.value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-600'}`}
                               >
                                 {option.label}
                               </button>
@@ -1968,30 +2009,12 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-800">LinkedIn Outreach</h2>
-                  <p className="text-sm text-slate-400 font-medium">Configure the LinkedIn-specific data for this combined campaign.</p>
+                  <p className="text-sm text-slate-400 font-medium">1 connection request + 4 follow-up messages. Adjust the day delays for follow-ups 2–4.</p>
                 </div>
-                <button
-                  type="button"
-                  onClick={addCombinedLinkedInStep}
-                  className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700"
-                >
-                  <Plus className="h-4 w-4" />
-                  Add Follow-up
-                </button>
               </div>
 
               <div className="grid gap-6 md:grid-cols-2">
-                <label className="space-y-2">
-                  <span className="text-sm font-semibold text-slate-700">Sender LinkedIn Profile</span>
-                  <input
-                    value={senderInfo.linkedin_profile_url}
-                    onChange={(event) => setSenderInfo((current) => ({ ...current, linkedin_profile_url: event.target.value }))}
-                    className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium"
-                    placeholder="https://linkedin.com/in/yourprofile"
-                    required
-                  />
-                  <p className="text-xs text-slate-400 font-medium">The LinkedIn account that will be used for outreach.</p>
-                </label>
+
 
                 <label className="space-y-2">
                   <span className="text-sm font-semibold text-slate-700">LinkedIn Action Gap (mins)</span>
@@ -2008,21 +2031,21 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               <div className="space-y-4">
                 {combinedLinkedInSteps.map((step, index) => {
                   const isConnectionRequest = index === 0
+                  const isRequiredZeroDelayStep = index <= 1
                   const stepLabel = isConnectionRequest ? 'Connection Request' : 'Follow-up Message'
+                  const stepTitle = isConnectionRequest ? 'Connection Request' : `Follow-up ${index}`
 
                   return (
                     <div key={`combined-linkedin-step-${index}`} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                       <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">LinkedIn Step {index + 1}</h3>
-                        {!isConnectionRequest && (
-                          <button
-                            type="button"
-                            onClick={() => removeCombinedLinkedInStep(index)}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-sm font-extrabold uppercase tracking-wider text-slate-500">{stepTitle}</h3>
+                          {isRequiredZeroDelayStep && (
+                            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-bold uppercase text-indigo-600">
+                              Required
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-[220px_1fr_180px]">
@@ -2042,17 +2065,23 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                           </div>
                         </div>
 
-                        <label className="space-y-2">
-                          <span className="text-sm font-semibold text-slate-700">Day Delay</span>
-                          <input
-                            type="number"
-                            min={isConnectionRequest ? 0 : (combinedLinkedInSteps[index - 1]?.day_delay ?? 0) + 1}
-                            value={isConnectionRequest ? 0 : step.day_delay}
-                            disabled={isConnectionRequest}
-                            onChange={(event) => updateCombinedLinkedInDelay(index, event.target.value)}
-                            className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400"
-                          />
-                        </label>
+                        <div className="space-y-2">
+                          <span className="text-sm font-semibold text-slate-700">Delay</span>
+                          {index === 1 ? (
+                            <span className="inline-flex min-h-10 w-full items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500 shadow-sm">
+                              3 Hours
+                            </span>
+                          ) : (
+                            <input
+                              type="number"
+                              min={isConnectionRequest ? 0 : (combinedLinkedInSteps[index - 1]?.day_delay ?? 0) + 1}
+                              value={isConnectionRequest ? 0 : step.day_delay}
+                              disabled={isConnectionRequest}
+                              onChange={(event) => updateCombinedLinkedInDelay(index, event.target.value)}
+                              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400"
+                            />
+                          )}
+                        </div>
                       </div>
                     </div>
                   )
