@@ -152,7 +152,10 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
   })
   const [steps, setSteps] = useState<SequenceStep[]>([
     { day_delay: 0, step_type: 'connection_request', message: '' },
-    { day_delay: 0, step_type: 'follow_up_message', message: getMessageVariable(2) }
+    { day_delay: 0, step_type: 'follow_up_message', message: getMessageVariable(2) },
+    { day_delay: 1, step_type: 'follow_up_message', message: getMessageVariable(3) },
+    { day_delay: 2, step_type: 'follow_up_message', message: getMessageVariable(4) },
+    { day_delay: 3, step_type: 'follow_up_message', message: getMessageVariable(5) }
   ])
   const [leadMode, setLeadMode] = useState<LeadSource>('external')
   const [leadRows, setLeadRows] = useState<Record<string, any>[]>([])
@@ -659,10 +662,6 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                   <h2 className="text-lg font-bold text-slate-800">Sequence Steps</h2>
                   <p className="text-sm text-slate-400 font-medium">Configure delays for your automated LinkedIn outreach steps.</p>
                 </div>
-                <button type="button" onClick={addStep} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700">
-                  <Plus className="h-4 w-4" />
-                  Add Step
-                </button>
               </div>
 
               <div className="space-y-4">
@@ -683,11 +682,6 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                             </span>
                           )}
                         </div>
-                        {index > 1 && (
-                          <button type="button" onClick={() => removeStep(index)} className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 bg-red-50 text-red-600 transition hover:bg-red-100">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
                       </div>
                       <div className="grid gap-4 md:grid-cols-[220px_1fr_180px]">
                         <div className="space-y-2">
