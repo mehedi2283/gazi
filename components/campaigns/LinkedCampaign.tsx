@@ -135,9 +135,9 @@ function getSequenceError(steps: SequenceStep[]) {
     const currentHours = getStepDelayInHours(step, index)
     const previousHours = getStepDelayInHours(steps[index - 1], index - 1)
 
-    if (currentHours <= previousHours) {
+    if (currentHours < previousHours) {
       const prevStepLabel = index - 1 === 1 ? '3 hours' : `${steps[index - 1].delay ?? steps[index - 1].day_delay} ${steps[index - 1].delay_unit || 'days'}`
-      return `Step ${index + 1} delay must be greater than Step ${index} (${prevStepLabel}).`
+      return `Step ${index + 1} delay must be at least ${prevStepLabel}.`
     }
   }
 
@@ -855,7 +855,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                           )}
                         </div>
                       </div>
-                      <div className="grid gap-4 md:grid-cols-[220px_1fr_180px]">
+                      <div className="grid gap-4 md:grid-cols-[220px_1fr_220px]">
                         <div className="space-y-2">
                           <span className="text-sm font-semibold text-slate-700">Step Type</span>
                           <span className="flex h-12 w-full items-center rounded-2xl border border-indigo-200 bg-indigo-50 px-4 text-sm font-bold text-indigo-700 shadow-sm">
@@ -872,28 +872,47 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                         </div>
                         <div className="space-y-2">
                           <span className="text-sm font-semibold text-slate-700">Delay</span>
-                          {index === 1 ? (
+                          {isConnectionRequest ? (
+                            <span className="flex h-12 w-full items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-500 shadow-inner">
+                              0 Days
+                            </span>
+                          ) : index === 1 ? (
                             <span className="flex h-12 w-full items-center rounded-2xl border border-slate-200 bg-slate-50 px-4 text-sm font-semibold text-slate-500 shadow-inner">
                               3 Hours
                             </span>
                           ) : (
-                            <div className="flex gap-2">
+                            <div className="flex h-12 items-center rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden transition-all focus-within:border-indigo-500 focus-within:ring-4 focus-within:ring-indigo-500/10">
                               <input
                                 type="number"
                                 min={step.delay_unit === 'hours' ? 3 : 1}
                                 value={step.delay !== undefined ? step.delay : step.day_delay}
-                                disabled={isRequiredZeroDelayStep}
                                 onChange={(event) => updateDelayValue(index, event.target.value)}
-                                className={`${FIELD_CLASS} flex-1`}
+                                className="h-full w-16 border-none bg-transparent px-4 text-sm font-semibold text-slate-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                               />
-                              <select
-                                value={step.delay_unit || 'days'}
-                                onChange={(event) => updateDelayUnit(index, event.target.value as 'days' | 'hours')}
-                                className={`${FIELD_CLASS} w-28`}
-                              >
-                                <option value="days">Days</option>
-                                <option value="hours">Hours</option>
-                              </select>
+                              <div className="ml-auto flex h-8 items-center gap-0.5 rounded-xl bg-slate-100 p-0.5 mr-2">
+                                <button
+                                  type="button"
+                                  onClick={() => updateDelayUnit(index, 'days')}
+                                  className={`flex h-7 items-center rounded-lg px-3 text-xs font-bold transition-all ${
+                                    (step.delay_unit || 'days') === 'days'
+                                      ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60'
+                                      : 'text-slate-500 hover:text-slate-700'
+                                  }`}
+                                >
+                                  Days
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateDelayUnit(index, 'hours')}
+                                  className={`flex h-7 items-center rounded-lg px-3 text-xs font-bold transition-all ${
+                                    step.delay_unit === 'hours'
+                                      ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60'
+                                      : 'text-slate-500 hover:text-slate-700'
+                                  }`}
+                                >
+                                  Hours
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>

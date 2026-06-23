@@ -237,9 +237,9 @@ function getLinkedInSequenceError(steps: CombinedLinkedInStep[]) {
     const currentHours = getCombinedLinkedInStepDelayInHours(step, index)
     const previousHours = getCombinedLinkedInStepDelayInHours(steps[index - 1], index - 1)
 
-    if (currentHours <= previousHours) {
+    if (currentHours < previousHours) {
       const prevStepLabel = index - 1 === 1 ? '3 hours' : `${steps[index - 1].delay ?? steps[index - 1].day_delay} ${steps[index - 1].delay_unit || 'days'}`
-      return `LinkedIn Step ${index + 1} delay must be greater than Step ${index} (${prevStepLabel}).`
+      return `LinkedIn Step ${index + 1} delay must be at least ${prevStepLabel}.`
     }
   }
 
@@ -2096,7 +2096,7 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                         </div>
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-[220px_1fr_180px]">
+                      <div className="grid gap-4 md:grid-cols-[220px_1fr_220px]">
                         <div className="space-y-2">
                           <span className="text-sm font-semibold text-slate-700">Step Type</span>
                           <span className="inline-flex min-h-10 w-full items-center rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700 shadow-sm">
@@ -2115,28 +2115,47 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
 
                         <div className="space-y-2">
                           <span className="text-sm font-semibold text-slate-700">Delay</span>
-                          {index === 1 ? (
+                          {isConnectionRequest ? (
+                            <span className="inline-flex min-h-10 w-full items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500 shadow-sm">
+                              0 Days
+                            </span>
+                          ) : index === 1 ? (
                             <span className="inline-flex min-h-10 w-full items-center rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-500 shadow-sm">
                               3 Hours
                             </span>
                           ) : (
-                            <div className="flex gap-2">
+                            <div className="flex min-h-10 items-center rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden transition-all focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500/20">
                               <input
                                 type="number"
                                 min={step.delay_unit === 'hours' ? 3 : 1}
                                 value={step.delay !== undefined ? step.delay : step.day_delay}
-                                disabled={isConnectionRequest}
                                 onChange={(event) => updateCombinedLinkedInDelayValue(index, event.target.value)}
-                                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400 flex-1"
+                                className="h-full w-14 border-none bg-transparent px-3 py-2 text-sm font-medium text-slate-900 outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                               />
-                              <select
-                                value={step.delay_unit || 'days'}
-                                onChange={(event) => updateCombinedLinkedInDelayUnit(index, event.target.value as 'days' | 'hours')}
-                                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium w-28"
-                              >
-                                <option value="days">Days</option>
-                                <option value="hours">Hours</option>
-                              </select>
+                              <div className="ml-auto flex h-7 items-center gap-0.5 rounded-lg bg-slate-100 p-0.5 mr-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => updateCombinedLinkedInDelayUnit(index, 'days')}
+                                  className={`flex h-6 items-center rounded-md px-2.5 text-[11px] font-bold transition-all ${
+                                    (step.delay_unit || 'days') === 'days'
+                                      ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60'
+                                      : 'text-slate-500 hover:text-slate-700'
+                                  }`}
+                                >
+                                  Days
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateCombinedLinkedInDelayUnit(index, 'hours')}
+                                  className={`flex h-6 items-center rounded-md px-2.5 text-[11px] font-bold transition-all ${
+                                    step.delay_unit === 'hours'
+                                      ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200/60'
+                                      : 'text-slate-500 hover:text-slate-700'
+                                  }`}
+                                >
+                                  Hours
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
