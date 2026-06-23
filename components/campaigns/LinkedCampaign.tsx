@@ -14,6 +14,8 @@ type Tab = typeof TABS[number]
 
 type SequenceStep = {
   day_delay: number
+  delay?: number
+  delay_unit?: 'days' | 'hours'
   step_type: StepType
   message: string
 }
@@ -103,19 +105,40 @@ function formatTimeLabel(value: string) {
   return `${hours12}:${minutes} ${period}`
 }
 
+function getStepDelayInHours(step: SequenceStep, index: number): number {
+  if (index === 0) return 0
+  if (index === 1) return 3 // step 1 is fixed to 3 hours
+  const unit = step.delay_unit || 'days'
+  const val = step.delay !== undefined ? step.delay : step.day_delay
+  return unit === 'days' ? val * 24 : val
+}
+
 function getSequenceError(steps: SequenceStep[]) {
   if (steps.length !== 5) return 'Sequence must have exactly 1 connection request and 4 follow-up messages.'
   if (steps[0]?.step_type !== 'connection_request') return 'The first sequence step must be a connection request.'
   if (steps[1]?.step_type !== 'follow_up_message') return 'The second sequence step must be a follow-up message.'
   if (steps[0]?.day_delay !== 0) return 'Connection request day delay must be 0.'
-  if (steps[1]?.day_delay !== 0) return 'First follow-up day delay must be 0.'
 
   for (let index = 2; index < steps.length; index += 1) {
-    const current = steps[index]?.day_delay
-    const previous = steps[index - 1]?.day_delay
+    const step = steps[index]
+    const val = step.delay !== undefined ? step.delay : step.day_delay
+    const unit = step.delay_unit || 'days'
 
-    if (!Number.isFinite(current) || current < 0) return `Step ${index + 1} day must be 0 or greater.`
-    if (current <= previous) return `Step ${index + 1} day must be greater than Step ${index}.`
+    if (!Number.isFinite(val) || val < 0) {
+      return `Step ${index + 1} delay must be 0 or greater.`
+    }
+
+    if (unit === 'hours' && val < 3) {
+      return `Step ${index + 1} delay must be at least 3 hours.`
+    }
+
+    const currentHours = getStepDelayInHours(step, index)
+    const previousHours = getStepDelayInHours(steps[index - 1], index - 1)
+
+    if (currentHours <= previousHours) {
+      const prevStepLabel = index - 1 === 1 ? '3 hours' : `${steps[index - 1].delay ?? steps[index - 1].day_delay} ${steps[index - 1].delay_unit || 'days'}`
+      return `Step ${index + 1} delay must be greater than Step ${index} (${prevStepLabel}).`
+    }
   }
 
   return ''
@@ -162,11 +185,11 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     linkedin_profile_url: ''
   })
   const [steps, setSteps] = useState<SequenceStep[]>([
-    { day_delay: 0, step_type: 'connection_request', message: '' },
-    { day_delay: 0, step_type: 'follow_up_message', message: getMessageVariable(2) },
-    { day_delay: 1, step_type: 'follow_up_message', message: getMessageVariable(3) },
-    { day_delay: 2, step_type: 'follow_up_message', message: getMessageVariable(4) },
-    { day_delay: 3, step_type: 'follow_up_message', message: getMessageVariable(5) }
+    { day_delay: 0, delay: 0, delay_unit: 'days', step_type: 'connection_request', message: '' },
+    { day_delay: 0, delay: 3, delay_unit: 'hours', step_type: 'follow_up_message', message: getMessageVariable(2) },
+    { day_delay: 1, delay: 1, delay_unit: 'days', step_type: 'follow_up_message', message: getMessageVariable(3) },
+    { day_delay: 2, delay: 2, delay_unit: 'days', step_type: 'follow_up_message', message: getMessageVariable(4) },
+    { day_delay: 3, delay: 3, delay_unit: 'days', step_type: 'follow_up_message', message: getMessageVariable(5) }
   ])
   const [leadMode, setLeadMode] = useState<LeadSource>('external')
   const [leadRows, setLeadRows] = useState<Record<string, any>[]>([])
@@ -242,13 +265,40 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     }))
   }
 
-  function updateDelay(index: number, value: string) {
+  function updateDelayValue(index: number, value: string) {
     setSteps((current) => current.map((step, stepIndex) => {
       if (stepIndex !== index) return step
-      if (stepIndex <= 1) return { ...step, day_delay: 0 }
-      const minimum = (current[stepIndex - 1]?.day_delay ?? 0) + 1
       const parsed = Number(value)
-      return { ...step, day_delay: Number.isFinite(parsed) ? Math.max(minimum, parsed) : minimum }
+      const val = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
+      const unit = step.delay_unit || 'days'
+      const dayDelay = unit === 'days' ? val : Math.floor(val / 24)
+
+      return {
+        ...step,
+        delay: val,
+        day_delay: dayDelay
+      }
+    }))
+  }
+
+  function updateDelayUnit(index: number, unit: 'days' | 'hours') {
+    setSteps((current) => current.map((step, stepIndex) => {
+      if (stepIndex !== index) return step
+      const currentVal = step.delay !== undefined ? step.delay : step.day_delay
+      let val = currentVal
+      if (unit === 'hours' && val < 3) {
+        val = 3
+      } else if (unit === 'days' && val === 3 && step.delay_unit === 'hours') {
+        val = 1
+      }
+      const dayDelay = unit === 'days' ? val : Math.floor(val / 24)
+
+      return {
+        ...step,
+        delay_unit: unit,
+        delay: val,
+        day_delay: dayDelay
+      }
     }))
   }
 
@@ -403,8 +453,8 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
         step_type: index === 0 ? 'connection_request' : 'follow_up_message',
         message: getMessageVariable(index + 1),
         day_delay: index === 1 ? 0 : (index === 0 ? 0 : step.day_delay),
-        delay: index === 1 ? 3 : (index === 0 ? 0 : step.day_delay),
-        delay_unit: index === 1 ? 'hours' : 'days'
+        delay: index === 1 ? 3 : (index === 0 ? 0 : (step.delay !== undefined ? step.delay : step.day_delay)),
+        delay_unit: index === 1 ? 'hours' : (index === 0 ? 'days' : (step.delay_unit || 'days'))
       })),
       lead_source: leadMode,
       lead_request: leadMode === 'external'
@@ -827,14 +877,24 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                               3 Hours
                             </span>
                           ) : (
-                            <input
-                              type="number"
-                              min={isRequiredZeroDelayStep ? 0 : (steps[index - 1]?.day_delay ?? 0) + 1}
-                              value={isRequiredZeroDelayStep ? 0 : step.day_delay}
-                              disabled={isRequiredZeroDelayStep}
-                              onChange={(event) => updateDelay(index, event.target.value)}
-                              className={FIELD_CLASS}
-                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                min={step.delay_unit === 'hours' ? 3 : 1}
+                                value={step.delay !== undefined ? step.delay : step.day_delay}
+                                disabled={isRequiredZeroDelayStep}
+                                onChange={(event) => updateDelayValue(index, event.target.value)}
+                                className={`${FIELD_CLASS} flex-1`}
+                              />
+                              <select
+                                value={step.delay_unit || 'days'}
+                                onChange={(event) => updateDelayUnit(index, event.target.value as 'days' | 'hours')}
+                                className={`${FIELD_CLASS} w-28`}
+                              >
+                                <option value="days">Days</option>
+                                <option value="hours">Hours</option>
+                              </select>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -863,7 +923,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                           <td className="px-4 py-2.5 font-semibold text-slate-700">{index === 0 ? 'Connection Request' : `Follow-up ${index}`}</td>
                           <td className="px-4 py-2.5 text-slate-600 font-medium">{index === 0 ? 'Connection Request' : 'Follow-up Message'}</td>
                           <td className="px-4 py-2.5 text-indigo-650 font-bold font-mono">
-                            {index === 0 ? '0 days' : index === 1 ? '3 hours' : `${step.day_delay} days`}
+                            {index === 0 ? '0 days' : index === 1 ? '3 hours' : `${step.delay !== undefined ? step.delay : step.day_delay} ${step.delay_unit || 'days'}`}
                           </td>
                           <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{index === 0 ? 'AI-generated personalized connection request' : 'AI-generated personalized follow-up message'}</td>
                         </tr>

@@ -209,17 +209,38 @@ function getSequenceError(steps: SequenceStep[]) {
   return ''
 }
 
+function getCombinedLinkedInStepDelayInHours(step: CombinedLinkedInStep, index: number): number {
+  if (index === 0) return 0
+  if (index === 1) return 3 // step 1 is fixed to 3 hours
+  const unit = step.delay_unit || 'days'
+  const val = step.delay !== undefined ? step.delay : step.day_delay
+  return unit === 'days' ? val * 24 : val
+}
+
 function getLinkedInSequenceError(steps: CombinedLinkedInStep[]) {
   if (steps.length !== 5) return 'LinkedIn sequence must have exactly 1 connection request and 4 follow-up messages.'
   if (steps[0]?.day_delay !== 0) return 'LinkedIn connection request day delay must be 0.'
-  if (steps[1]?.day_delay !== 0) return 'LinkedIn first follow-up day delay must be 0.'
 
   for (let index = 2; index < steps.length; index += 1) {
-    const current = steps[index]?.day_delay
-    const previous = steps[index - 1]?.day_delay
+    const step = steps[index]
+    const val = step.delay !== undefined ? step.delay : step.day_delay
+    const unit = step.delay_unit || 'days'
 
-    if (!Number.isFinite(current) || current < 0) return `LinkedIn Step ${index + 1} day must be 0 or greater.`
-    if (current <= previous) return `LinkedIn Step ${index + 1} day must be greater than Step ${index}.`
+    if (!Number.isFinite(val) || val < 0) {
+      return `LinkedIn Step ${index + 1} delay must be 0 or greater.`
+    }
+
+    if (unit === 'hours' && val < 3) {
+      return `LinkedIn Step ${index + 1} delay must be at least 3 hours.`
+    }
+
+    const currentHours = getCombinedLinkedInStepDelayInHours(step, index)
+    const previousHours = getCombinedLinkedInStepDelayInHours(steps[index - 1], index - 1)
+
+    if (currentHours <= previousHours) {
+      const prevStepLabel = index - 1 === 1 ? '3 hours' : `${steps[index - 1].delay ?? steps[index - 1].day_delay} ${steps[index - 1].delay_unit || 'days'}`
+      return `LinkedIn Step ${index + 1} delay must be greater than Step ${index} (${prevStepLabel}).`
+    }
   }
 
   return ''
@@ -253,6 +274,8 @@ type Tab = typeof TABS[number] | 'LinkedIn'
 
 type CombinedLinkedInStep = {
   day_delay: number
+  delay?: number
+  delay_unit?: 'days' | 'hours'
 }
 
 const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(function CampaignForm({ title, subtitle, submitLabel, mode, channel = 'email', hideSubmit = false, initialData, onSubmit }, ref) {
@@ -345,11 +368,11 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
   })
   const [combinedLinkedInActionGap, setCombinedLinkedInActionGap] = useState(String(initialData?.email_gap ?? 10))
   const [combinedLinkedInSteps, setCombinedLinkedInSteps] = useState<CombinedLinkedInStep[]>([
-    { day_delay: 0 },
-    { day_delay: 0 },
-    { day_delay: 1 },
-    { day_delay: 2 },
-    { day_delay: 3 }
+    { day_delay: 0, delay: 0, delay_unit: 'days' },
+    { day_delay: 0, delay: 3, delay_unit: 'hours' },
+    { day_delay: 1, delay: 1, delay_unit: 'days' },
+    { day_delay: 2, delay: 2, delay_unit: 'days' },
+    { day_delay: 3, delay: 3, delay_unit: 'days' }
   ])
 
   // Fetch email accounts from Supabase
@@ -499,16 +522,18 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
     if (initialData?.combined_linkedin?.sequences?.length) {
       setCombinedLinkedInSteps(
         initialData.combined_linkedin.sequences.map((sequence: any, index: number) => ({
-          day_delay: index <= 1 ? 0 : Number(sequence.day_delay ?? index)
+          day_delay: index <= 1 ? 0 : Number(sequence.day_delay ?? index),
+          delay: sequence.delay !== undefined ? Number(sequence.delay) : (index <= 1 ? (index === 1 ? 3 : 0) : Number(sequence.day_delay ?? index)),
+          delay_unit: sequence.delay_unit || (index === 1 ? 'hours' : 'days')
         }))
       )
     } else {
       setCombinedLinkedInSteps([
-        { day_delay: 0 },
-        { day_delay: 0 },
-        { day_delay: 1 },
-        { day_delay: 2 },
-        { day_delay: 3 }
+        { day_delay: 0, delay: 0, delay_unit: 'days' },
+        { day_delay: 0, delay: 3, delay_unit: 'hours' },
+        { day_delay: 1, delay: 1, delay_unit: 'days' },
+        { day_delay: 2, delay: 2, delay_unit: 'days' },
+        { day_delay: 3, delay: 3, delay_unit: 'days' }
       ])
     }
     setAttachmentUrl(initialData?.attachment_url || '')
@@ -660,16 +685,39 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
     ))
   }
 
-  function updateCombinedLinkedInDelay(index: number, value: string) {
+  function updateCombinedLinkedInDelayValue(index: number, value: string) {
     setCombinedLinkedInSteps((current) => current.map((step, stepIndex) => {
       if (stepIndex !== index) return step
-      if (stepIndex === 0) return { day_delay: 0 }
-
-      const minimum = (current[stepIndex - 1]?.day_delay ?? 0) + 1
-      const nextValue = Number(value)
+      const parsed = Number(value)
+      const val = Number.isFinite(parsed) ? Math.max(0, parsed) : 0
+      const unit = step.delay_unit || 'days'
+      const dayDelay = unit === 'days' ? val : Math.floor(val / 24)
 
       return {
-        day_delay: Number.isFinite(nextValue) ? Math.max(minimum, nextValue) : minimum
+        ...step,
+        delay: val,
+        day_delay: dayDelay
+      }
+    }))
+  }
+
+  function updateCombinedLinkedInDelayUnit(index: number, unit: 'days' | 'hours') {
+    setCombinedLinkedInSteps((current) => current.map((step, stepIndex) => {
+      if (stepIndex !== index) return step
+      const currentVal = step.delay !== undefined ? step.delay : step.day_delay
+      let val = currentVal
+      if (unit === 'hours' && val < 3) {
+        val = 3
+      } else if (unit === 'days' && val === 3 && step.delay_unit === 'hours') {
+        val = 1
+      }
+      const dayDelay = unit === 'days' ? val : Math.floor(val / 24)
+
+      return {
+        ...step,
+        delay_unit: unit,
+        delay: val,
+        day_delay: dayDelay
       }
     }))
   }
@@ -1008,8 +1056,8 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
               step_type: index === 0 ? 'connection_request' : 'follow_up_message',
               message: getBodyVariable(index + 1),
               day_delay: index === 1 ? 0 : (index === 0 ? 0 : step.day_delay),
-              delay: index === 1 ? 3 : (index === 0 ? 0 : step.day_delay),
-              delay_unit: index === 1 ? 'hours' : 'days'
+              delay: index === 1 ? 3 : (index === 0 ? 0 : (step.delay !== undefined ? step.delay : step.day_delay)),
+              delay_unit: index === 1 ? 'hours' : (index === 0 ? 'days' : (step.delay_unit || 'days'))
             }))
           }
         } : {}),
@@ -2072,14 +2120,24 @@ const CampaignForm = React.forwardRef<CampaignFormHandle, CampaignFormProps>(fun
                               3 Hours
                             </span>
                           ) : (
-                            <input
-                              type="number"
-                              min={isConnectionRequest ? 0 : (combinedLinkedInSteps[index - 1]?.day_delay ?? 0) + 1}
-                              value={isConnectionRequest ? 0 : step.day_delay}
-                              disabled={isConnectionRequest}
-                              onChange={(event) => updateCombinedLinkedInDelay(index, event.target.value)}
-                              className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400"
-                            />
+                            <div className="flex gap-2">
+                              <input
+                                type="number"
+                                min={step.delay_unit === 'hours' ? 3 : 1}
+                                value={step.delay !== undefined ? step.delay : step.day_delay}
+                                disabled={isConnectionRequest}
+                                onChange={(event) => updateCombinedLinkedInDelayValue(index, event.target.value)}
+                                className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium disabled:bg-slate-50 disabled:text-slate-400 flex-1"
+                              />
+                              <select
+                                value={step.delay_unit || 'days'}
+                                onChange={(event) => updateCombinedLinkedInDelayUnit(index, event.target.value as 'days' | 'hours')}
+                                className="rounded-md border border-slate-200 bg-white px-3 py-2 text-slate-850 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/20 shadow-sm font-medium w-28"
+                              >
+                                <option value="days">Days</option>
+                                <option value="hours">Hours</option>
+                              </select>
+                            </div>
                           )}
                         </div>
                       </div>
