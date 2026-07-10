@@ -180,10 +180,47 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     report_email: '',
     company: '',
     location: '',
+    address: '',
     booking_calendar_link: '',
     company_details: '',
     linkedin_profile_url: ''
   })
+  const [clientEmail, setClientEmail] = useState('')
+  const [calendlyToken, setCalendlyToken] = useState('')
+  const [existingTokens, setExistingTokens] = useState<Array<{ token: string; campaign_name: string }>>([])
+  const [loadingTokens, setLoadingTokens] = useState(false)
+  const [useExistingToken, setUseExistingToken] = useState(false)
+  const [verifyingToken, setVerifyingToken] = useState(false)
+
+  // Lookup existing tokens when client email changes
+  useEffect(() => {
+    const email = clientEmail.trim().toLowerCase()
+    if (!email || !email.includes('@')) {
+      setExistingTokens([])
+      return
+    }
+
+    const timeout = setTimeout(async () => {
+      setLoadingTokens(true)
+      try {
+        const res = await fetch(`/api/campaigns/tokens?client_email=${encodeURIComponent(email)}`)
+        const json = await res.json()
+
+        if (json.data && json.data.length > 0) {
+          setExistingTokens(json.data)
+        } else {
+          setExistingTokens([])
+        }
+      } catch {
+        setExistingTokens([])
+      } finally {
+        setLoadingTokens(false)
+      }
+    }, 500)
+
+    return () => clearTimeout(timeout)
+  }, [clientEmail])
+
   const [steps, setSteps] = useState<SequenceStep[]>([
     { day_delay: 0, delay: 0, delay_unit: 'days', step_type: 'connection_request', message: '' },
     { day_delay: 0, delay: 3, delay_unit: 'hours', step_type: 'follow_up_message', message: getMessageVariable(2) },
@@ -402,7 +439,7 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
     const requiredError =
       !name.trim() ? 'Campaign name is required' :
       !campaignOwner.company_name.trim() || !campaignOwner.created_from_company.trim() ? 'Campaign owner details are required' :
-      !senderInfo.name.trim() || !senderInfo.company.trim() || !senderInfo.location.trim() || !senderInfo.booking_calendar_link.trim() ? 'Complete sender profile details are required' :
+      !senderInfo.name.trim() || !senderInfo.company.trim() || !senderInfo.location.trim() || !senderInfo.address.trim() || !senderInfo.booking_calendar_link.trim() || !calendlyToken.trim() || !clientEmail.trim() ? 'Complete sender profile details are required (including Address, Calendly Token, and Client Email)' :
       !selectedHeyReachAccount ? 'Add a verified HeyReach account before launching' :
       leadMode === 'external' && (!externalLead.market_name.trim() || !externalLead.product_name.trim()) ? 'Country and product name are required for External lead creation' :
       leadMode === 'import' && !leadRows.length ? 'Upload a CSV or spreadsheet before launching imported LinkedIn leads' :
@@ -425,6 +462,27 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
       return
     }
 
+    // Verify Calendly Token
+    setVerifyingToken(true)
+    try {
+      const verifyRes = await fetch('/api/calendly/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: calendlyToken.trim() })
+      })
+      const verifyJson = await verifyRes.json()
+      if (!verifyRes.ok || !verifyJson.ok) {
+        throw new Error(verifyJson.error || 'This Calendly token is not available for use or expired')
+      }
+    } catch (err: any) {
+      setError(err?.message || 'This Calendly token is not available for use or expired')
+      setVerifyingToken(false)
+      setSubmitting(false)
+      return
+    } finally {
+      setVerifyingToken(false)
+    }
+
     const payload = {
       campaign_name: name.trim(),
       target_lead_count: Number(targetLeadCount || 0),
@@ -441,11 +499,12 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
       report_email: senderInfo.report_email.trim(),
       company: senderInfo.company.trim(),
       location: senderInfo.location.trim(),
-      client_email: null,
-      calendly_token: null,
+      client_email: clientEmail.trim() || null,
+      calendly_token: calendlyToken.trim() || null,
       booking_calendar_link: senderInfo.booking_calendar_link.trim(),
       company_details: senderInfo.company_details.trim(),
       linkedin_profile_url: '',
+      address: senderInfo.address.trim(),
       heyreach_account_id: selectedHeyReachAccount?.id || null,
       heyreach_account: selectedHeyReachAccount,
       sequences: steps.map((step, index) => ({
@@ -812,9 +871,75 @@ const LinkedCampaign = React.forwardRef<LinkedCampaignHandle, LinkedCampaignProp
                   <input value={senderInfo.location} onChange={(event) => setSenderField('location', event.target.value)} className={FIELD_CLASS} placeholder="City, Country" />
                 </label>
                 <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Address</span>
+                  <input value={senderInfo.address} onChange={(event) => setSenderField('address', event.target.value)} className={FIELD_CLASS} placeholder="Street address" />
+                </label>
+                <label className="space-y-2">
                   <span className="text-sm font-semibold text-slate-700">Booking Calendar Link</span>
                   <input value={senderInfo.booking_calendar_link} onChange={(event) => setSenderField('booking_calendar_link', event.target.value)} className={FIELD_CLASS} placeholder="https://cal.com/..." />
                 </label>
+                <label className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Client Email</span>
+                  <input
+                    type="email"
+                    value={clientEmail}
+                    onChange={(event) => {
+                      setClientEmail(event.target.value)
+                      setUseExistingToken(false)
+                    }}
+                    className={FIELD_CLASS}
+                    placeholder="client@email.com"
+                  />
+                </label>
+                <div className="space-y-2">
+                  <span className="text-sm font-semibold text-slate-700">Calendly Token</span>
+                  {loadingTokens ? (
+                    <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-500">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Looking up existing tokens…
+                    </div>
+                  ) : existingTokens.length > 0 && !useExistingToken ? (
+                    <div className="space-y-2">
+                      <select
+                        value={calendlyToken}
+                        onChange={(event) => {
+                          setCalendlyToken(event.target.value)
+                          if (event.target.value === '__new__') {
+                            setCalendlyToken('')
+                            setUseExistingToken(true)
+                          }
+                        }}
+                        className={FIELD_CLASS}
+                      >
+                        <option value="">Select an existing token</option>
+                        {existingTokens.map((item, idx) => (
+                          <option key={idx} value={item.token}>
+                            {item.token.slice(0, 20)}… — from "{item.campaign_name}"
+                          </option>
+                        ))}
+                        <option value="__new__">＋ Enter a new token</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <input
+                        value={calendlyToken}
+                        onChange={(event) => setCalendlyToken(event.target.value)}
+                        className={FIELD_CLASS}
+                        placeholder="Enter Calendly Token"
+                      />
+                      {existingTokens.length > 0 && useExistingToken && (
+                        <button
+                          type="button"
+                          onClick={() => { setUseExistingToken(false); setCalendlyToken('') }}
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors"
+                        >
+                          ← Back to existing tokens
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <label className="space-y-2 md:col-span-2">
                   <span className="text-sm font-semibold text-slate-700">Company Details</span>
                   <textarea value={senderInfo.company_details} onChange={(event) => setSenderField('company_details', event.target.value)} className={TEXTAREA_CLASS} placeholder="Describe your company, offer, and relevant context." />

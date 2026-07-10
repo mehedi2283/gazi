@@ -73,7 +73,7 @@ async function saveLinkedInCampaign(payload: any, auth: { userId: string; organi
       sender_company: payload.company || null,
       sender_company_details: payload.company_details || null,
       location: payload.location || null,
-      sender_address: payload.linkedin_profile_url || null,
+      sender_address: payload.address || payload.sender_address || payload.linkedin_profile_url || null,
       created_at: nowIso,
       updated_at: nowIso
     }])
