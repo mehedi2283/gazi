@@ -54,8 +54,12 @@ export async function sendLeadsToWebhook(payload: unknown) {
   return postWebhook(LEAD_WEBHOOK_URL, payload, 'Webhook')
 }
 
-export async function sendLinkedInLeadsToWebhook(payload: unknown) {
-  const response = await fetch(LINKEDIN_WEBHOOK_URL, {
+const DEFAULT_LINKEDIN_EXTERNAL_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/apollo-to-linkedin'
+const LINKEDIN_EXTERNAL_WEBHOOK_URL = process.env.LINKEDIN_EXTERNAL_WEBHOOK_URL || DEFAULT_LINKEDIN_EXTERNAL_WEBHOOK_URL
+
+export async function sendLinkedInLeadsToWebhook(payload: any) {
+  const url = payload?.lead_source === 'external' ? LINKEDIN_EXTERNAL_WEBHOOK_URL : LINKEDIN_WEBHOOK_URL
+  const response = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
