@@ -1,8 +1,7 @@
 const DEFAULT_LEAD_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/88e7c5d9-6015-4ade-86af-03fc2b7b1c90'
-const DEFAULT_LINKEDIN_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/82832488-69e1-4511-bda8-04832c03be10'
 const LEAD_WEBHOOK_URL = process.env.LEADS_WEBHOOK_URL || DEFAULT_LEAD_WEBHOOK_URL
-const LINKEDIN_WEBHOOK_URL = process.env.LINKEDIN_WEBHOOK_URL || DEFAULT_LINKEDIN_WEBHOOK_URL
 const IMPORT_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/22d3c430-9fa6-4c17-893b-a2e2a6d4e090'
+const LINKEDIN_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/82832488-69e1-4511-bda8-04832c03be10'
 const WEBHOOK_ACK_TIMEOUT_MS = 15000
 
 type LeadPayload = {
@@ -54,8 +53,7 @@ export async function sendLeadsToWebhook(payload: unknown) {
   return postWebhook(LEAD_WEBHOOK_URL, payload, 'Webhook')
 }
 
-const DEFAULT_LINKEDIN_EXTERNAL_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/apollo-to-linkedin'
-const LINKEDIN_EXTERNAL_WEBHOOK_URL = process.env.LINKEDIN_EXTERNAL_WEBHOOK_URL || DEFAULT_LINKEDIN_EXTERNAL_WEBHOOK_URL
+const LINKEDIN_EXTERNAL_WEBHOOK_URL = 'https://gaziai.app.n8n.cloud/webhook/apollo-to-linkedin'
 
 export async function sendLinkedInLeadsToWebhook(payload: any) {
   const url = payload?.lead_source === 'external' ? LINKEDIN_EXTERNAL_WEBHOOK_URL : LINKEDIN_WEBHOOK_URL
